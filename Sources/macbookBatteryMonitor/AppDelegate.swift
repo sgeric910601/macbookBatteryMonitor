@@ -106,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
         registerLoginItemIfNeeded()
         runPanelSelfTestIfRequested()
+        runSizingSelfTestIfRequested()
         runUpdateSelfTestIfRequested()
     }
 
@@ -139,6 +140,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     /// 開發用：`--selftest-panel` 會打開面板（耗電排行分頁）20 秒後自動關閉，用來確認關閉後取樣會停
+    /// 開發用：`--selftest-sizing` 依序換頁，印出面板大小與內容的理想大小，確認 macOS 12 的面板會跟著內容調整
+    private func runSizingSelfTestIfRequested() {
+        guard CommandLine.arguments.contains("--selftest-sizing") else { return }
+        let steps: [(String, (AppDelegate) -> Void)] = [
+            ("打開主面板（詳細資訊）", { $0.ui.tab = .details; $0.showPopover(page: .main) }),
+            ("耗電／電量歷史", { $0.ui.tab = .history }),
+            ("設定頁", { $0.ui.page = .settings }),
+            ("顯示項目", { $0.ui.page = .displayItems }),
+            ("回到主面板", { $0.ui.page = .main }),
+        ]
+        for (index, step) in steps.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3 + Double(index) * 4) { [weak self] in
+                guard let self else { return }
+                step.1(self)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    let content = (self?.popover?.contentViewController as? NSHostingController<RootView>)?
+                        .sizeThatFits(in: NSSize(width: 380, height: 100_000)) ?? .zero
+                    let size = self?.popover?.contentSize ?? .zero
+                    let fits = abs(content.height - size.height) < 2 && abs(content.width - size.width) < 2
+                    print("selftest-sizing: \(step.0) 面板 \(Int(size.width))×\(Int(size.height)) 內容 \(Int(content.width))×\(Int(content.height)) \(fits ? "一致" : "不一致")")
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3 + Double(steps.count) * 4) { [weak self] in
+            self?.popover?.performClose(nil)
+            print("selftest-sizing: 結束")
+            fflush(stdout)
+        }
+    }
+
     private func runPanelSelfTestIfRequested() {
         let hardware = CommandLine.arguments.contains("--selftest-hardware")
         guard hardware || CommandLine.arguments.contains("--selftest-panel") else { return }
@@ -379,7 +410,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.chargeLimit.panelOpened()
         refresh()
         // 面板每次打開才建立、關掉就釋放，關著時不會有任何 SwiftUI 畫面在背景更新
-        let hosting = SizingHostingController(rootView: RootView(store: store, settings: settings, ui: ui))
+        let hosting = SizingHostingController(rootView: RootView(store: store, settings: settings, ui: ui), changes: [
+            ui.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            store.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            settings.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+        ])
         let popover = NSPopover()
         popover.behavior = store.adminCPU.authorizing ? .applicationDefined : .transient
         popover.delegate = self

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// 系統監控模組的選單列圖示、定時取樣與面板
@@ -195,7 +196,14 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
                                     self?.popover?.performClose(nil)
                                     self?.openSettings?()
                                 })
-        let hosting = SizingHostingController(rootView: root)
+        let changes: AnyPublisher<Void, Never>
+        switch kind {
+        case .cpu: changes = cpu.objectWillChange.map { _ in }.eraseToAnyPublisher()
+        case .memory: changes = memory.objectWillChange.map { _ in }.eraseToAnyPublisher()
+        case .disk: changes = disk.objectWillChange.map { _ in }.eraseToAnyPublisher()
+        case .network: changes = network.objectWillChange.map { _ in }.eraseToAnyPublisher()
+        }
+        let hosting = SizingHostingController(rootView: root, changes: [changes])
         let popover = NSPopover()
         popover.behavior = .transient
         popover.delegate = self

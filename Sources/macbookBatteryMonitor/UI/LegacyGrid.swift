@@ -45,7 +45,7 @@ struct PairRows: View {
     private func cell(_ pair: Pair, labelWidth: CGFloat) -> some View {
         HStack(spacing: spacing) {
             Text(pair.label).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .leading)
-            Text(pair.value).monospacedDigit().frame(maxWidth: .infinity, alignment: .leading)
+            Text(pair.value).monospacedDigit().minimumScaleFactor(0.7).frame(maxWidth: .infinity, alignment: .leading)
         }
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)

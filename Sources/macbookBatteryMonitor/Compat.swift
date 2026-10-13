@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 // 舊系統版本（macOS 12 起）用的相容寫法：主版本用到的 macOS 13／14 API，在這裡依系統版本分流
@@ -33,11 +34,20 @@ extension NSApplication {
 }
 
 /// macOS 13 起可以設 sizingOptions，讓面板跟著 SwiftUI 內容大小改變；
-/// macOS 12 沒有，每次排版後用內容的理想大小更新 preferredContentSize，面板才會跟著換頁變大變小
+/// macOS 12 沒有，內容可能改變時（換頁、換分頁、資料更新）重新問 SwiftUI 內容的理想大小並更新 preferredContentSize。
+/// 不能用 view.fittingSize：面板打開後它會被現有的約束綁住，回報的是目前的大小
 final class SizingHostingController<Content: View>: NSHostingController<Content> {
-    override init(rootView: Content) {
+    private var subscriptions: [AnyCancellable] = []
+    private var pending = false
+
+    /// - Parameter changes: 內容可能改變大小的通知（例如 PanelState、BatteryStore 的 objectWillChange）
+    init(rootView: Content, changes: [AnyPublisher<Void, Never>] = []) {
         super.init(rootView: rootView)
-        if #available(macOS 13, *), !Compat.forceMacOS12Paths { sizingOptions = [.preferredContentSize] }
+        if #available(macOS 13, *), !Compat.forceMacOS12Paths {
+            sizingOptions = [.preferredContentSize]
+            return
+        }
+        subscriptions = changes.map { $0.sink { [weak self] in self?.scheduleResize() } }
     }
 
     @available(*, unavailable)
@@ -46,8 +56,22 @@ final class SizingHostingController<Content: View>: NSHostingController<Content>
     override func viewDidLayout() {
         super.viewDidLayout()
         if #available(macOS 13, *), !Compat.forceMacOS12Paths { return }
-        let size = view.fittingSize
-        if size.width > 0, size.height > 0, preferredContentSize != size { preferredContentSize = size }
+        scheduleResize()
+    }
+
+    /// objectWillChange 在資料改變之前發出，等下一輪再量，同一輪的多次通知只量一次
+    private func scheduleResize() {
+        guard !pending else { return }
+        pending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            pending = false
+            let ideal = sizeThatFits(in: NSSize(width: max(view.frame.width, 1), height: 100_000))
+            let size = NSSize(width: ceil(ideal.width), height: ceil(ideal.height))
+            guard size.width > 0, size.height > 0,
+                  abs(size.width - preferredContentSize.width) > 0.5 || abs(size.height - preferredContentSize.height) > 0.5 else { return }
+            preferredContentSize = size
+        }
     }
 }
 

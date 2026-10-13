@@ -99,10 +99,14 @@ struct PeripheralsView: View {
                     levelColumn("右", device.right, threshold: threshold)
                     levelColumn("盒", device.caseLevel, threshold: 0)
                 }
+                // 三欄維持完整寬度（「100%」不換行、標籤不被擠掉），空間不夠時由左邊的名稱截斷
+                .fixedSize()
             } else {
                 Text(device.lowest.map { "\($0)%" } ?? "—")
                     .font(.callout.weight(.semibold))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(low ? Color.red : Color.primary)
             }
             Menu {

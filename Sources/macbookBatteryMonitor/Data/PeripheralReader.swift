@@ -160,7 +160,7 @@ final class PeripheralStore: ObservableObject {
     /// 截圖用的示範數據，不含使用者的真實設備
     func loadPreview(now: Date = Date()) {
         devices = [
-            PeripheralBattery(id: "preview-airpods", name: "AirPods Pro", kind: .headphones, left: 80, right: 76, caseLevel: 45),
+            PeripheralBattery(id: "preview-airpods", name: "AirPods Pro - 我的耳機", kind: .headphones, left: 100, right: 100, caseLevel: 70),
             PeripheralBattery(id: "preview-keyboard", name: "Magic Keyboard", kind: .keyboard, level: 88),
             PeripheralBattery(id: "preview-mouse", name: "Magic Mouse", kind: .mouse, level: 14),
         ]

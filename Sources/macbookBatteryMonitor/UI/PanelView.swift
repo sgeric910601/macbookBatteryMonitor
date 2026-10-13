@@ -88,7 +88,8 @@ struct PanelView: View {
             }
         }
         .padding(14)
-        .onAppear { store.setHardwareSampling(active: true) }
+        // 面板換成可捲動的版面時，SwiftUI 會重建內容，可能在面板關閉後才補發 onAppear：只有面板真的開著才開始取樣
+        .onAppear { if ui.isVisible { store.setHardwareSampling(active: true) } }
         .onDisappear { store.setHardwareSampling(active: false) }
     }
 
@@ -189,7 +190,7 @@ private struct TimeCard: View {
     /// 充電上限滑桿（支援調整的 Mac 才有），放在卡片最上方
     var chargeLimit: SystemChargeLimit?
     var planActive = false
-    /// 智慧充電列（支援調整充電上限的 Mac 才有），放在滑桿上方
+    /// 智慧充電（支援調整充電上限的 Mac 才有）：充電夥伴放在滑桿左邊，排程狀態放在滑桿下方
     var journey: ChargingJourneyPresentation?
     var appearance: ChargingAppearance = .companion
     var animated = false
@@ -201,11 +202,12 @@ private struct TimeCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
-                if let journey {
-                    ChargingJourneyView(presentation: journey, appearance: appearance, animated: animated, open: openPlan)
+                if let chargeLimit, let journey {
+                    ChargingJourneyView(presentation: journey, appearance: appearance, animated: animated, open: openPlan) {
+                        ChargeLimitSlider(control: chargeLimit, planActive: planActive)
+                    }
                     Divider()
-                }
-                if let chargeLimit {
+                } else if let chargeLimit {
                     ChargeLimitSlider(control: chargeLimit, planActive: planActive)
                     Divider()
                 }

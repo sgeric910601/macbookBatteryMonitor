@@ -15,7 +15,7 @@ struct ChargeLimitSlider: View {
                     control.setEditing(editing)
                 }
                 .controlSize(.small)
-                .help("與系統設定「電池」裡的充電上限是同一個設定，放開後套用")
+                .help(planActive ? "智慧充電正在調整這個上限；手動拖動會結束目前的排程" : "與系統設定「電池」裡的充電上限是同一個設定，放開後套用")
                 Text("\(control.shown)%")
                     .font(.callout.weight(.semibold))
                     .monospacedDigit()
@@ -40,7 +40,6 @@ struct ChargeLimitSlider: View {
 
     private var note: (text: String, warning: Bool)? {
         if case .failed(let message) = control.status { return (message, true) }
-        if planActive { return ("智慧充電正在調整這個上限；手動拖動會結束目前的排程。", false) }
         if !control.enabled, control.limit < 100 { return ("macOS 目前暫時沒有套用這個上限。", false) }
         return nil
     }

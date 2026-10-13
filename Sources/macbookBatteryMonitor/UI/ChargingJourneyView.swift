@@ -30,35 +30,35 @@ struct ChargingJourneyPresentation: Equatable {
     static func make(percent: Int, charging: Bool, decision: ChargingPlanDecision?, now: Date = Date()) -> ChargingJourneyPresentation {
         let progress = min(1, max(0, Double(percent) / 100))
         guard let decision else {
-            return .init(title: "智慧充電", detail: "指定時間前充到需要的電量，其餘時間維持保養上限",
+            return .init(title: "智慧充電", detail: "指定時間前充好，平常維持保養上限",
                          progress: progress, tint: .neutral, onPad: charging, badge: nil, animatedFlow: charging)
         }
         let deadline = time(decision.deadline, now: now)
+        let target = "\(decision.targetPercent)%"
         switch decision.phase {
         case .unsupported:
             return .init(title: "智慧充電", detail: "這台 Mac 不支援調整充電上限", progress: progress, tint: .neutral,
                          onPad: false, badge: nil, animatedFlow: false)
         case .unplugged:
-            return .init(title: "等待接上電源", detail: "目標 \(deadline) 前充到 \(decision.targetPercent)%", progress: progress,
+            return .init(title: "等待接上電源", detail: "\(deadline) 前充到 \(target)", progress: progress,
                          tint: .neutral, onPad: false, badge: nil, animatedFlow: false)
         case .waiting:
-            return .init(title: "保養中，等待開始充電",
-                         detail: "預計 \(time(decision.startAt, now: now)) 開始，\(deadline) 前充到 \(decision.targetPercent)%",
+            return .init(title: "等待開始", detail: "\(time(decision.startAt, now: now)) 開始充電，\(deadline) 前到 \(target)",
                          progress: progress, tint: .blue, onPad: false, badge: .sleeping, animatedFlow: false)
         case .starting:
-            return .init(title: "準備充電到 \(decision.targetPercent)%", detail: "目標 \(deadline) 完成", progress: progress,
+            return .init(title: "準備充電", detail: "\(deadline) 前到 \(target)", progress: progress,
                          tint: .blue, onPad: true, badge: nil, animatedFlow: false)
         case .charging:
-            return .init(title: "充電到 \(decision.targetPercent)%", detail: "約 \(duration(decision.requiredMinutes))後完成・目標 \(deadline)",
+            return .init(title: "充電中", detail: "約 \(duration(decision.requiredMinutes))後到 \(target)，目標 \(deadline)",
                          progress: progress, tint: .green, onPad: true, badge: nil, animatedFlow: true)
         case .systemPaused:
-            return .init(title: "macOS 暫停充電", detail: "仍以 \(deadline) 前充到 \(decision.targetPercent)% 為目標",
+            return .init(title: "macOS 暫停充電", detail: "目標 \(deadline) 前到 \(target)",
                          progress: progress, tint: .orange, onPad: true, badge: .paused, animatedFlow: false)
         case .ready:
-            return .init(title: "已準備好", detail: "已達 \(decision.targetPercent)%・目標 \(deadline)", progress: progress,
+            return .init(title: "已準備好", detail: "已達 \(target)", progress: progress,
                          tint: .green, onPad: false, badge: .ready, animatedFlow: false)
         case .late:
-            return .init(title: "可能無法準時", detail: "繼續充電中・原定 \(deadline) 前充到 \(decision.targetPercent)%",
+            return .init(title: "可能無法準時", detail: "繼續充電中，原定 \(deadline) 前到 \(target)",
                          progress: progress, tint: .orange, onPad: charging, badge: .late, animatedFlow: charging)
         }
     }
@@ -82,44 +82,59 @@ struct ChargingJourneyPresentation: Equatable {
     }
 }
 
-struct ChargingJourneyView: View {
+/// 充電上限滑桿加上智慧充電：左邊是充電夥伴（或電量條），右邊上方是滑桿、下方一兩行排程狀態，
+/// 點夥伴或狀態打開智慧充電頁。和滑桿放在同一列，主面板只比沒有智慧充電時高一點
+struct ChargingJourneyView<Control: View>: View {
     let presentation: ChargingJourneyPresentation
     let appearance: ChargingAppearance
     /// 面板開著、沒有省電模式時才播放動畫
     let animated: Bool
     let open: () -> Void
+    /// 充電上限滑桿
+    @ViewBuilder var control: Control
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Button(action: open) {
-            HStack(spacing: 10) {
-                if appearance == .companion {
-                    ChargingCompanion(onPad: presentation.onPad, badge: presentation.badge, tint: tint,
-                                      animated: animated && !reduceMotion)
-                        .frame(width: 60, height: 63)
-                } else {
-                    energyBar
-                        .frame(width: 58, height: 34)
+        HStack(alignment: .center, spacing: 10) {
+            Button(action: open) {
+                Group {
+                    if appearance == .companion {
+                        ChargingCompanion(onPad: presentation.onPad, badge: presentation.badge, tint: tint,
+                                          animated: animated && !reduceMotion)
+                            .frame(width: 48, height: 50)
+                    } else {
+                        energyBar
+                            .frame(width: 48, height: 34)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(presentation.title).font(.callout.weight(.semibold))
-                    Text(presentation.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .help("設定智慧充電")
+            .accessibilityLabel("設定智慧充電")
+            VStack(alignment: .leading, spacing: 3) {
+                control
+                Button(action: open) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        (Text(presentation.title).fontWeight(.semibold).foregroundColor(.primary)
+                            + Text("・" + presentation.detail).foregroundColor(.secondary))
+                            .font(.caption)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 2)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("設定智慧充電")
+                .accessibilityLabel("智慧充電，\(presentation.title)，\(presentation.detail)")
+            }
         }
-        .buttonStyle(.plain)
-        .help("設定智慧充電")
-        .accessibilityLabel("智慧充電，\(presentation.title)，\(presentation.detail)")
     }
 
     /// 電力流動：電量條，充電中有一個光點往右流
@@ -128,11 +143,11 @@ struct ChargingJourneyView: View {
             let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
             ZStack(alignment: .leading) {
                 Capsule().fill(tint.opacity(0.18)).frame(height: 8)
-                Capsule().fill(tint.opacity(0.8)).frame(width: max(8, 58 * presentation.progress), height: 8)
+                Capsule().fill(tint.opacity(0.8)).frame(width: max(8, 48 * presentation.progress), height: 8)
                 if animated && !reduceMotion && presentation.animatedFlow {
                     Circle().fill(.white).frame(width: 6, height: 6)
                         .shadow(color: tint, radius: 4)
-                        .offset(x: CGFloat(phase) * 50)
+                        .offset(x: CGFloat(phase) * 40)
                 }
                 Image(systemName: presentation.badge?.symbol ?? "bolt.fill")
                     .font(.system(size: 13, weight: .bold))

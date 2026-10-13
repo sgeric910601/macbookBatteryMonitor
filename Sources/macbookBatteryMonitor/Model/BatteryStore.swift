@@ -28,6 +28,8 @@ final class BatteryStore: ObservableObject {
     /// 智慧充電只在正式執行的 App 裡運作（AppDelegate 呼叫 startChargingPlan 之後）；
     /// --snapshot、--dump 等開發指令也會建立 BatteryStore，絕不能因此寫入充電上限或改動排程
     private var chargingPlanRunning = false
+    /// 最近七天的充電速度（每 10 分鐘重算一次，不必每秒整理七天的歷史）
+    private var historyRate: (date: Date, value: Double?)?
     @Published private(set) var componentPower: ComponentPowerSample?
     @Published private(set) var breakdown = PowerBreakdown(systemWatts: nil, status: .sampling)
     private let hardwareWorker = HardwarePowerWorker()
@@ -168,7 +170,9 @@ final class BatteryStore: ObservableObject {
 
     /// 依目前電量與排程判斷，需要時寫入充電上限；completion 在寫入（或判斷）結束後呼叫
     func evaluateChargingPlan(_ event: ChargingPlanEvent, completion: (() -> Void)? = nil) {
-        guard chargingPlanRunning, !previewing, let input = chargingPlanInput() else {
+        // 沒有排程時每秒只做這個判斷，不讀歷史也不連線
+        guard chargingPlanRunning, !previewing, chargingPlan.isActive, let input = chargingPlanInput() else {
+            if chargingPlanRunning { syncChargingWake() }
             completion?()
             return
         }
@@ -215,12 +219,18 @@ final class BatteryStore: ObservableObject {
         chargingWake.sync(wakeAt: wakeAt, enabled: AppSettings.shared.chargingWakeEnabled)
     }
 
+    private func recentChargingRate(now: Date) -> Double? {
+        if let cached = historyRate, abs(now.timeIntervalSince(cached.date)) < 600 { return cached.value }
+        let value = ChargingRateEstimator.percentPerHour(samples: history.samples, now: now)
+        historyRate = (now, value)
+        return value
+    }
+
     private func chargingPlanInput() -> ChargingPlanInput? {
         guard let s = snapshot, let e = estimates else { return nil }
         let target = chargingPlan.plan?.targetPercent ?? 100
         var estimate = Estimator.minutesToCharge(to: target, snapshot: s, estimates: e)
-        if estimate == nil, target > s.percent,
-           let rate = ChargingRateEstimator.percentPerHour(samples: history.samples, now: s.date) {
+        if estimate == nil, target > s.percent, let rate = recentChargingRate(now: s.date) {
             estimate = Int((Double(target - s.percent) / rate * 60).rounded(.up))
         }
         return ChargingPlanInput(now: s.date, percent: s.percent, connected: s.externalConnected,

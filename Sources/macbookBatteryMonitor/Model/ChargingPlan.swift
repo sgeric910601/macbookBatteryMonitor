@@ -199,25 +199,41 @@ enum ChargingPlanEngine {
     }
 }
 
-/// 最近七天實際的充電速度（每小時幾 %，取中位數），系統沒有預估時用來推算需要的時間
+/// 最近七天實際的充電速度（每小時幾 %），系統沒有預估時用來推算需要的時間。
+/// 電量歷史每分鐘一筆、電量是整數，大部分相鄰兩筆的電量相同，所以不能只看電量有上升的那幾筆
+/// （那樣每一段都會算成每分鐘 1%）：以每一段連續充電「總共充了幾 % ÷ 總共花了多久」計算，再取各段的中位數
 enum ChargingRateEstimator {
     static let fallbackPercentPerHour = 20.0
     private static let window: TimeInterval = 7 * 24 * 3600
+    /// 一段充電至少要這麼久、充這麼多才採用，太短的段落誤差大
+    private static let minimumSeconds: TimeInterval = 10 * 60
+    private static let minimumPercent = 3
 
     static func percentPerHour(samples: [HistorySample], now: Date = Date()) -> Double? {
         let ordered = samples.filter { $0.t >= now.addingTimeInterval(-window) && $0.t <= now && $0.pct >= 0 }
             .sorted { $0.t < $1.t }
         var rates: [Double] = []
-        var seconds = 0.0
+        var gained = 0
+        var seconds: TimeInterval = 0
+        func finishSession() {
+            if seconds >= minimumSeconds, gained >= minimumPercent {
+                rates.append(Double(gained) / seconds * 3600)
+            }
+            gained = 0
+            seconds = 0
+        }
         for (left, right) in zip(ordered, ordered.dropFirst()) {
             let dt = right.t.timeIntervalSince(left.t)
-            // 中間斷了很久（睡眠、App 沒開）的區段不算
-            guard dt > 0, dt <= 30 * 60, left.plugged, right.plugged, left.charging || right.charging,
-                  right.pct > left.pct else { continue }
-            rates.append(Double(right.pct - left.pct) / dt * 3600)
+            // 中間斷了很久（睡眠、App 沒開）或沒在充電，這一段結束
+            guard dt > 0, dt <= 30 * 60, left.plugged, right.plugged, left.charging else {
+                finishSession()
+                continue
+            }
+            gained += max(0, right.pct - left.pct)
             seconds += dt
         }
-        guard seconds >= 5 * 60, !rates.isEmpty else { return nil }
+        finishSession()
+        guard !rates.isEmpty else { return nil }
         rates.sort()
         let middle = rates.count / 2
         let rate = rates.count.isMultiple(of: 2) ? (rates[middle - 1] + rates[middle]) / 2 : rates[middle]

@@ -268,6 +268,13 @@ final class ChargingPlanTests {
         let rate = ChargingRateEstimator.percentPerHour(samples: samples, now: start.addingTimeInterval(4 * 3600))
         XCTAssertEqual(rate.map { Int($0.rounded()) }, 30)
         XCTAssertNil(ChargingRateEstimator.percentPerHour(samples: Array(samples.prefix(1)), now: start))
+        // 實際的歷史是每分鐘一筆、電量是整數：每 2 分鐘 +1%（每小時 30%），不能只算電量有上升的那幾分鐘（會變成每小時 60%）
+        let minute = (0...60).map { i in
+            HistorySample(t: start.addingTimeInterval(Double(i) * 60), pct: 50 + i / 2, watts: nil, plugged: true, charging: true)
+        }
+        XCTAssertEqual(ChargingRateEstimator.percentPerHour(samples: minute, now: start.addingTimeInterval(3600)).map { Int($0.rounded()) }, 30)
+        // 太短的充電（不到 10 分鐘或不到 3%）不採用
+        XCTAssertNil(ChargingRateEstimator.percentPerHour(samples: Array(minute.prefix(6)), now: start.addingTimeInterval(3600)))
     }
 
     func testDailyRecap() {

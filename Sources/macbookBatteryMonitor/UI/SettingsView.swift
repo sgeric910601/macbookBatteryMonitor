@@ -188,10 +188,19 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         if chargeLimit.supported {
-                            Text("可在主面板電量下方的滑桿調整（80–100%），與系統設定「電池」裡的充電上限是同一個設定，改哪一邊都會同步。實際停在上限由 macOS 控制，這個 App 不會另外控制充電。")
+                            Text("可在主面板電量下方的滑桿調整（80–100%），與系統設定「電池」裡的充電上限是同一個設定，改哪一邊都會同步。實際停在上限由 macOS 控制；只有設定了智慧充電時，App 才會依排程調整這個上限。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                            Divider()
+                            Picker("智慧充電列", selection: binding(\.chargingAppearance)) {
+                                ForEach(ChargingAppearance.allCases) { Text($0.title).tag($0) }
+                            }
+                            Text("主面板資訊卡最上方顯示充電夥伴（會動的貓咪，充電時躺在充電墊上）或電量條；面板關閉或省電模式時不播放動畫。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("設定智慧充電…") { ui.page = .chargingPlan }
                         } else {
                             if ChargeLimitReader.lastKnown()?.active == false {
                                 Text("用電池時 macOS 不會套用上限，數值是上次接電時讀到的。")
@@ -239,10 +248,10 @@ struct SettingsView: View {
                 }
             }
 
-            UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked)
+            UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked, ui: ui)
 
             HStack {
-                Text("\(AppEdition.appName) \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                Text("\(AppEdition.appName) \(updater.currentVersion)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Spacer()

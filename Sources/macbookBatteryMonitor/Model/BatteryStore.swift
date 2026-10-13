@@ -20,6 +20,11 @@ final class BatteryStore: ObservableObject {
     let updater = Updater()
     /// 主面板的充電上限滑桿（調整 macOS 系統設定裡的充電上限）
     let chargeLimit = SystemChargeLimit()
+    /// 智慧充電：指定時間前充到目標，平常維持保養上限
+    let chargingPlan = ChargingPlanController()
+    /// 智慧充電的精準喚醒（選用，需要管理員授權）
+    let chargingWake = ChargingWakeScheduler()
+    private let sleepGate = SleepGate()
     @Published private(set) var componentPower: ComponentPowerSample?
     @Published private(set) var breakdown = PowerBreakdown(systemWatts: nil, status: .sampling)
     private let hardwareWorker = HardwarePowerWorker()
@@ -81,6 +86,8 @@ final class BatteryStore: ObservableObject {
             peripherals.objectWillChange.map { _ in }.eraseToAnyPublisher(),
             updater.objectWillChange.map { _ in }.eraseToAnyPublisher(),
             chargeLimit.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            chargingPlan.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            chargingWake.objectWillChange.map { _ in }.eraseToAnyPublisher(),
         ]
         forwarding = nested.map { publisher in
             publisher.sink { [weak self] in self?.objectWillChange.send() }
@@ -133,6 +140,87 @@ final class BatteryStore: ObservableObject {
         computed.displayFlow = flowPresentation.kind(connected: s.externalConnected, watts: computed.batteryWatts,
             holding: holding, uptime: ProcessInfo.processInfo.systemUptime)
         estimates = computed
+        evaluateChargingPlan(.refresh)
+    }
+
+    /// App 啟動時呼叫（只有 MacBook）：手動調整上限時結束排程、睡眠前先套用排程需要的上限
+    func startChargingPlan() {
+        guard BatteryReader.hasBattery, !previewing else { return }
+        chargeLimit.onUserCommit = { [weak self] value in self?.chargingPlan.userChangedLimit(to: value) }
+        chargingWake.onAuthorized = { [weak self] in self?.evaluateChargingPlan(.refresh) }
+        chargingWake.onUnavailable = { [weak self] in
+            AppSettings.shared.chargingSleepStrategy = .readinessFirst
+            self?.setChargingSleepStrategy(.readinessFirst)
+        }
+        sleepGate.onWillSleep = { [weak self] allow in
+            guard let self, self.chargingPlan.isActive else { allow(); return }
+            self.evaluateChargingPlan(.willSleep, completion: allow)
+        }
+        sleepGate.start()
+        if let plan = chargingPlan.plan {
+            ChargingPlanLog.shared.write("App 啟動，繼續排程（\(plan.deadline.formatted(date: .abbreviated, time: .shortened)) 前充到 \(plan.targetPercent)%）")
+        }
+    }
+
+    /// 依目前電量與排程判斷，需要時寫入充電上限；completion 在寫入（或判斷）結束後呼叫
+    func evaluateChargingPlan(_ event: ChargingPlanEvent, completion: (() -> Void)? = nil) {
+        guard !previewing, let input = chargingPlanInput() else {
+            completion?()
+            return
+        }
+        let target = chargingPlan.evaluate(input, event: event, preciseWakeReady: chargingWake.ready)
+        syncChargingWake()
+        guard let target else {
+            completion?()
+            return
+        }
+        Task {
+            let result = await chargeLimit.applyAutomatically(target)
+            chargingPlan.writeFinished(target: target, success: result.success, readBack: result.readBack)
+            completion?()
+        }
+    }
+
+    /// 建立排程（快速、指定時間或每週）
+    func startChargingPlan(_ schedule: ChargingSchedule) {
+        let settings = AppSettings.shared
+        guard chargingPlan.start(schedule, target: settings.chargingTargetPercent, hold: settings.chargingHoldPercent,
+                                 currentLimit: chargeLimit.limit, strategy: settings.chargingSleepStrategy) else { return }
+        evaluateChargingPlan(.refresh)
+    }
+
+    func setChargingSleepStrategy(_ strategy: ChargingSleepStrategy) {
+        chargingPlan.setSleepStrategy(strategy)
+        syncChargingWake()
+    }
+
+    func cancelChargingPlan() {
+        guard let input = chargingPlanInput(), let target = chargingPlan.cancel(input) else { return }
+        Task {
+            let result = await chargeLimit.applyAutomatically(target)
+            chargingPlan.writeFinished(target: target, success: result.success, readBack: result.readBack)
+        }
+    }
+
+    /// 精準喚醒：選項打開、排程用精準喚醒時排定（或改排）喚醒，其他情況取消
+    func syncChargingWake() {
+        let decision = chargingPlan.decision
+        let wakeAt = chargingPlan.plan?.sleepStrategy == .preciseWake ? decision?.wakeAt : nil
+        chargingWake.sync(wakeAt: wakeAt, enabled: AppSettings.shared.chargingWakeEnabled)
+    }
+
+    private func chargingPlanInput() -> ChargingPlanInput? {
+        guard let s = snapshot, let e = estimates else { return nil }
+        let target = chargingPlan.plan?.targetPercent ?? 100
+        var estimate = Estimator.minutesToCharge(to: target, snapshot: s, estimates: e)
+        if estimate == nil, target > s.percent,
+           let rate = ChargingRateEstimator.percentPerHour(samples: history.samples, now: s.date) {
+            estimate = Int((Double(target - s.percent) / rate * 60).rounded(.up))
+        }
+        return ChargingPlanInput(now: s.date, percent: s.percent, connected: s.externalConnected,
+                                 limitSupported: chargeLimit.supported, currentLimit: chargeLimit.limit,
+                                 estimatedMinutes: estimate, isCharging: e.state == .charging,
+                                 systemPaused: [.pluggedIdle, .limitReached, .full].contains(e.state))
     }
 
     /// 桌上型 Mac：只讀一個 SMC 值（整機耗電），平均方式與 MacBook 的平均放電相同
@@ -293,6 +381,18 @@ final class BatteryStore: ObservableObject {
             EnergyProcess(id: "photos", name: "照片", power: 2.1, appPath: "/System/Applications/Photos.app"),
         ]
         processesLoaded = true
+    }
+
+    /// 截圖用的智慧充電示範：明天 7:30 前充到 100%，等待時維持 80%（只放在記憶體，不寫入使用者的排程）
+    func loadChargingPlanPreview(now: Date = Date()) {
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
+        let deadline = calendar.date(bySettingHour: 7, minute: 30, second: 0, of: tomorrow) ?? now
+        let plan = ChargingPlan(schedule: .weekly(weekdays: [2, 3, 4, 5, 6], minuteOfDay: 7 * 60 + 30), deadline: deadline,
+                                targetPercent: 100, holdPercent: 80, restoreLimit: 80, sleepStrategy: .preciseWake, createdAt: now)
+        let input = ChargingPlanInput(now: now, percent: snapshot?.percent ?? 80, connected: true, limitSupported: true,
+                                      currentLimit: 80, estimatedMinutes: nil, isCharging: false, systemPaused: true)
+        chargingPlan.loadPreview(plan, decision: ChargingPlanEngine.evaluate(plan, input: input))
     }
 
     /// 開發用快照：接著電源的示範狀態（檢查充電中、已達充電上限時的版面）

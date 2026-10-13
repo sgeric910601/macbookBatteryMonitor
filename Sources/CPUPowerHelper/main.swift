@@ -1,6 +1,7 @@
 import Foundation
 import CPUPowerShared
 import Darwin
+import IOKit.pwr_mgt
 
 /// 所有子程序與租約狀態都只在同一個 queue 存取。
 final class CPUSampler {
@@ -132,11 +133,12 @@ final class CPUSampler {
         queue.async {
             self.disabled = true
             self.reconcile()
+            ChargingWake.cancel()
             do {
                 // 固定 root 管理的位置，不從客戶端接受任何檔案路徑。
                 let fm = FileManager.default
                 for path in [CPUHelperConstants.launchDaemon, CPUHelperConstants.configuration,
-                             CPUHelperConstants.executable] {
+                             CPUHelperConstants.chargingWakeRecord, CPUHelperConstants.executable] {
                     if fm.fileExists(atPath: path) { try fm.removeItem(atPath: path) }
                 }
                 try fm.removeItem(atPath: CPUHelperConstants.directory)
@@ -155,12 +157,51 @@ final class CPUSampler {
     }
 }
 
+/// 智慧充電的喚醒事件：識別碼固定，時間只能在 1 分鐘後到 7 天內，同時只會有一個。
+/// 排定的時間記在服務資料夾裡，改排或取消時用它找到舊的事件
+enum ChargingWake {
+    static let queue = DispatchQueue(label: "com.kuan.batterymonitor.cpu.wake")
+
+    static func schedule(at epoch: Double) -> String? {
+        queue.sync {
+            guard ChargingWakePolicy.isAllowed(epoch, now: Date()) else { return "喚醒時間超出允許範圍" }
+            cancelRecorded()
+            let date = Date(timeIntervalSince1970: epoch)
+            let result = IOPMSchedulePowerEvent(date as CFDate, CPUHelperConstants.chargingWakeIdentifier as CFString,
+                                                kIOPMAutoWake as CFString)
+            guard result == kIOReturnSuccess else { return "macOS 沒有接受喚醒排程（\(result)）" }
+            try? Data(String(epoch).utf8).write(to: URL(fileURLWithPath: CPUHelperConstants.chargingWakeRecord), options: .atomic)
+            return nil
+        }
+    }
+
+    static func cancel() {
+        queue.sync { cancelRecorded() }
+    }
+
+    private static func cancelRecorded() {
+        let url = URL(fileURLWithPath: CPUHelperConstants.chargingWakeRecord)
+        if let text = try? String(contentsOf: url, encoding: .utf8), let epoch = Double(text), epoch.isFinite {
+            _ = IOPMCancelScheduledPowerEvent(Date(timeIntervalSince1970: epoch) as CFDate,
+                                              CPUHelperConstants.chargingWakeIdentifier as CFString, kIOPMAutoWake as CFString)
+        }
+        try? FileManager.default.removeItem(at: url)
+    }
+}
+
 final class CPUClient: NSObject, CPUHelperProtocol {
     let id = UUID()
     let sampler: CPUSampler
     init(sampler: CPUSampler) { self.sampler = sampler }
     func sample(active: Bool, interval: Int, withReply reply: @escaping (Data) -> Void) {
         sampler.sample(client: id, active: active, interval: interval, reply: reply)
+    }
+    func scheduleChargingWake(at epoch: Double, withReply reply: @escaping (String?) -> Void) {
+        reply(ChargingWake.schedule(at: epoch))
+    }
+    func cancelChargingWake(withReply reply: @escaping (String?) -> Void) {
+        ChargingWake.cancel()
+        reply(nil)
     }
     func uninstall(withReply reply: @escaping (String?) -> Void) { sampler.uninstall(reply: reply) }
 }

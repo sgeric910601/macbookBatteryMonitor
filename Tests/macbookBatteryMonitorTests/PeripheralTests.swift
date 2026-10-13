@@ -72,4 +72,40 @@ final class PeripheralTests {
         var silent = PeripheralAlerts()
         XCTAssertTrue(silent.evaluate([mouse]) { _ in 0 }.isEmpty)
     }
+
+    func testBluetoothLEBattery() {
+        // 電池電量是一個位元組 0～100；空值或超出範圍視為讀不到
+        XCTAssertEqual(PeripheralParse.bluetoothLELevel(Data([85])), 85)
+        XCTAssertEqual(PeripheralParse.bluetoothLELevel(Data([100, 7])), 100)
+        XCTAssertNil(PeripheralParse.bluetoothLELevel(Data([101])))
+        XCTAssertNil(PeripheralParse.bluetoothLELevel(Data()))
+        XCTAssertNil(PeripheralParse.bluetoothLELevel(nil))
+        // 名稱看不出種類時用 HID 用途：Razer Basilisk 是滑鼠
+        XCTAssertEqual(PeripheralParse.kind(name: "Basilisk X HyperSpeed", usages: [(1, 2), (1, 6)]), .mouse)
+        XCTAssertEqual(PeripheralParse.kind(name: "K380", usages: [(1, 6), (12, 1)]), .keyboard)
+        XCTAssertEqual(PeripheralParse.kind(name: "MX Anywhere 3S", usages: []), .other)
+        XCTAssertEqual(PeripheralParse.kind(name: "MX Master Mouse", usages: [(1, 6)]), .mouse)
+        // 同名設備已經由系統資料列出（例如 Apple 的設備）時以原本的為準，不重複
+        let existing = [PeripheralBattery(id: "aa:bb", name: "Magic Mouse", kind: .mouse, level: 50)]
+        let ble = [PeripheralBattery(id: "ble-1", name: "magic mouse", kind: .mouse, level: 49),
+                   PeripheralBattery(id: "ble-2", name: "Basilisk X HyperSpeed", kind: .mouse, level: 72)]
+        let merged = PeripheralParse.merge(existing, bluetoothLE: ble)
+        XCTAssertEqual(merged.map(\.id), ["ble-2", "aa:bb"])
+        XCTAssertEqual(merged.first { $0.id == "aa:bb" }?.level, 50)
+    }
+
+    func testDuplicateAirPodsMerge() {
+        // 截圖的情況：同一副 AirPods Pro 3 列兩次，一筆只有右耳與充電盒
+        let partial = PeripheralBattery(id: "aa", name: "harekaze的AirPods Pro 3", kind: .headphones, right: 78, caseLevel: 66)
+        let full = PeripheralBattery(id: "bb", name: "harekaze的AirPods Pro 3", kind: .headphones, left: 75, right: 78, caseLevel: 66)
+        let merged = PeripheralParse.mergeSameName([partial, full])
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged.first?.id, "bb")
+        XCTAssertEqual(merged.first?.left, 75)
+        XCTAssertEqual(merged.first?.right, 78)
+        XCTAssertEqual(merged.first?.caseLevel, 66)
+        // 不同名稱的設備不合併
+        let mouse = PeripheralBattery(id: "cc", name: "Magic Mouse", kind: .mouse, level: 40)
+        XCTAssertEqual(PeripheralParse.mergeSameName([partial, mouse]).count, 2)
+    }
 }

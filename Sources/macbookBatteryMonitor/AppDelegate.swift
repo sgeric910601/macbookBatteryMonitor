@@ -45,8 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         settings.onChange = { [weak self] in self?.updateStatusItem() }
         settings.onIntervalChange = { [weak self] in self?.applySampleInterval() }
-        // 全新安裝：先問要不要開系統監控，再建立模組圖示
-        if settings.needsModeChoice { askForMode() }
+        // 全新安裝：所有需要授權的東西都在第一次啟動時問完（系統監控、管理員 CPU 取樣、通知、藍牙）
+        let freshInstall = settings.needsModeChoice
+        if freshInstall { askForMode() }
         // 系統監控關閉時不建立任何模組圖示與計時器
         settings.onMonitorsChange = { [weak self] in self?.monitors.syncItems() }
         monitors.openSettings = { [weak self] in self?.showPopover(page: .settings) }
@@ -54,7 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.adminCPU.authorizationChanged = { [weak self] pending in
             self?.popover?.behavior = pending ? .applicationDefined : .transient
         }
+        if freshInstall { askForAdminCPU() }
         Notifier.shared.setup()
+        // 藍牙權限還沒決定時 macOS 會跳出詢問（從舊版升級也會問這一次）；已經允許就直接在背景讀；拒絕過就不再問
+        if !BLEBatteryReader.denied { store.peripherals.startBluetoothLE() }
         // 用新版覆蓋 App 後，自訂的 App 圖示會消失，套回使用者選的顏色
         AppIconChanger.restoreIfNeeded(settings.appIconColor)
 
@@ -71,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 系統充電上限：啟動時讀一次，之後由系統通知、打開面板時重新讀取；在面板上調整後立即更新選單列與面板
         store.chargeLimit.onChange = { [weak self] in self?.refresh() }
         store.chargeLimit.start()
+        // 智慧充電：繼續上次的排程；精準喚醒的開關改變時排定或取消喚醒
+        store.startChargingPlan()
+        settings.onChargingWakeChange = { [weak self] in self?.store.syncChargingWake() }
         // 自動檢查發現新版本時發通知（可在設定 → 更新關閉），點通知打開設定的「更新」
         store.updater.onNewRelease = { [weak self] release in
             guard let self, self.settings.updateNotification else { return }
@@ -118,13 +125,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let alert = NSAlert()
         alert.messageText = "要在選單列顯示哪些資訊？"
         alert.informativeText = (battery
-            ? "「電池＋系統監控」會另外在選單列加上 CPU／GPU、記憶體、磁碟與網路圖示；「只看電池」只有一個電池圖示，最省電。"
-            : "「耗電＋系統監控」會另外在選單列加上 CPU／GPU、記憶體、磁碟與網路圖示；「只看耗電」只有一個顯示系統耗電的圖示，最省電。")
-            + "\n\n之後可以在設定 →「系統監控」隨時更改。"
+            ? "「電池＋系統監控」會在選單列另外加入 CPU／GPU、記憶體、磁碟與網路圖示，並持續更新。「只看電池」只顯示電池圖示，耗電最少。"
+            : "「耗電＋系統監控」會在選單列另外加入 CPU／GPU、記憶體、磁碟與網路圖示，並持續更新。「只看耗電」只顯示系統耗電圖示，耗電最少。")
+            + "\n\n你可以隨時在「設定」>「系統監控」中更改。"
         alert.addButton(withTitle: battery ? "電池＋系統監控" : "耗電＋系統監控")
         alert.addButton(withTitle: battery ? "只看電池" : "只看耗電")
         NSApp.activateCompat()
         settings.chooseMode(systemMonitors: alert.runModal() == .alertFirstButtonReturn)
+    }
+
+    /// 第一次啟動：要不要開管理員 CPU 取樣（Apple 晶片的 CPU 能量計數器在部分機型不會更新）。
+    /// Intel 直接由 SMC 讀 CPU 功耗，不需要
+    private func askForAdminCPU() {
+        guard !ChipInfo.isIntel else { return }
+        let alert = NSAlert()
+        alert.messageText = "要開啟「管理員 CPU 取樣」嗎？"
+        alert.informativeText = """
+            部分 Apple 晶片機型的 CPU 能量計數器不會更新，電力細項中的 CPU 功耗會顯示為「—」。開啟後，App 會安裝一個只讀取 CPU 功耗的系統服務，提供準確的數值。
+
+            安裝服務需要管理員權限，按下「開啟…」後 macOS 會請你輸入管理員密碼。服務只在面板打開時取樣，閒置時會自行結束，不會讀取其他資料。
+
+            你可以隨時在「設定」>「CPU 功耗」中關閉，關閉時會一併移除服務。
+            """
+        alert.addButton(withTitle: "開啟…")
+        alert.addButton(withTitle: "暫不開啟")
+        NSApp.activateCompat()
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        // 第一次 update 只記錄「啟動時的狀態」，選項從關變開才會安裝服務並跳出管理員授權
+        store.adminCPU.update(active: false, enabled: false)
+        settings.adminCPUSampling = true
+        store.adminCPU.update(active: false, enabled: true)
     }
 
     /// 開發用：`--selftest-update` 檢查 GitHub 上的新版本，有就直接一鍵更新（App 會結束並由安裝程序重新開啟）
@@ -214,6 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         store.adminCPU.stop()
+        store.chargingWake.stop()
         store.history.save()
     }
 
@@ -232,6 +263,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateStatusItem()
         if let s = store.snapshot, let e = store.estimates {
             Notifier.shared.evaluate(s, state: e.state, settings: settings)
+        }
+        if let note = store.chargingPlan.takeNotification(), let plan = store.chargingPlan.plan {
+            Notifier.shared.notifyChargingPlan(note, plan: plan)
         }
     }
 
@@ -298,6 +332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func willSleep() {
+        if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統即將睡眠") }
         sleeping = true
         powerTransitionTask?.cancel()
         store.setHardwareSampling(active: false)
@@ -307,6 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func didWake() {
+        if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統已喚醒") }
         sleeping = false
         monitors.setSleeping(false)
         refresh()

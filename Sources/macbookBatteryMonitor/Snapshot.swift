@@ -111,11 +111,18 @@ enum SnapshotCommand {
         let release = ReleaseInfo(tag: "v9.9.9", version: [9, 9, 9],
                                   pageURL: URL(string: "https://github.com/sgeric910601/macbookBatteryMonitor/releases")!,
                                   assetName: "x.zip", assetURL: URL(string: "https://github.com/x.zip")!, assetSize: 0, checksumURL: nil)
-        let states: [(String, Updater.State)] = [("idle", .idle), ("uptodate", .upToDate), ("available", .available(release)),
-                                                 ("downloading", .downloading(release)), ("failed", .failed("無法連線到 GitHub，請稍後再試"))]
-        for (name, state) in states {
+        var beta = release
+        beta.tag = "v9.9.9-beta.1"
+        beta.beta = 1
+        let states: [(String, Updater.State, Bool)] = [
+            ("idle", .idle, false), ("uptodate", .upToDate, false), ("available", .available(release), false),
+            ("beta", .available(beta), false), ("beta-confirm", .available(beta), true),
+            ("downloading", .downloading(release), false), ("failed", .failed("無法連線到 GitHub，請稍後再試"), false)]
+        for (name, state, confirming) in states {
             updater.loadPreview(state)
-            let view = UpdateCard(updater: updater, settings: .shared)
+            let ui = PanelState()
+            ui.confirmingBetaInstall = confirming
+            let view = UpdateCard(updater: updater, settings: .shared, ui: ui)
                 .padding(14)
                 .frame(width: 380)
                 .background(Color(nsColor: .windowBackgroundColor))

@@ -85,7 +85,32 @@ enum PeripheralParse {
                 }
             }
         }
-        return result
+        return mergeSameName(result)
+    }
+
+    /// 新款 AirPods 在系統藍牙資訊裡可能列兩次（兩個位址，其中一筆只有部分電量），同名的合併成一行：
+    /// 左耳、右耳、充電盒各取有數值的那筆，兩筆都有時以資料比較完整的為準
+    static func mergeSameName(_ devices: [PeripheralBattery]) -> [PeripheralBattery] {
+        func completeness(_ device: PeripheralBattery) -> Int {
+            [device.level, device.left, device.right, device.caseLevel].compactMap { $0 }.count
+        }
+        var merged: [PeripheralBattery] = []
+        for device in devices {
+            guard let index = merged.firstIndex(where: { $0.name.caseInsensitiveCompare(device.name) == .orderedSame }) else {
+                merged.append(device)
+                continue
+            }
+            let existing = merged[index]
+            var primary = completeness(device) > completeness(existing) ? device : existing
+            let other = primary == device ? existing : device
+            primary.level = primary.level ?? other.level
+            primary.left = primary.left ?? other.left
+            primary.right = primary.right ?? other.right
+            primary.caseLevel = primary.caseLevel ?? other.caseLevel
+            if primary.kind == .other { primary.kind = other.kind }
+            merged[index] = primary
+        }
+        return merged
     }
 
     /// IORegistry 中有 BatteryPercent 的 HID 服務；同一個設備可能有好幾個服務，依 id 合併
@@ -100,6 +125,34 @@ enum PeripheralParse {
             result.append(PeripheralBattery(id: id, name: name, kind: kind(name: name), level: level))
         }
         return result
+    }
+
+    /// 藍牙標準電池服務的「電池電量」（0x2A19）：一個位元組，0～100
+    static func bluetoothLELevel(_ value: Data?) -> Int? {
+        guard let byte = value?.first, byte <= 100 else { return nil }
+        return Int(byte)
+    }
+
+    /// 藍牙低功耗 HID 設備的種類：名稱看得出來就用名稱，否則看 HID 用途
+    /// （Generic Desktop 0x01：滑鼠 0x02、搖桿 0x04、遊戲手把 0x05、鍵盤 0x06；Digitizer 0x0D：觸控板）
+    static func kind(name: String, usages: [(page: Int, usage: Int)]) -> PeripheralBattery.Kind {
+        let byName = kind(name: name)
+        if byName != .other { return byName }
+        let set = Set(usages.map { "\($0.page):\($0.usage)" })
+        if set.contains("1:2") { return .mouse }
+        if set.contains("1:6") { return .keyboard }
+        if set.contains("13:5") || set.contains("13:4") { return .trackpad }
+        if set.contains("1:5") || set.contains("1:4") { return .gameController }
+        return .other
+    }
+
+    /// 加上藍牙低功耗設備：同名的設備已經由 IORegistry 或 system_profiler 列出時（例如 Apple 的設備），以原本的為準
+    static func merge(_ devices: [PeripheralBattery], bluetoothLE: [PeripheralBattery]) -> [PeripheralBattery] {
+        var merged = devices
+        for device in bluetoothLE where !merged.contains(where: { $0.name.caseInsensitiveCompare(device.name) == .orderedSame }) {
+            merged.append(device)
+        }
+        return merged.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// 同一個設備兩邊都有時合併：名稱與左右耳用 system_profiler 的（使用者取的藍牙名稱），缺的電量用 HID 補

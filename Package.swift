@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.macOS(.v12)],
     targets: [
         .target(name: "CPUPowerShared", path: "Sources/CPUPowerShared"),
-        .executableTarget(name: "CPUPowerHelper", dependencies: ["CPUPowerShared"], path: "Sources/CPUPowerHelper"),
+        .executableTarget(name: "CPUPowerHelper", dependencies: ["CPUPowerShared"], path: "Sources/CPUPowerHelper",
+                          linkerSettings: [.linkedFramework("IOKit")]),
         .executableTarget(
             name: "macbookBatteryMonitor",
             dependencies: ["CPUPowerShared"],

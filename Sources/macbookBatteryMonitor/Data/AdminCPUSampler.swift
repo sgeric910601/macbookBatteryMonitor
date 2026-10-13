@@ -230,6 +230,12 @@ final class AdminCPUSampler: ObservableObject {
     private func disable(finalStatus: String = "已關閉並移除 CPU 服務") {
         reading = nil
         desiredActive = false
+        // 智慧充電的精準喚醒也用這個服務：只斷線，不移除
+        if AppSettings.shared.chargingWakeEnabled, CPUHelperInstaller.supportsChargingWake, process == nil {
+            disconnect()
+            status = "已關閉 CPU 取樣；智慧充電的精準喚醒仍使用管理員服務"
+            return
+        }
         // 授權進行中：先取消，安裝程序結束的回呼看到選項已關會再移除，避免留下孤兒服務
         if let process {
             if let installLease { try? FileManager.default.removeItem(at: installLease) }

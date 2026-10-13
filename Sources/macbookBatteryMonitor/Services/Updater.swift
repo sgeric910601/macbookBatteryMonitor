@@ -3,7 +3,8 @@ import CryptoKit
 import Foundation
 import Combine
 
-/// 一鍵更新：從 GitHub Releases 下載同一個版本別的新版，驗證後換掉目前的 App 並重新開啟
+/// 一鍵更新：從 GitHub Releases 下載新版，驗證後換掉目前的 App 並重新開啟。
+/// Beta 測試版只有使用者按「檢查更新」時才會找，不會自動通知，安裝前另外確認（見 UpdateCard）
 @MainActor
 final class Updater: ObservableObject {
     enum State: Equatable {
@@ -19,7 +20,8 @@ final class Updater: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var lastChecked: Date?
 
-    static let releasesAPI = URL(string: "https://api.github.com/repos/sgeric910601/macbookBatteryMonitor/releases/latest")!
+    /// 最近的 Release 清單（包含 Beta）；正式版只看 releases/latest 會漏掉 Beta
+    static let releasesAPI = URL(string: "https://api.github.com/repos/sgeric910601/macbookBatteryMonitor/releases?per_page=20")!
     static let releasesPage = URL(string: "https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest")!
     /// 自動檢查的間隔
     static let checkInterval: TimeInterval = 24 * 3600
@@ -30,7 +32,10 @@ final class Updater: ObservableObject {
     /// 自動檢查發現新版本時呼叫，每個版本只呼叫一次；手動檢查時使用者已經看到，不呼叫
     var onNewRelease: ((ReleaseInfo) -> Void)?
 
-    var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0" }
+    /// 執行中的版本（Beta 會帶序號）
+    let current = AppVersion.current()
+    /// 畫面上顯示的目前版本：1.7.0、1.7.0 beta 1
+    var currentVersion: String { current.text }
 
     var available: ReleaseInfo? {
         switch state {
@@ -69,14 +74,21 @@ final class Updater: ObservableObject {
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
             lastChecked = Date()
             UserDefaults.standard.set(lastChecked, forKey: Self.lastCheckKey)
+            // 舊系統版本：系統已升級到 macOS 14 以上時改裝主版本的通用版
             let mainSupported = ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 14, minorVersion: 0, patchVersion: 0))
                 && !Compat.forceMacOS12Paths
-            guard let release = UpdateLogic.release(json: data, edition: AppEdition.current.rawValue, mainSupported: mainSupported),
-                  let current = UpdateLogic.version(currentVersion) else {
+            let releases = UpdateLogic.releases(json: data, edition: AppEdition.current.rawValue, mainSupported: mainSupported)
+            guard !releases.isEmpty else {
                 state = userInitiated ? .failed("找不到新版的下載檔") : .idle
                 return
             }
-            guard UpdateLogic.isNewer(release.version, than: current) else {
+            let found = UpdateLogic.choose(releases, current: current)
+            // Beta 只在手動檢查時列出，也不發通知
+            if let beta = found.beta, found.stable == nil, userInitiated {
+                state = .available(beta)
+                return
+            }
+            guard let release = found.stable else {
                 state = .upToDate
                 return
             }
@@ -164,9 +176,11 @@ final class Updater: ObservableObject {
         guard run("/usr/bin/ditto", ["-x", "-k", zip.path, unpacked.path]) == 0 else { throw UpdateError(message: "解壓縮失敗") }
         let app = unpacked.appendingPathComponent("macbookBatteryMonitor.app")
         // v1.7.0 起只有一個 App，系統監控是設定裡的開關，不再比對版本別
+        // 版本號與 Beta 序號都要和 Release 的 tag 一致（正式版的 App 不能帶 Beta 序號）
         guard let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")) as? [String: Any],
               info["CFBundleIdentifier"] as? String == "com.kuan.batterymonitor",
-              (info["CFBundleShortVersionString"] as? String).flatMap(UpdateLogic.version) == release.version else {
+              (info["CFBundleShortVersionString"] as? String).flatMap(UpdateLogic.version) == release.version,
+              AppVersion.current(info: info).beta == release.beta else {
             throw UpdateError(message: "下載的 App 與這個 App 或版本號不符")
         }
         guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path]) == 0 else {

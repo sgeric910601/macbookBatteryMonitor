@@ -32,6 +32,8 @@ final class AppSettings: ObservableObject {
     var onMonitorsChange: (() -> Void)?
     /// 更新頻率或省電模式改變時呼叫（重設所有取樣間隔）
     var onIntervalChange: (() -> Void)?
+    /// 智慧充電的精準喚醒開關改變時呼叫
+    var onChargingWakeChange: (() -> Void)?
 
     /// 可選的更新頻率（秒）
     static let updateIntervals = [1, 2, 5, 10]
@@ -106,6 +108,31 @@ final class AppSettings: ObservableObject {
     /// 選用的管理員 CPU 取樣（預設關閉）。開啟時安裝系統服務，關閉時移除；由 AdminCPUSampler 在下一次更新時套用
     @Published var adminCPUSampling: Bool {
         didSet { defaults.set(adminCPUSampling, forKey: Keys.adminCPUSampling) }
+    }
+
+    /// 智慧充電：主面板那一列左邊顯示充電夥伴（貓咪）或電量條
+    @Published var chargingAppearance: ChargingAppearance {
+        didSet { defaults.set(chargingAppearance.rawValue, forKey: Keys.chargingAppearance) }
+    }
+    /// 智慧充電的完成目標與保養上限（建立排程時的預設值）
+    @Published var chargingTargetPercent: Int {
+        didSet {
+            defaults.set(chargingTargetPercent, forKey: Keys.chargingTargetPercent)
+            if chargingHoldPercent > chargingTargetPercent { chargingHoldPercent = chargingTargetPercent }
+        }
+    }
+    @Published var chargingHoldPercent: Int {
+        didSet { defaults.set(chargingHoldPercent, forKey: Keys.chargingHoldPercent) }
+    }
+    @Published var chargingSleepStrategy: ChargingSleepStrategy {
+        didSet { defaults.set(chargingSleepStrategy.rawValue, forKey: Keys.chargingSleepStrategy) }
+    }
+    /// 精準喚醒（需要管理員授權一次，與管理員 CPU 取樣共用服務）
+    @Published var chargingWakeEnabled: Bool {
+        didSet {
+            defaults.set(chargingWakeEnabled, forKey: Keys.chargingWakeEnabled)
+            if chargingWakeEnabled != oldValue { onChargingWakeChange?() }
+        }
     }
 
     /// 電力流向細項中隱藏的項目（FlowItem.rawValue）
@@ -189,6 +216,11 @@ final class AppSettings: ObservableObject {
         static let autoCheckUpdates = "autoCheckUpdates"
         static let updateNotification = "updateNotification"
         static let adminCPUSampling = "adminCPUSampling"
+        static let chargingAppearance = "chargingAppearance"
+        static let chargingTargetPercent = "chargingTargetPercent"
+        static let chargingHoldPercent = "chargingHoldPercent"
+        static let chargingSleepStrategy = "chargingSleepStrategy"
+        static let chargingWakeEnabled = "chargingWakeEnabled"
     }
 
     /// 這台 Mac 以前用過這個 App（有設定或電量歷史），從舊版升級時不再詢問
@@ -216,6 +248,11 @@ final class AppSettings: ObservableObject {
             Keys.adminCPUSampling: false,
             Keys.autoCheckUpdates: true,
             Keys.updateNotification: true,
+            Keys.chargingAppearance: ChargingAppearance.companion.rawValue,
+            Keys.chargingTargetPercent: 100,
+            Keys.chargingHoldPercent: 80,
+            Keys.chargingSleepStrategy: ChargingSleepStrategy.readinessFirst.rawValue,
+            Keys.chargingWakeEnabled: false,
         ])
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)
         display = MenuBarDisplay(rawValue: defaults.string(forKey: Keys.display) ?? "") ?? .iconAndPercent
@@ -248,5 +285,22 @@ final class AppSettings: ObservableObject {
         appIconColor = AppIconColor(rawValue: defaults.string(forKey: Keys.appIconColor) ?? "") ?? .mint
         autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
         updateNotification = defaults.bool(forKey: Keys.updateNotification)
+        chargingAppearance = ChargingAppearance(rawValue: defaults.string(forKey: Keys.chargingAppearance) ?? "") ?? .companion
+        let target = ChargingPlan.clamp(defaults.integer(forKey: Keys.chargingTargetPercent))
+        chargingTargetPercent = target
+        chargingHoldPercent = min(ChargingPlan.clamp(defaults.integer(forKey: Keys.chargingHoldPercent)), target)
+        chargingSleepStrategy = ChargingSleepStrategy(rawValue: defaults.string(forKey: Keys.chargingSleepStrategy) ?? "") ?? .readinessFirst
+        chargingWakeEnabled = defaults.bool(forKey: Keys.chargingWakeEnabled)
     }
+}
+
+/// 主面板智慧充電那一列左邊的樣子
+enum ChargingAppearance: String, CaseIterable, Identifiable {
+    /// 充電夥伴：會動的貓咪（充電時躺在充電墊上）
+    case companion
+    /// 電力流動：電量條
+    case energy
+
+    var id: String { rawValue }
+    var title: String { self == .companion ? "充電夥伴" : "電力流動" }
 }

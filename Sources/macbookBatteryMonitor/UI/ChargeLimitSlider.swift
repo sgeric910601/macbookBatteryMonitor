@@ -3,6 +3,8 @@ import SwiftUI
 /// 主面板資訊卡最上方的充電上限滑桿：拖動後直接改 macOS 系統設定裡的充電上限
 struct ChargeLimitSlider: View {
     @ObservedObject var control: SystemChargeLimit
+    /// 智慧充電進行中：手動調整會結束排程
+    var planActive = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -38,6 +40,7 @@ struct ChargeLimitSlider: View {
 
     private var note: (text: String, warning: Bool)? {
         if case .failed(let message) = control.status { return (message, true) }
+        if planActive { return ("智慧充電正在調整這個上限；手動拖動會結束目前的排程。", false) }
         if !control.enabled, control.limit < 100 { return ("macOS 目前暫時沒有套用這個上限。", false) }
         return nil
     }

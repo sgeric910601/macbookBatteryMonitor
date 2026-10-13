@@ -100,6 +100,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(title: "\(device.name) 電量偏低：\(level)%", body: "已低於你設定的 \(threshold)%\(detail)，建議充電。")
     }
 
+    /// 智慧充電：已在完成時間前充好，或照目前速度可能趕不上
+    func notifyChargingPlan(_ event: ChargingPlanNotification, plan: ChargingPlan) {
+        let time = plan.deadline.formatted(date: .omitted, time: .shortened)
+        switch event {
+        case .ready:
+            post(title: "已充到 \(plan.targetPercent)%", body: "智慧充電已在 \(time) 前完成。拔掉電源後會還原原本的充電上限。")
+        case .late:
+            post(title: "智慧充電可能無法準時", body: "macOS 仍在充電，原定 \(time) 前充到 \(plan.targetPercent)%。")
+        }
+    }
+
     func notifyUpdate(_ release: ReleaseInfo, currentVersion: String) {
         post(title: "\(AppEdition.appName) 有新版本 v\(release.versionText)",
              body: "目前是 \(currentVersion)。點這則通知打開設定，按「一鍵更新」就能升級。",

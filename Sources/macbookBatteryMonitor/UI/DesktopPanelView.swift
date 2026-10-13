@@ -21,7 +21,7 @@ struct DesktopPanelView: View {
             DesktopPowerSection(breakdown: store.breakdown, ui: ui, powerSaving: settings.powerSavingActive,
                                 hasBuiltInDisplay: desktop.hasBuiltInDisplay)
             Picker("", selection: ui.binding(\.tab)) {
-                ForEach(BottomTab.allCases, id: \.self) { Text($0.title(desktop: true)).tag($0) }
+                ForEach(BottomTab.tabs(desktop: true), id: \.self) { Text($0.title(desktop: true)).tag($0) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -30,7 +30,7 @@ struct DesktopPanelView: View {
                 case .details: DesktopDetailsView(desktop: desktop, breakdown: store.breakdown)
                 case .history: HistoryChartView(history: store.history, ui: ui, desktop: true)
                 case .processes: TopProcessesView(store: store)
-                case .peripherals: PeripheralsView(store: store.peripherals, settings: settings)
+                case .peripherals, .today: PeripheralsView(store: store.peripherals, settings: settings)
                 }
             }
             .frame(height: 231, alignment: .top)

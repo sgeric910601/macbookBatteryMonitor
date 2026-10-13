@@ -51,6 +51,8 @@ if [[ -f Resources/AppIcon.icns ]]; then
 fi
 # 設定裡可切換的其他 App 圖示顏色
 cp Resources/AppIcons/icon-*.png "$APP/Contents/Resources/" 2>/dev/null || true
+# 智慧充電的充電夥伴：透明背景的 HEVC 動畫與不播放時的靜態圖
+cp Resources/Companion/companion-* "$APP/Contents/Resources/"
 codesign --force --sign - --timestamp=none "$APP"
 echo "✅ 已產生 ${APP}（MBMEdition=${EDITION}，$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")）"
 

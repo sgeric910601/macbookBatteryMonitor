@@ -24,12 +24,16 @@ final class SystemChargeLimit: ObservableObject {
     @Published private(set) var draft: Int?
     /// 上限改變（在這裡或系統設定調整）後讓 App 立即重新整理
     var onChange: (() -> Void)?
+    /// 使用者放開滑桿、要寫入新的上限時呼叫（智慧充電進行中就以使用者為準、結束排程）
+    var onUserCommit: ((Int) -> Void)?
 
     private let service = PowerUIChargeLimit()
     private var started = false
     private var notifyToken: Int32 = 0
     private var editing = false
     private var commitTask: Task<Void, Never>?
+    /// 智慧充電的寫入依序進行
+    private var automaticWrites: Task<Void, Never>?
 
     /// 滑桿與數字顯示的值
     var shown: Int { draft ?? limit }
@@ -74,6 +78,35 @@ final class SystemChargeLimit: ObservableObject {
         if !editing { commit() }
     }
 
+    /// 智慧充電用：寫入並讀回確認，系統讀回的上限等於目標才回傳 true。
+    /// 使用者正在拖動或滑桿正在寫入時，等它結束再寫（最多 10 秒），不會蓋掉使用者剛設定的值
+    func applyAutomatically(_ target: Int) async -> (success: Bool, readBack: Int?) {
+        guard supported, options.contains(target) else { return (false, nil) }
+        let previous = automaticWrites
+        let task = Task { @MainActor [weak self] () -> (success: Bool, readBack: Int?) in
+            await previous?.value
+            guard let self else { return (false, nil) }
+            for _ in 0..<100 where self.status == .applying || self.editing || self.draft != nil {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            guard self.status != .applying, !self.editing, self.draft == nil else { return (false, self.limit) }
+            if self.limit == target { return (true, self.limit) }
+            self.status = .applying
+            let outcome = await self.service.set(target)
+            self.status = .idle
+            switch outcome {
+            case .applied(let reading):
+                self.apply(reading)
+                return (reading.limit == target, reading.limit)
+            case .rejected(_, let after):
+                if let after { self.apply(after) }
+                return (false, after?.limit)
+            }
+        }
+        automaticWrites = Task { _ = await task.value }
+        return await task.value
+    }
+
     /// 開發用截圖：不讀系統，直接用示範值
     func loadPreview(limit: Int) {
         supported = true
@@ -88,6 +121,7 @@ final class SystemChargeLimit: ObservableObject {
             draft = nil
             return
         }
+        onUserCommit?(target)
         status = .applying
         Task {
             let outcome = await service.set(target)

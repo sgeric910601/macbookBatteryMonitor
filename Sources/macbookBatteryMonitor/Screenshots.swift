@@ -54,6 +54,23 @@ enum ScreenshotCommand {
         SnapshotCommand.render(peripherals, appearance: .darkAqua, settle: 0.6, to: dir.appendingPathComponent("peripherals.png"))
         ui.tab = .details
 
+        // 智慧充電：接著電源維持保養上限 80%、明天 7:30 前充到 100%，旁邊是今日回顧與智慧充電頁
+        let planStore = BatteryStore()
+        planStore.loadPluggedPreview(now: now, atLimit: true)
+        planStore.loadChargingPlanPreview(now: now)
+        let planUI = PanelState()
+        planUI.isVisible = true
+        planUI.tab = .today
+        let pagesUI = PanelState()
+        pagesUI.isVisible = true
+        pagesUI.page = .chargingPlan
+        let pluggedIcon = StatusIconRenderer.image(percent: 80, state: .limitReached, low: false, showsPercent: false)
+        let smartCharging = Showcase(menuItems: [MenuItem(image: pluggedIcon, text: "80%")]) {
+            Popover { RootView(store: planStore, settings: settings, ui: planUI) }
+            Popover { ChargingPlanView(store: planStore, settings: settings, ui: pagesUI).frame(width: 380) }
+        }
+        SnapshotCommand.render(smartCharging, appearance: .darkAqua, settle: 0.6, to: dir.appendingPathComponent("smart-charging.png"))
+
         // 桌上型 Mac（沒有電池）：選單列電腦圖示加系統耗電，面板是系統耗電與耗電細項
         let desktopStore = BatteryStore()
         desktopStore.loadDesktopPreview(now: now)

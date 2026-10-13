@@ -11,14 +11,36 @@ struct RootView: View {
                 Color.clear.frame(height: 1)
             } else {
                 switch ui.page {
-                case .main: PanelView(store: store, settings: settings, ui: ui)
+                case .main: MainPage(store: store, settings: settings, ui: ui)
                 case .settings: ScrollingPage(page: .settings, ui: ui) { SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater, chargeLimit: store.chargeLimit,
                                                                                      hasBattery: store.snapshot != nil) }
+                case .chargingPlan: ScrollingPage(page: .chargingPlan, ui: ui) { ChargingPlanView(store: store, settings: settings, ui: ui) }
                 case .displayItems: ScrollingPage(page: .displayItems, ui: ui) { DisplayItemsView(settings: settings, ui: ui, limitSlider: store.chargeLimit.supported) }
                 }
             }
         }
         .frame(width: 380)
+    }
+}
+
+/// 主面板：放得下時維持原本的版面；比螢幕還高時（小螢幕或放大顯示）改成可捲動，免得下方被切掉
+private struct MainPage: View {
+    @ObservedObject var store: BatteryStore
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var ui: PanelState
+
+    var body: some View {
+        if (ui.pageHeights[.main] ?? 0) > ScrollingPage<EmptyView>.maxHeight {
+            ScrollingPage(page: .main, ui: ui) { PanelView(store: store, settings: settings, ui: ui) }
+        } else {
+            PanelView(store: store, settings: settings, ui: ui)
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                })
+                .onPreferenceChange(ContentHeightKey.self) { height in
+                    if height > 0, ui.pageHeights[.main] != height { ui.pageHeights[.main] = height }
+                }
+        }
     }
 }
 
@@ -32,10 +54,17 @@ struct PanelView: View {
             if let s = store.snapshot, let e = store.estimates {
                 HeaderView(s: s, e: e, lowThreshold: settings.lowThreshold)
                 TimeCard(s: s, e: e, unpluggedAt: store.unpluggedAt, fullThreshold: settings.fullThreshold,
-                         chargeLimit: store.chargeLimit.supported ? store.chargeLimit : nil)
+                         chargeLimit: store.chargeLimit.supported ? store.chargeLimit : nil,
+                         planActive: store.chargingPlan.isActive,
+                         journey: store.chargeLimit.supported
+                            ? ChargingJourneyPresentation.make(percent: s.percent, charging: e.state == .charging,
+                                                               decision: store.chargingPlan.decision, now: s.date) : nil,
+                         appearance: settings.chargingAppearance,
+                         animated: ui.isVisible && !settings.powerSavingActive,
+                         openPlan: { ui.page = .chargingPlan })
                 PowerFlowView(s: s, e: e, breakdown: store.breakdown, ui: ui, powerSaving: settings.powerSavingActive)
                 Picker("", selection: ui.binding(\.tab)) {
-                    ForEach(BottomTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(BottomTab.tabs(desktop: false), id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -45,6 +74,7 @@ struct PanelView: View {
                     case .history: HistoryChartView(history: store.history, ui: ui)
                     case .processes: TopProcessesView(store: store)
                     case .peripherals: PeripheralsView(store: store.peripherals, settings: settings)
+                    case .today: DailyRecapView(recap: DailyBatteryRecap.make(samples: store.history.samples, day: s.date))
                     }
                 }
                 .frame(height: 231, alignment: .top)
@@ -70,7 +100,8 @@ struct PanelView: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer()
-            if let release = store.updater.available {
+            // Beta 是使用者手動找到的，不在面板上提示
+            if let release = store.updater.available, !release.isBeta {
                 Button {
                     ui.page = .settings
                 } label: {
@@ -157,6 +188,12 @@ private struct TimeCard: View {
     let fullThreshold: Int
     /// 充電上限滑桿（支援調整的 Mac 才有），放在卡片最上方
     var chargeLimit: SystemChargeLimit?
+    var planActive = false
+    /// 智慧充電列（支援調整充電上限的 Mac 才有），放在滑桿上方
+    var journey: ChargingJourneyPresentation?
+    var appearance: ChargingAppearance = .companion
+    var animated = false
+    var openPlan: () -> Void = {}
 
     /// 上限數值只在滑桿顯示，卡片其他地方不再重複
     private var limitShownAbove: Bool { chargeLimit != nil }
@@ -164,8 +201,12 @@ private struct TimeCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
+                if let journey {
+                    ChargingJourneyView(presentation: journey, appearance: appearance, animated: animated, open: openPlan)
+                    Divider()
+                }
                 if let chargeLimit {
-                    ChargeLimitSlider(control: chargeLimit)
+                    ChargeLimitSlider(control: chargeLimit, planActive: planActive)
                     Divider()
                 }
                 switch e.state {
@@ -301,7 +342,8 @@ struct ScrollingPage<Content: View>: View {
     @ViewBuilder var content: Content
 
     /// 扣掉選單列與 popover 箭頭、邊緣的空間
-    private var maxHeight: CGFloat { max(300, (NSScreen.main?.visibleFrame.height ?? 800) - 40) }
+    static var maxHeight: CGFloat { max(300, (NSScreen.main?.visibleFrame.height ?? 800) - 40) }
+    private var maxHeight: CGFloat { Self.maxHeight }
 
     var body: some View {
         ScrollViewReader { proxy in

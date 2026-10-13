@@ -10,6 +10,9 @@ struct UpdateCard: View {
     /// 點新版本通知時捲到這張卡片
     static let anchor = "update"
 
+    /// 「安裝 Beta…」的確認狀態放在 PanelState（只裝 Command Line Tools 時不能用 @State）
+    @ObservedObject var ui: PanelState
+
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
@@ -22,6 +25,9 @@ struct UpdateCard: View {
                 if let release = updater.available {
                     Link("查看 v\(release.versionText) 的更新內容", destination: release.pageURL)
                         .font(.caption)
+                    if release.isBeta, ui.confirmingBetaInstall, updater.canInstall {
+                        betaConfirmation(release)
+                    }
                 }
                 HStack {
                     Text("自動檢查更新")
@@ -46,7 +52,7 @@ struct UpdateCard: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text("每天檢查一次 GitHub 上有沒有新版本，只會提示，不會自動安裝：面板底部會出現「有新版本」，開啟通知時也會發一則通知（每個版本只通知一次，點通知直接打開這裡）。更新時會下載通用版（Apple 晶片與 Intel 都能用），驗證後換上新版並重新開啟，設定與歷史資料都會保留。")
+                Text("每天檢查一次 GitHub 上有沒有新版本，只會提示，不會自動安裝：面板底部會出現「有新版本」，開啟通知時也會發一則通知（每個版本只通知一次，點通知直接打開這裡）。更新時會下載通用版（Apple 晶片與 Intel 都能用），驗證後換上新版並重新開啟，設定與歷史資料都會保留。Beta 測試版只有按「檢查更新」時才會列出，不會自動通知，安裝前會再確認一次。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -66,7 +72,10 @@ struct UpdateCard: View {
                 .font(.callout)
                 .foregroundStyle(.green)
         case .available(let release):
-            Text("有新版本 v\(release.versionText)（目前 \(updater.currentVersion)）").font(.callout.weight(.semibold))
+            Text(release.isBeta ? "有 Beta 測試版 v\(release.versionText)（目前 \(updater.currentVersion)）"
+                                : "有新版本 v\(release.versionText)（目前 \(updater.currentVersion)）")
+                .font(.callout.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
         case .downloading(let release):
             HStack(spacing: 6) { ProgressView().controlSize(.small); Text("下載並驗證 v\(release.versionText)…") }.font(.callout)
         case .installing:
@@ -78,8 +87,11 @@ struct UpdateCard: View {
 
     @ViewBuilder private var action: some View {
         switch updater.state {
-        case .available:
-            if updater.canInstall {
+        case .available(let release):
+            if updater.canInstall, release.isBeta {
+                Button("安裝 Beta…") { ui.confirmingBetaInstall = true }
+                    .disabled(ui.confirmingBetaInstall)
+            } else if updater.canInstall {
                 Button("一鍵更新") { Task { await updater.install() } }
                     .buttonStyle(.borderedProminent)
             } else {
@@ -95,6 +107,30 @@ struct UpdateCard: View {
         case .idle, .upToDate:
             Button("檢查更新") { Task { await updater.check(userInitiated: true) } }
         }
+    }
+
+    /// Beta 安裝前的確認：說明測試版的風險與回到正式版的方式
+    private func betaConfirmation(_ release: ReleaseInfo) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("確定要安裝 Beta 測試版 v\(release.versionText) 嗎？", systemImage: "exclamationmark.triangle.fill")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text("Beta 是尚未正式發布的測試版本，用來搶先試用新功能，可能還有錯誤或不穩定的地方。之後有正式版時會照常提示更新；想回到目前的正式版，需要到 GitHub 下載正式版重新安裝。設定與歷史資料都會保留。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("取消") { ui.confirmingBetaInstall = false }
+                Button("安裝 Beta") {
+                    ui.confirmingBetaInstall = false
+                    Task { await updater.install() }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var lastCheckedText: String? {

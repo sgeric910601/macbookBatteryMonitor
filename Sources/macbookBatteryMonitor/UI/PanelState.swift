@@ -6,6 +6,8 @@ enum PowerFlowLevel { case overview, components, chip }
 enum PanelPage {
     case main
     case settings
+    /// 智慧充電（點主面板資訊卡最上方那一列）
+    case chargingPlan
     /// 設定 → 顯示項目
     case displayItems
 }
@@ -15,10 +17,16 @@ enum BottomTab: String, CaseIterable {
     case history = "電量歷史"
     case processes = "耗電排行"
     case peripherals = "周邊設備"
+    case today = "今日"
 
     /// 桌上型 Mac 沒有電量，歷史分頁改叫「耗電歷史」
     func title(desktop: Bool) -> String {
         desktop && self == .history ? "耗電歷史" : rawValue
+    }
+
+    /// 桌上型 Mac 沒有電量，沒有「今日」回顧
+    static func tabs(desktop: Bool) -> [BottomTab] {
+        desktop ? allCases.filter { $0 != .today } : allCases
     }
 }
 
@@ -54,6 +62,12 @@ final class PanelState: ObservableObject {
     @Published var scrollTarget: String?
     /// macOS 關閉了這個 App 的通知（設定頁打開時檢查）
     @Published var notificationsBlocked = false
+    /// 智慧充電頁的輸入：指定完成時間、每週排程的星期與時間
+    @Published var chargingCustomDeadline = Date().addingTimeInterval(4 * 3600)
+    @Published var chargingWeekdays: Set<Int> = [2, 3, 4, 5, 6]
+    @Published var chargingWeeklyTime = Calendar.current.date(from: DateComponents(hour: 8, minute: 0)) ?? Date()
+    /// 設定 → 更新：按了「安裝 Beta…」，等使用者再確認一次
+    @Published var confirmingBetaInstall = false
     @Published var loginStatus: LoginItem.Status = .disabled
     @Published var loginError: String?
 

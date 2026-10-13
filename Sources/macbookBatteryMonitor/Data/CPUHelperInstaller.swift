@@ -5,7 +5,13 @@ import Darwin
 
 /// 一次授權安裝 root 保護的固定輔助程式；不修改 sudoers 或保存密碼。
 enum CPUHelperInstaller {
-    static var installed: Bool {
+    static var installed: Bool { configuration != nil }
+
+    /// 服務能排定智慧充電喚醒：v1.7.0 以前安裝的服務只有 CPU 取樣，要用喚醒時需重新安裝
+    static var supportsChargingWake: Bool { configuration?.chargingWake == true }
+
+    /// 已安裝、檔案權限正確且屬於這個使用者的服務設定
+    private static var configuration: CPUHelperConfiguration? {
         let fm = FileManager.default
         for (path, mode) in [(CPUHelperConstants.directory, 0o755),
                              (CPUHelperConstants.executable, 0o755),
@@ -14,11 +20,12 @@ enum CPUHelperInstaller {
             guard let attrs = try? fm.attributesOfItem(atPath: path),
                   (attrs[.ownerAccountID] as? NSNumber)?.intValue == 0,
                   (attrs[.posixPermissions] as? NSNumber)?.intValue == mode,
-                  attrs[.type] as? FileAttributeType != .typeSymbolicLink else { return false }
+                  attrs[.type] as? FileAttributeType != .typeSymbolicLink else { return nil }
         }
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: CPUHelperConstants.configuration)),
-              let config = try? JSONDecoder().decode(CPUHelperConfiguration.self, from: data) else { return false }
-        return config.uid == getuid() && config.version == CPUHelperConstants.version
+              let config = try? JSONDecoder().decode(CPUHelperConfiguration.self, from: data),
+              config.uid == getuid(), config.version == CPUHelperConstants.version else { return nil }
+        return config
     }
 
     /// 系統裡留有任何服務檔案（包含版本不符的舊服務），關閉選項時要移除

@@ -59,7 +59,7 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 
 ### 周邊設備
 
-面板下方的「周邊設備」分頁列出連線中的藍牙鍵盤、滑鼠、觸控板與耳機電量（AirPods 等會分別列出左耳、右耳與充電盒）。每個設備右邊的鈴鐺可以各自設定低電量通知：不通知，或低於 10%、15%、20%、30%、50% 時通知（預設 20%）。
+面板下方的「周邊設備」分頁列出連線中的藍牙鍵盤、滑鼠、觸控板與耳機電量（AirPods 等在同一行並排顯示「左」「右」「盒」三個電量，v1.6.3 起）。羅技、Razer 等非 Apple 的藍牙低功耗滑鼠、鍵盤也會顯示（v1.6.2 起，需要允許藍牙權限，第一次啟動時會詢問）。每個設備右邊的鈴鐺可以各自設定低電量通知：不通知，或低於 10%、15%、20%、30%、50% 時通知（預設 20%）。
 
 ![周邊設備：AirPods、鍵盤、滑鼠的電量與通知設定](docs/screenshots/peripherals.png)
 
@@ -76,7 +76,7 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 
 ### 舊版本（有已知 bug，不建議使用）
 
-舊版本仍保留在 Releases，但都有下表的 bug，最新版已全部修正。v1.5.0 起有一鍵更新，之後不必再手動下載。想省電的話，請用最新版、把系統監控關掉（只看電池）並開啟省電模式或調慢更新頻率，不要改用舊版。
+舊版本仍保留在 Releases，但都有下表的 bug，最新版已全部修正。另外，有周邊設備功能的 v1.4.0～v1.6.1 都有兩個問題：羅技、Razer 等非 Apple 的藍牙低功耗滑鼠、鍵盤不顯示電量，以及部分新款 AirPods 在周邊設備分頁列成兩行（v1.6.2 修正）。v1.5.0 起有一鍵更新，之後不必再手動下載。想省電的話，請用最新版、把系統監控關掉（只看電池）並開啟省電模式或調慢更新頻率，不要改用舊版。
 
 | 已知 bug | v1.0.0 | v1.1.0 | v1.2.1 | v1.2.2 | v1.3.0 | v1.4.1 |
 |---|---|---|---|---|---|---|
@@ -98,11 +98,13 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 
 | 版本 | 介面 | 下載 |
 |---|---|---|
-| v1.6.0 | 充電上限滑桿（沒有已知 bug，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.0) |
-| v1.5.3 | 外接磁碟、風扇與溫度（沒有已知 bug，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.3) |
-| v1.5.0 | 一鍵更新（沒有已知 bug，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.0) |
+| v1.6.2 | 羅技、Razer 等藍牙低功耗滑鼠、鍵盤電量（耳機只顯示一個數字，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.2) |
+| v1.6.1 | 兩個版本各自的 App 名稱（周邊設備有上述兩個問題，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.1) |
+| v1.6.0 | 充電上限滑桿（周邊設備有上述兩個問題，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.0) |
+| v1.5.3 | 外接磁碟、風扇與溫度（周邊設備有上述兩個問題，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.3) |
+| v1.5.0 | 一鍵更新（周邊設備有上述兩個問題，可直接一鍵更新到最新版） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.0) |
 | v1.4.1 | 新 App 圖示，可換背景色 | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.4.1) |
-| v1.4.0 | 周邊設備、可調更新頻率與顯示項目（沒有已知 bug，但沒有一鍵更新） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.4.0) |
+| v1.4.0 | 周邊設備、可調更新頻率與顯示項目（周邊設備有上述兩個問題，也沒有一鍵更新） | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.4.0) |
 | v1.3.0 | 電池版／系統監控版、省電模式 | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.3.0) |
 | v1.2.2 | 每秒更新、可展開硬體細項 | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.2.2) |
 | v1.2.1 | 選單列每 30 秒更新、可展開硬體細項 | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.2.1) |
@@ -121,7 +123,7 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
      ```bash
      xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app
      ```
-4. 第一次啟動會詢問要「只看電池」還是「電池＋系統監控」（桌上型 Mac 是「只看耗電」／「耗電＋系統監控」）、詢問通知權限，並自動加入開機自啟動（可在設定關閉）
+4. 第一次啟動會詢問要「只看電池」還是「電池＋系統監控」（桌上型 Mac 是「只看耗電」／「耗電＋系統監控」）、要不要開啟管理員 CPU 取樣（Apple 晶片），以及通知與藍牙權限（藍牙只用來讀取羅技、Razer 等藍牙滑鼠、鍵盤的電量），並自動加入開機自啟動（可在設定關閉）
 
 已經在用 v1.5.0 以後的版本：到設定 → 更新按「一鍵更新」即可升級，不必重新下載。
 
@@ -144,7 +146,7 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 - 詳細資訊：電池電壓、電池電流、電池功率、系統耗電、系統預估、電池溫度、健康度、循環次數、容量（mAh）、變壓器（額定瓦數）、變壓器即時電壓與電流、充電上限（有充電上限滑桿的 Mac 只顯示在滑桿上，不重複列出）；每個欄位都可以在設定 → 顯示項目隱藏
 - 電量歷史圖表（1 小時／24 小時／7 天，第一次啟動會用 `pmset` 紀錄回填過去幾天）
 - 耗電排行：前 5 名 App，同一個 App 的子程序會合併，依更新頻率更新
-- 周邊設備：連線中的藍牙鍵盤、滑鼠、觸控板與耳機電量，每 60 秒更新，每個設備可以各自設定低電量通知
+- 周邊設備：連線中的藍牙鍵盤、滑鼠、觸控板與耳機電量，包括羅技、Razer 等藍牙低功耗設備（v1.6.2 起），耳機的左耳、右耳與充電盒在同一行並排（v1.6.3 起），每 60 秒更新，每個設備可以各自設定低電量通知
 
 **系統監控模組**（設定 → 系統監控：總開關加上四個模組各自的開關）
 - CPU／GPU：選單列顯示 CPU 與 GPU 使用率；面板有使用者／系統比例、最近 2 分鐘曲線、各核心（效能核心、節能核心）、GPU 記憶體、平均負載、CPU 使用率最高的 App，以及「風扇與溫度」：風扇轉速與佔最高轉速的比例（沒有風扇的機型不顯示）、CPU／GPU／SoC／電池／儲存裝置溫度（讀不到的項目不顯示）
@@ -196,6 +198,8 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 「自動檢查更新」預設開啟：啟動後與之後每 6 小時看一次，距離上次檢查超過一天才會連到 `api.github.com` 查最新版本，只提示、不會自動安裝。所以一直開著 App 的話，新版發布後大約 1 天內會發現。
 
 「有新版本時通知」預設開啟：自動檢查發現新版本時發一則 macOS 通知，每個版本只通知一次（手動按「檢查更新」看到的版本不會再通知），點通知會打開設定並捲到「更新」。不想收到可在設定 → 更新關閉；關閉自動檢查更新時也不會通知，但面板底部仍會在手動檢查到新版本時顯示「有新版本」。App 不在可寫入的位置（例如由系統管理員安裝）時無法一鍵更新，會提示到 GitHub 手動下載。
+
+**Beta 測試版**（v1.6.3 起）：GitHub 上標成「預先發行版本」的 Beta（例如 v1.7.0-beta.1）只有在設定 → 更新按「檢查更新」時才會列出，自動檢查不會提示或通知。按「安裝 Beta…」後會先說明測試版可能不穩定，再按一次「安裝 Beta」才會下載安裝（同樣驗證校驗碼與簽章）。已有比 Beta 新的正式版時只會列出正式版；裝了 Beta 之後，有正式版時照常提示更新。
 
 v1.4.1 以前的版本沒有這個功能，要先手動下載一次新版。
 
@@ -276,7 +280,7 @@ IOReport 是系統私有介面，可用性依晶片與 macOS 版本而異。機�
 - SMART 健康狀態要啟動 `diskutil`，還可能喚醒休眠中的外接硬碟，所以只在磁碟面板開著時查，每顆最多 10 分鐘一次
 - 風扇與溫度只在 CPU 面板開著時於背景每 2 秒讀一次（一次約 28 毫秒），選單列平常不讀
 - CPU 與記憶體的 App 排行只在該模組面板開著時，持續跑一個 `top` 依更新頻率輸出；關閉面板就停止
-- 周邊設備電量變化很慢，每 60 秒查一次：鍵盤、滑鼠、觸控板讀 IORegistry（很快）；耳機要跑 `system_profiler`（約 0.1～0.3 秒），所以背景更新時只有連著藍牙音訊裝置才查，打開周邊設備分頁時才查所有藍牙設備
+- 周邊設備電量變化很慢，每 60 秒查一次：鍵盤、滑鼠、觸控板讀 IORegistry（很快）；耳機要跑 `system_profiler`（約 0.1～0.3 秒），所以背景更新時只有連著藍牙音訊裝置才查，打開周邊設備分頁時才查所有藍牙設備；羅技、Razer 等藍牙低功耗設備用 CoreBluetooth 向已連線的設備讀電量，不建立新連線，讀到新值時只重新整理這部分
 - 不是即時讀數的資料不必每秒查：電量歷史每分鐘記一筆（每 15 分鐘寫一次檔，睡眠前和結束時也會存）；健康度每 6 小時查一次（`system_profiler` 每次約需 0.5 秒，健康度以週為單位變化）
 
 ## 資料來源
@@ -309,8 +313,9 @@ IOReport 是系統私有介面，可用性依晶片與 macOS 版本而異。機�
 | 網路速度與累計流量 | `sysctl` 的 64 位元介面計數器（`NET_RT_IFLIST2`），只查目前使用中的介面 |
 | 網路介面與 IP | `SCDynamicStore`（預設路由介面）、`getifaddrs` |
 | CPU／記憶體 App 排行 | `top -o cpu`、`top -o mem` |
-| 新版本資訊（一鍵更新） | GitHub API `releases/latest`，每天最多一次；下載檔以 Release 的 `SHA256SUMS.txt` 驗證 |
+| 新版本資訊（一鍵更新） | GitHub API `releases`（最近 20 個，Beta 只在手動檢查時列出），每天最多一次；下載檔以 Release 的 `SHA256SUMS.txt` 驗證 |
 | 周邊設備電量（鍵盤、滑鼠、觸控板） | IORegistry 中帶 `BatteryPercent` 的服務 |
+| 周邊設備電量（羅技、Razer 等藍牙低功耗滑鼠、鍵盤） | CoreBluetooth：已連線設備標準電池服務（`0x180F`）的電池電量（`0x2A19`），需要藍牙權限；名稱看不出是滑鼠或鍵盤時用 IORegistry 的 HID 用途判斷 |
 | 周邊設備電量（耳機左右耳、充電盒） | `system_profiler SPBluetoothDataType`；是否連著藍牙耳機由 CoreAudio 的裝置清單判斷 |
 
 ## 資料存放位置
@@ -342,7 +347,7 @@ IOReport 是系統私有介面，可用性依晶片與 macOS 版本而異。機�
 ```bash
 git clone https://github.com/sgeric910601/macbookBatteryMonitor.git
 cd macbookBatteryMonitor
-git checkout v1.6.1          # 或其他版本的 tag，不指定就是最新的開發版
+git checkout v1.6.2          # 或其他版本的 tag，不指定就是最新的開發版
 ./build.sh                   # 通用版（Apple 晶片＋Intel）：產生 build/macbookBatteryMonitor.app
 ./build.sh install           # 並安裝到 /Applications 啟動
 ```

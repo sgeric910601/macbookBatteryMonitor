@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ComponentPowerFlowView: View {
     let breakdown: PowerBreakdown
-    let ui: PanelState
+    @ObservedObject var ui: PanelState
     /// 省電模式關掉流動動畫
     var animated = true
     /// 桌上型 Mac 的面板：來源畫成桌機；值是有沒有內建螢幕（iMac 有，Mac mini 沒有），沒有時「其他」不含螢幕
@@ -12,7 +12,7 @@ struct ComponentPowerFlowView: View {
     @Environment(\.colorScheme) private var scheme
 
     private var chip: Bool { ui.powerFlowLevel == .chip }
-    private var settings: AppSettings { .shared }
+    @ObservedObject private var settings = AppSettings.shared
     /// 依設定隱藏的項目不顯示；沒有 ANE 通道的機型直接拿掉 ANE
     private var rows: [ComponentRow] {
         let all: [ComponentRow] = chip ? [
@@ -55,7 +55,7 @@ struct ComponentPowerFlowView: View {
                     Text(chip ? (chipComplete ? "晶片合計" : "已取得合計") : "系統負載").font(.system(size: 9)).foregroundStyle(.secondary)
                 }
                 .frame(width: 58, height: 92)
-                .background(Color.primary.opacity(0.055), in: UnevenRoundedRectangle(topLeadingRadius: 13, bottomLeadingRadius: 13))
+                .background(Color.primary.opacity(0.055), in: SideRoundedRectangle(leading: 13))
                 ComponentRibbons(values: rows.map(\.watts), total: chip ? breakdown.chipWatts : breakdown.systemWatts,
                                  animated: animated && !reduceMotion, dark: scheme == .dark)
                     .frame(maxWidth: .infinity).frame(height: 126)
@@ -100,7 +100,7 @@ struct ComponentPowerFlowView: View {
         }
         .frame(maxWidth: .infinity).frame(height: 38)
         .background(Color.primary.opacity(expandable ? 0.085 : 0.055),
-                    in: UnevenRoundedRectangle(bottomTrailingRadius: 11, topTrailingRadius: 11))
+                    in: SideRoundedRectangle(trailing: 11))
     }
 }
 

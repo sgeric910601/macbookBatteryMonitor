@@ -2,12 +2,12 @@ import SwiftUI
 
 /// 主面板資訊卡最上方的充電上限滑桿：拖動後直接改 macOS 系統設定裡的充電上限
 struct ChargeLimitSlider: View {
-    let control: SystemChargeLimit
+    @ObservedObject var control: SystemChargeLimit
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
-                CardTitle("充電上限", systemImage: "battery.100percent.bolt")
+                CardTitle("充電上限", systemImage: SymbolCompat.name("battery.100percent.bolt"))
                     .fixedSize()
                 Slider(value: position, in: 0...Double(max(1, control.options.count - 1)), step: 1) { editing in
                     control.setEditing(editing)

@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 struct HistorySample: Codable {
     var t: Date
@@ -24,14 +24,13 @@ struct ChartPoint: Identifiable {
 }
 
 @MainActor
-@Observable
-final class HistoryStore {
+final class HistoryStore: ObservableObject {
     static let retention: TimeInterval = 7 * 24 * 3600
 
-    private(set) var samples: [HistorySample] = []
-    @ObservationIgnored private var isPreview = false
-    @ObservationIgnored private var unsaved = 0
-    @ObservationIgnored private let fileURL: URL
+    @Published private(set) var samples: [HistorySample] = []
+    private var isPreview = false
+    private var unsaved = 0
+    private let fileURL: URL
 
     init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

@@ -36,7 +36,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             let blocked = settings.authorizationStatus == .denied
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { completion(blocked) }
+                MainActor.assumeIsolatedCompat { completion(blocked) }
             }
         }
     }
@@ -140,7 +140,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let opensUpdate = kind == Self.updateKind && response.actionIdentifier == UNNotificationDefaultActionIdentifier
         Self.log.notice("點了通知：kind=\(kind ?? "-", privacy: .public) action=\(response.actionIdentifier, privacy: .public)")
         DispatchQueue.main.async {
-            MainActor.assumeIsolated {
+            MainActor.assumeIsolatedCompat {
                 if opensUpdate { Notifier.shared.onOpenUpdate?() }
             }
             completionHandler()

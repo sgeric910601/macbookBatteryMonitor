@@ -46,7 +46,7 @@ extension PowerState {
 
     var symbol: String {
         switch self {
-        case .discharging: return "battery.75percent"
+        case .discharging: return SymbolCompat.name("battery.75percent")
         case .charging: return "bolt.fill"
         case .pluggedIdle: return "powerplug.fill"
         case .full: return "checkmark.circle.fill"
@@ -113,7 +113,7 @@ struct BatteryGlyph: View {
                     RoundedRectangle(cornerRadius: h * 0.28, style: .continuous)
                         .strokeBorder(Color.secondary.opacity(0.55), lineWidth: 2)
                     RoundedRectangle(cornerRadius: h * 0.16, style: .continuous)
-                        .fill(color.gradient)
+                        .fill(color.softGradient)
                         .frame(width: max(3, (bodyWidth - 8) * CGFloat(min(max(percent, 0), 100)) / 100))
                         .padding(4)
                     if let limit, limit < 100 {
@@ -151,5 +151,12 @@ struct BatteryGlyph: View {
         case .pluggedIdle, .full, .limitReached: return "powerplug.fill"
         case .discharging: return nil
         }
+    }
+}
+
+extension Color {
+    /// macOS 12 沒有 Color.gradient：上亮下暗的線性漸層，效果接近
+    var softGradient: LinearGradient {
+        LinearGradient(colors: [self, opacity(0.78)], startPoint: .top, endPoint: .bottom)
     }
 }

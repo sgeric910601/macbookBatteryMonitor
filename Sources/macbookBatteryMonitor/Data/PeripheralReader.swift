@@ -64,12 +64,11 @@ enum PeripheralReader {
 
 /// 周邊設備清單：每 60 秒更新一次，打開周邊設備分頁時立即更新；每個設備依自己的門檻發低電量通知
 @MainActor
-@Observable
-final class PeripheralStore {
-    private(set) var devices: [PeripheralBattery] = []
-    private(set) var updated: Date?
-    private(set) var loading = false
-    @ObservationIgnored private var alerts = PeripheralAlerts()
+final class PeripheralStore: ObservableObject {
+    @Published private(set) var devices: [PeripheralBattery] = []
+    @Published private(set) var updated: Date?
+    @Published private(set) var loading = false
+    private var alerts = PeripheralAlerts()
 
     static let interval: TimeInterval = 60
 

@@ -96,7 +96,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         if shouldRun, timer == nil {
             let interval = settings.sampleInterval
             let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.tick() }
+                MainActor.assumeIsolatedCompat { self?.tick() }
             }
             timer.tolerance = interval * 0.1
             RunLoop.main.add(timer, forMode: .common)
@@ -195,8 +195,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
                                     self?.popover?.performClose(nil)
                                     self?.openSettings?()
                                 })
-        let hosting = NSHostingController(rootView: root)
-        hosting.sizingOptions = [.preferredContentSize]
+        let hosting = SizingHostingController(rootView: root)
         let popover = NSPopover()
         popover.behavior = .transient
         popover.delegate = self
@@ -204,7 +203,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         popover.contentSize = hosting.view.fittingSize
         self.popover = popover
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        NSApp.activate()
+        NSApp.activateCompat()
         popover.contentViewController?.view.window?.makeKey()
         startTop()
     }
@@ -226,7 +225,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
             return
         }
         let stream = TopStream(arguments: ["-l", "0", "-s", "\(Int(settings.sampleInterval))", "-o", column, "-stats", "pid,command,\(column)", "-n", "15"]) { [weak self] text in
-            MainActor.assumeIsolated {
+            MainActor.assumeIsolatedCompat {
                 guard let self else { return }
                 if openKind == .cpu { self.cpu.receiveTop(text) } else { self.memory.receiveTop(text) }
             }

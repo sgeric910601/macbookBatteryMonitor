@@ -9,11 +9,12 @@ cd "$(dirname "$0")"
 
 APP_NAME="macbookBatteryMonitor"
 APP="build/$APP_NAME.app"
-EDITION="universal"
+# 舊系統版本分支（macOS 12 起）預設打包 legacy
+EDITION="legacy"
 INSTALL=0
 for arg in "$@"; do
     case "$arg" in
-        universal|battery|status) EDITION="$arg" ;;
+        legacy|universal|battery|status) EDITION="$arg" ;;
         install) INSTALL=1 ;;
         *) echo "用法：./build.sh [universal|battery|status] [install]" >&2; exit 1 ;;
     esac

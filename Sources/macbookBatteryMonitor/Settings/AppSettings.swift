@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+import Combine
 
 enum MenuBarDisplay: String, CaseIterable, Identifiable {
     case iconAndPercent
@@ -22,28 +22,27 @@ enum MenuBarDisplay: String, CaseIterable, Identifiable {
 }
 
 @MainActor
-@Observable
-final class AppSettings {
+final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
-    @ObservationIgnored private let defaults = UserDefaults.standard
+    private let defaults = UserDefaults.standard
     /// 影響選單列圖示的設定改變時呼叫
-    @ObservationIgnored var onChange: (() -> Void)?
+    var onChange: (() -> Void)?
     /// 系統監控模組開關改變時呼叫
-    @ObservationIgnored var onMonitorsChange: (() -> Void)?
+    var onMonitorsChange: (() -> Void)?
     /// 更新頻率或省電模式改變時呼叫（重設所有取樣間隔）
-    @ObservationIgnored var onIntervalChange: (() -> Void)?
+    var onIntervalChange: (() -> Void)?
 
     /// 可選的更新頻率（秒）
     static let updateIntervals = [1, 2, 5, 10]
 
     /// 更新頻率（秒），預設每秒
-    var updateInterval: Int {
+    @Published var updateInterval: Int {
         didSet { defaults.set(updateInterval, forKey: Keys.updateInterval); onIntervalChange?() }
     }
 
     /// 省電模式：電力流向改用靜態圖示、不播放動畫，更新頻率至少每 2 秒
-    var powerSaving: Bool {
+    @Published var powerSaving: Bool {
         didSet { defaults.set(powerSaving, forKey: Keys.powerSaving); onIntervalChange?() }
     }
 
@@ -56,25 +55,25 @@ final class AppSettings {
     static func updateText(seconds: Int) -> String { seconds <= 1 ? "每秒更新" : "每 \(seconds) 秒更新" }
 
     /// 每個系統監控模組是否在選單列顯示（並依取樣間隔更新）
-    var monitorCPU: Bool {
+    @Published var monitorCPU: Bool {
         didSet { defaults.set(monitorCPU, forKey: Keys.monitorCPU); onMonitorsChange?() }
     }
-    var monitorMemory: Bool {
+    @Published var monitorMemory: Bool {
         didSet { defaults.set(monitorMemory, forKey: Keys.monitorMemory); onMonitorsChange?() }
     }
-    var monitorDisk: Bool {
+    @Published var monitorDisk: Bool {
         didSet { defaults.set(monitorDisk, forKey: Keys.monitorDisk); onMonitorsChange?() }
     }
-    var monitorNetwork: Bool {
+    @Published var monitorNetwork: Bool {
         didSet { defaults.set(monitorNetwork, forKey: Keys.monitorNetwork); onMonitorsChange?() }
     }
 
     /// 系統監控總開關：關閉時選單列只有電池（桌上型為耗電）圖示，四個模組都不取樣，和以前的電池版一樣省電
-    var systemMonitors: Bool {
+    @Published var systemMonitors: Bool {
         didSet { defaults.set(systemMonitors, forKey: Keys.systemMonitors); onMonitorsChange?() }
     }
     /// 全新安裝、還沒選過要不要開系統監控（第一次啟動時詢問）
-    private(set) var needsModeChoice = false
+    @Published private(set) var needsModeChoice = false
 
     func chooseMode(systemMonitors: Bool) {
         needsModeChoice = false
@@ -92,20 +91,20 @@ final class AppSettings {
     }
 
     /// 選用的管理員 CPU 取樣（預設關閉）。開啟時安裝系統服務，關閉時移除；由 AdminCPUSampler 在下一次更新時套用
-    var adminCPUSampling: Bool {
+    @Published var adminCPUSampling: Bool {
         didSet { defaults.set(adminCPUSampling, forKey: Keys.adminCPUSampling) }
     }
 
     /// 電力流向細項中隱藏的項目（FlowItem.rawValue）
-    var hiddenFlowItems: Set<String> {
+    @Published var hiddenFlowItems: Set<String> {
         didSet { defaults.set(hiddenFlowItems.sorted(), forKey: Keys.hiddenFlowItems) }
     }
     /// 詳細資訊分頁中隱藏的欄位（DetailField.rawValue）
-    var hiddenDetailFields: Set<String> {
+    @Published var hiddenDetailFields: Set<String> {
         didSet { defaults.set(hiddenDetailFields.sorted(), forKey: Keys.hiddenDetailFields) }
     }
     /// 每個周邊設備的低電量通知門檻（設備 id → %，0 表示關閉）；沒設定過的設備用預設值
-    var peripheralThresholds: [String: Int] {
+    @Published var peripheralThresholds: [String: Int] {
         didSet { defaults.set(peripheralThresholds, forKey: Keys.peripheralThresholds) }
     }
     static let defaultPeripheralThreshold = 20
@@ -123,36 +122,36 @@ final class AppSettings {
     func setPeripheralThreshold(_ value: Int, for id: String) { peripheralThresholds[id] = value }
 
     /// App 圖示的背景色；改變時立刻套用到 App 本身（失敗原因放在 appIconError）
-    var appIconColor: AppIconColor {
+    @Published var appIconColor: AppIconColor {
         didSet {
             defaults.set(appIconColor.rawValue, forKey: Keys.appIconColor)
             appIconError = AppIconChanger.apply(appIconColor)
         }
     }
-    private(set) var appIconError: String?
+    @Published private(set) var appIconError: String?
 
     /// 每天自動檢查一次 GitHub 上有沒有新版本（只檢查，不會自動安裝）
-    var autoCheckUpdates: Bool {
+    @Published var autoCheckUpdates: Bool {
         didSet { defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates) }
     }
     /// 自動檢查發現新版本時發通知（每個版本只通知一次）
-    var updateNotification: Bool {
+    @Published var updateNotification: Bool {
         didSet { defaults.set(updateNotification, forKey: Keys.updateNotification) }
     }
 
-    var display: MenuBarDisplay {
+    @Published var display: MenuBarDisplay {
         didSet { defaults.set(display.rawValue, forKey: Keys.display); onChange?() }
     }
-    var lowAlertEnabled: Bool {
+    @Published var lowAlertEnabled: Bool {
         didSet { defaults.set(lowAlertEnabled, forKey: Keys.lowAlertEnabled) }
     }
-    var lowThreshold: Int {
+    @Published var lowThreshold: Int {
         didSet { defaults.set(lowThreshold, forKey: Keys.lowThreshold); onChange?() }
     }
-    var fullAlertEnabled: Bool {
+    @Published var fullAlertEnabled: Bool {
         didSet { defaults.set(fullAlertEnabled, forKey: Keys.fullAlertEnabled) }
     }
-    var fullThreshold: Int {
+    @Published var fullThreshold: Int {
         didSet { defaults.set(fullThreshold, forKey: Keys.fullThreshold) }
     }
 

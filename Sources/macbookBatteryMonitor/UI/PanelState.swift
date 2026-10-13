@@ -1,4 +1,4 @@
-import Observation
+import Combine
 import SwiftUI
 
 enum PowerFlowLevel { case overview, components, chip }
@@ -41,22 +41,21 @@ enum HistoryRange: String, CaseIterable, Identifiable {
 /// 面板的介面狀態。
 /// 只裝 Command Line Tools 時沒有 SwiftUI 的 macro 外掛，不能用 @State，所以集中放在這裡。
 @MainActor
-@Observable
-final class PanelState {
+final class PanelState: ObservableObject {
     /// 面板關閉時設為 false，畫面會換成空白，不再監聽任何資料
-    var isVisible = false
-    var powerFlowLevel: PowerFlowLevel = .overview
-    var page: PanelPage = .main
-    var tab: BottomTab = .details
-    var historyRange: HistoryRange = .day
+    @Published var isVisible = false
+    @Published var powerFlowLevel: PowerFlowLevel = .overview
+    @Published var page: PanelPage = .main
+    @Published var tab: BottomTab = .details
+    @Published var historyRange: HistoryRange = .day
     /// 設定頁等可捲動頁面量到的內容高度，下次打開直接用，面板不必先撐到最高再縮回來
-    var pageHeights: [PanelPage: CGFloat] = [:]
+    @Published var pageHeights: [PanelPage: CGFloat] = [:]
     /// 打開可捲動頁面時要捲到的卡片（例如點新版本通知時的「更新」）
-    var scrollTarget: String?
+    @Published var scrollTarget: String?
     /// macOS 關閉了這個 App 的通知（設定頁打開時檢查）
-    var notificationsBlocked = false
-    var loginStatus: LoginItem.Status = .disabled
-    var loginError: String?
+    @Published var notificationsBlocked = false
+    @Published var loginStatus: LoginItem.Status = .disabled
+    @Published var loginError: String?
 
     func binding<T>(_ keyPath: ReferenceWritableKeyPath<PanelState, T>) -> Binding<T> {
         Binding(get: { self[keyPath: keyPath] }, set: { self[keyPath: keyPath] = $0 })

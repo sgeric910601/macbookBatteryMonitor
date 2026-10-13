@@ -1,9 +1,8 @@
-import Charts
 import SwiftUI
 
 struct HistoryChartView: View {
-    let history: HistoryStore
-    let ui: PanelState
+    @ObservedObject var history: HistoryStore
+    @ObservedObject var ui: PanelState
     /// 桌上型 Mac：沒有電量，只畫耗電
     var desktop = false
 
@@ -42,34 +41,16 @@ struct HistoryChartView: View {
             } else if points.count < 2 {
                 collecting
             } else {
-                Chart(points) { p in
-                    LineMark(
-                        x: .value("時間", p.t),
-                        y: .value("電量", p.pct),
-                        series: .value("段", p.segment)
-                    )
-                    .foregroundStyle(p.plugged ? Color.green : Color.blue)
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                }
-                .chartXScale(domain: domain)
-                .chartYScale(domain: 0...100)
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: [0, 50, 100]) { value in
-                        AxisGridLine()
-                        AxisValueLabel {
-                            if let v = value.as(Int.self) { Text("\(v)%") }
-                        }
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: axisDates(domain)) { _ in
-                        AxisGridLine()
-                        AxisValueLabel(format: xFormat)
-                    }
-                }
-                .padding(.trailing, 10)
-                .frame(height: wattPoints.isEmpty ? 140 : 100)
+                // macOS 12 沒有 Swift Charts：用 Canvas 畫，用電池時藍色、接電時綠色
+                PlotView(series: [PlotSeries(points: points.map {
+                            PlotPoint(x: $0.t.timeIntervalSinceReferenceDate, y: $0.pct, segment: $0.segment,
+                                      color: $0.plugged ? .green : .blue)
+                         }, lineWidth: 2)],
+                         xDomain: plotDomain(domain), yDomain: 0...100, yTicks: [0, 50, 100],
+                         yLabel: { "\(Int($0))%" }, yAxis: .leading,
+                         xTicks: axisDates(domain).map(\.timeIntervalSinceReferenceDate), xLabel: timeLabel)
+                    .padding(.trailing, 10)
+                    .frame(height: wattPoints.isEmpty ? 140 : 100)
 
                 if !wattPoints.isEmpty {
                     wattsChart(wattPoints, domain: domain, showsTime: false)
@@ -97,33 +78,24 @@ struct HistoryChartView: View {
 
     /// 耗電面積圖；桌上型 Mac 時是主圖，要顯示時間軸
     private func wattsChart(_ points: [ChartPoint], domain: ClosedRange<Date>, showsTime: Bool) -> some View {
-        Chart(points) { p in
-            AreaMark(
-                x: .value("時間", p.t),
-                y: .value("功率", p.watts ?? 0),
-                series: .value("段", p.wattsSegment)
-            )
-            .foregroundStyle(Color.orange.opacity(0.35).gradient)
-            .interpolationMethod(.monotone)
-        }
-        .chartXScale(domain: domain)
-        .chartXAxis {
-            if showsTime {
-                AxisMarks(values: axisDates(domain)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: xFormat)
-                }
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: showsTime ? 3 : 2)) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let v = value.as(Double.self) { Text("\(Int(v))W") }
-                }
-            }
-        }
-        .padding(.trailing, 10)
+        let top = ByteFormat.niceAxisMax(points.compactMap(\.watts).max() ?? 0, minimum: 5)
+        let ticks: [Double] = showsTime ? [0, top / 2, top] : [0, top]
+        return PlotView(series: [PlotSeries(points: points.map {
+                            PlotPoint(x: $0.t.timeIntervalSinceReferenceDate, y: $0.watts ?? 0, segment: $0.wattsSegment, color: .orange)
+                        }, lineWidth: nil, fillOpacity: 0.45)],
+                        xDomain: plotDomain(domain), yDomain: 0...top, yTicks: ticks,
+                        yLabel: { "\(Int($0))W" }, yAxis: .leading,
+                        xTicks: showsTime ? axisDates(domain).map(\.timeIntervalSinceReferenceDate) : [],
+                        xLabel: showsTime ? timeLabel : nil)
+            .padding(.trailing, 10)
+    }
+
+    private func plotDomain(_ domain: ClosedRange<Date>) -> ClosedRange<Double> {
+        domain.lowerBound.timeIntervalSinceReferenceDate...domain.upperBound.timeIntervalSinceReferenceDate
+    }
+
+    private func timeLabel(_ x: Double) -> String {
+        Date(timeIntervalSinceReferenceDate: x).formatted(xFormat)
     }
 
     private var legend: some View {

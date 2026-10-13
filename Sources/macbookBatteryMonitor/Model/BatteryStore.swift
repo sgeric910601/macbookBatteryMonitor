@@ -1,18 +1,17 @@
 import Foundation
-import Observation
+import Combine
 
 @MainActor
-@Observable
-final class BatteryStore {
-    private(set) var snapshot: BatterySnapshot?
+final class BatteryStore: ObservableObject {
+    @Published private(set) var snapshot: BatterySnapshot?
     /// 桌上型 Mac（沒有電池）的整機耗電；有電池的 Mac 一直是 nil
-    private(set) var desktop: DesktopPower?
-    private(set) var estimates: Estimates?
-    private(set) var systemHealth: SystemHealth?
-    private(set) var topProcesses: [EnergyProcess] = []
-    private(set) var processesLoaded = false
+    @Published private(set) var desktop: DesktopPower?
+    @Published private(set) var estimates: Estimates?
+    @Published private(set) var systemHealth: SystemHealth?
+    @Published private(set) var topProcesses: [EnergyProcess] = []
+    @Published private(set) var processesLoaded = false
     /// 這次拔掉電源的時間，用來算「已使用電池多久」
-    private(set) var unpluggedAt: Date?
+    @Published private(set) var unpluggedAt: Date?
     let history = HistoryStore()
     let adminCPU = AdminCPUSampler()
     /// 周邊設備電量（鍵盤、滑鼠、耳機等）
@@ -21,12 +20,12 @@ final class BatteryStore {
     let updater = Updater()
     /// 主面板的充電上限滑桿（調整 macOS 系統設定裡的充電上限）
     let chargeLimit = SystemChargeLimit()
-    private(set) var componentPower: ComponentPowerSample?
-    private(set) var breakdown = PowerBreakdown(systemWatts: nil, status: .sampling)
-    @ObservationIgnored private let hardwareWorker = HardwarePowerWorker()
-    @ObservationIgnored private var samplingGate = SamplingGate()
+    @Published private(set) var componentPower: ComponentPowerSample?
+    @Published private(set) var breakdown = PowerBreakdown(systemWatts: nil, status: .sampling)
+    private let hardwareWorker = HardwarePowerWorker()
+    private var samplingGate = SamplingGate()
     /// 截圖用的示範數據：不啟動真實的硬體取樣，免得蓋掉示範值
-    @ObservationIgnored private var previewing = false
+    private var previewing = false
 
     /// Intel 的 powermetrics 沒有 CPU Power 這一行，而且 SMC 已經直接提供 CPU 功耗，不使用管理員取樣
     private static var adminCPUEnabled: Bool { AppSettings.shared.adminCPUSampling && !ChipInfo.isIntel }
@@ -58,21 +57,34 @@ final class BatteryStore {
 
 
     /// 平滑電流用的時間常數（秒），約等於「近 3 分鐘平均」
-    @ObservationIgnored private let tau: Double = 180
-    @ObservationIgnored private var avgDischarge: Double?
-    @ObservationIgnored private var avgCharge: Double?
-    @ObservationIgnored private var lastDate: Date?
-    @ObservationIgnored private var lastState: PowerState?
-    @ObservationIgnored private var chargingPresentation = ChargingPresentation()
-    @ObservationIgnored private var flowPresentation = PowerFlowPresentation()
+    private let tau: Double = 180
+    private var avgDischarge: Double?
+    private var avgCharge: Double?
+    private var lastDate: Date?
+    private var lastState: PowerState?
+    private var chargingPresentation = ChargingPresentation()
+    private var flowPresentation = PowerFlowPresentation()
     /// 這次接上電源的時間（判斷充電上限是否已被關掉用）
-    @ObservationIgnored private var pluggedSince: Date?
-    @ObservationIgnored private var processStream: ProcessEnergyStream?
+    private var pluggedSince: Date?
+    private var processStream: ProcessEnergyStream?
     /// 面板開著才允許跑 top，避免關掉後還在背景取樣
-    @ObservationIgnored var panelVisible = false
+    var panelVisible = false
+
+    /// 巢狀物件的變化轉給這個物件（macOS 12 沒有 Observation，主面板只觀察 BatteryStore）
+    private var forwarding: [AnyCancellable] = []
 
     init() {
         unpluggedAt = history.lastUnplugged()
+        let nested: [AnyPublisher<Void, Never>] = [
+            history.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            adminCPU.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            peripherals.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            updater.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+            chargeLimit.objectWillChange.map { _ in }.eraseToAnyPublisher(),
+        ]
+        forwarding = nested.map { publisher in
+            publisher.sink { [weak self] in self?.objectWillChange.send() }
+        }
     }
 
     func refresh() {
@@ -192,7 +204,7 @@ final class BatteryStore {
         }
         if processStream == nil {
             processStream = ProcessEnergyStream(interval: interval) { [weak self] result in
-                MainActor.assumeIsolated {
+                MainActor.assumeIsolatedCompat {
                     self?.topProcesses = result
                     self?.processesLoaded = true
                 }

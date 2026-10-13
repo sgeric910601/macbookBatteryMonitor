@@ -2,10 +2,10 @@ import SwiftUI
 
 /// 桌上型 Mac（沒有電池）的主面板：整機耗電、硬體細項、耗電歷史、耗電排行與周邊設備
 struct DesktopPanelView: View {
-    let store: BatteryStore
+    @ObservedObject var store: BatteryStore
     let desktop: DesktopPower
-    let settings: AppSettings
-    let ui: PanelState
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var ui: PanelState
 
     /// 面板開著時，標題、詳細資訊與耗電細項都用同一次硬體取樣的整機耗電，數字才會對得起來
     private var current: DesktopPower {
@@ -71,7 +71,7 @@ private struct DesktopHeaderView: View {
 /// 沒有電池就沒有變壓器與電池的流向，直接從系統細項開始；點晶片運算再展開 CPU／GPU／ANE
 private struct DesktopPowerSection: View {
     let breakdown: PowerBreakdown
-    let ui: PanelState
+    @ObservedObject var ui: PanelState
     let powerSaving: Bool
     let hasBuiltInDisplay: Bool
 
@@ -103,15 +103,8 @@ private struct DesktopDetailsView: View {
 
     var body: some View {
         Card(expand: true) {
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 9) {
-                ForEach(Array(stride(from: 0, to: rows.count, by: 2)), id: \.self) { index in
-                    GridRow {
-                        cell(rows[index])
-                        if index + 1 < rows.count { cell(rows[index + 1]) }
-                    }
-                }
-            }
-            .font(.callout)
+            PairRows(pairs: rows.map { PairRows.Pair(label: $0.0, value: $0.1) })
+                .font(.callout)
         }
     }
 
@@ -140,11 +133,4 @@ private struct DesktopDetailsView: View {
         return "\(minutes / (24 * 60)) 天 \(minutes % (24 * 60) / 60) 小時"
     }
 
-    private func cell(_ row: (String, String)) -> some View {
-        HStack(spacing: 10) {
-            Text(row.0).foregroundStyle(.secondary).lineLimit(1)
-            Text(row.1).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-        }
-        .gridCellColumns(1)
-    }
 }

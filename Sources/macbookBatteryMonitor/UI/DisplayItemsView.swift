@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 設定 → 顯示項目：電力流向細項與詳細資訊欄位要不要顯示
 struct DisplayItemsView: View {
-    let settings: AppSettings
-    let ui: PanelState
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var ui: PanelState
     /// 主面板有充電上限滑桿（充電上限不列在詳細資訊）
     var limitSlider = false
 
@@ -40,11 +40,12 @@ struct DisplayItemsView: View {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     CardTitle("詳細資訊欄位", systemImage: "list.bullet.rectangle")
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                    VStack(alignment: .leading, spacing: 6) {
                         let fields = DetailField.available(limitSlider: limitSlider)
                         ForEach(Array(stride(from: 0, to: fields.count, by: 2)), id: \.self) { index in
-                            GridRow {
+                            TwoColumns {
                                 checkbox(fields[index])
+                            } right: {
                                 if index + 1 < fields.count { checkbox(fields[index + 1]) }
                             }
                         }

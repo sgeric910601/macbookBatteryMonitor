@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct RootView: View {
-    let store: BatteryStore
-    let settings: AppSettings
-    let ui: PanelState
+    @ObservedObject var store: BatteryStore
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var ui: PanelState
 
     var body: some View {
         Group {
@@ -23,9 +23,9 @@ struct RootView: View {
 }
 
 struct PanelView: View {
-    let store: BatteryStore
-    let settings: AppSettings
-    let ui: PanelState
+    @ObservedObject var store: BatteryStore
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var ui: PanelState
 
     var body: some View {
         VStack(spacing: 10) {
@@ -53,7 +53,7 @@ struct PanelView: View {
                 DesktopPanelView(store: store, desktop: desktop, settings: settings, ui: ui)
                 footer(updated: desktop.date)
             } else {
-                ContentUnavailableView("找不到電池", systemImage: "battery.0percent", description: Text("讀不到這台 Mac 的電池與耗電資訊。"))
+                UnavailableMessage(title: "找不到電池", systemImage: SymbolCompat.name("battery.0percent"), description: "讀不到這台 Mac 的電池與耗電資訊。")
                 footer(updated: nil)
             }
         }
@@ -180,22 +180,14 @@ private struct TimeCard: View {
     private var discharging: some View {
         VStack(alignment: .leading, spacing: 8) {
             CardTitle("預估可用時間", systemImage: "clock")
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-                GridRow {
-                    Text("")
-                    Text("用到 0%").font(.caption).foregroundStyle(.secondary)
-                    Text("用到 10%").font(.caption).foregroundStyle(.secondary)
-                }
-                GridRow {
-                    Text("系統預估").foregroundStyle(.secondary)
-                    Text(e.systemToEmpty == nil ? "計算中…" : Format.duration(e.systemToEmpty))
-                    Text(e.systemTo10 == nil && s.percent > Estimator.reservePercent ? "計算中…" : to10(e.systemTo10)).fontWeight(.semibold)
-                }
-                GridRow {
-                    Text("依目前耗電").foregroundStyle(.secondary)
-                    Text(Format.duration(e.liveToEmpty))
-                    Text(to10(e.liveTo10)).fontWeight(.semibold)
-                }
+            // macOS 12 沒有 Grid：標籤欄寬依最長的標籤，兩個時間欄固定寬度
+            let labelWidth = TextWidth.max(["系統預估", "依目前耗電"])
+            VStack(alignment: .leading, spacing: 5) {
+                estimateRow(labelWidth, "", Text("用到 0%").font(.caption).foregroundColor(.secondary),
+                            Text("用到 10%").font(.caption).foregroundColor(.secondary))
+                estimateRow(labelWidth, "系統預估", Text(e.systemToEmpty == nil ? "計算中…" : Format.duration(e.systemToEmpty)),
+                            Text(e.systemTo10 == nil && s.percent > Estimator.reservePercent ? "計算中…" : to10(e.systemTo10)).bold())
+                estimateRow(labelWidth, "依目前耗電", Text(Format.duration(e.liveToEmpty)), Text(to10(e.liveTo10)).bold())
             }
             .font(.callout)
             .monospacedDigit()
@@ -278,6 +270,15 @@ private struct TimeCard: View {
         }
     }
 
+    private func estimateRow(_ labelWidth: CGFloat, _ label: String, _ toEmpty: Text, _ to10: Text) -> some View {
+        HStack(spacing: 14) {
+            Text(label).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .leading)
+            toEmpty.frame(width: 104, alignment: .leading)
+            to10.frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .lineLimit(1)
+    }
+
     private func row(_ label: String, _ value: String) -> some View {
         HStack {
             Text(label).foregroundStyle(.secondary)
@@ -296,7 +297,7 @@ private struct TimeCard: View {
 /// 否則 macOS 會把超出螢幕的上半部（返回按鈕與第一張卡片）直接切掉
 struct ScrollingPage<Content: View>: View {
     let page: PanelPage
-    let ui: PanelState
+    @ObservedObject var ui: PanelState
     @ViewBuilder var content: Content
 
     /// 扣掉選單列與 popover 箭頭、邊緣的空間
@@ -310,7 +311,7 @@ struct ScrollingPage<Content: View>: View {
                         Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
                     })
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .bounceOnlyWhenScrollable()
             .frame(height: min(ui.pageHeights[page] ?? maxHeight, maxHeight))
             .onPreferenceChange(ContentHeightKey.self) { height in
                 if height > 0, ui.pageHeights[page] != height { ui.pageHeights[page] = height }

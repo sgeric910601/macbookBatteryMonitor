@@ -2,7 +2,7 @@ import AppKit
 import UserNotifications
 
 if CommandLine.arguments.contains("--dump-monitors") {
-    MainActor.assumeIsolated { MonitorDebug.dump() }
+    MainActor.assumeIsolatedCompat { MonitorDebug.dump() }
     exit(0)
 }
 
@@ -53,7 +53,7 @@ if CommandLine.arguments.contains("--dump") {
 }
 
 if let index = CommandLine.arguments.firstIndex(of: "--screenshots"), index + 1 < CommandLine.arguments.count {
-    MainActor.assumeIsolated {
+    MainActor.assumeIsolatedCompat {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
         ScreenshotCommand.run(directory: CommandLine.arguments[index + 1])
@@ -62,7 +62,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--screenshots"), index + 1 
 }
 
 if let index = CommandLine.arguments.firstIndex(of: "--snapshot"), index + 1 < CommandLine.arguments.count {
-    MainActor.assumeIsolated {
+    MainActor.assumeIsolatedCompat {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
         SnapshotCommand.run(directory: CommandLine.arguments[index + 1])
@@ -70,7 +70,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--snapshot"), index + 1 < C
     exit(0)
 }
 
-MainActor.assumeIsolated {
+MainActor.assumeIsolatedCompat {
     let app = NSApplication.shared
     let delegate = AppDelegate()
     app.delegate = delegate

@@ -40,13 +40,13 @@ struct StaticPowerFlowView: View {
     }
 
     private var batterySymbol: String {
-        if batteryCharging { return "battery.100percent.bolt" }
+        if batteryCharging { return SymbolCompat.name("battery.100percent.bolt") }
         switch s.percent {
-        case 88...: return "battery.100percent"
-        case 63..<88: return "battery.75percent"
-        case 38..<63: return "battery.50percent"
-        case 13..<38: return "battery.25percent"
-        default: return "battery.0percent"
+        case 88...: return SymbolCompat.name("battery.100percent")
+        case 63..<88: return SymbolCompat.name("battery.75percent")
+        case 38..<63: return SymbolCompat.name("battery.50percent")
+        case 13..<38: return SymbolCompat.name("battery.25percent")
+        default: return SymbolCompat.name("battery.0percent")
         }
     }
 

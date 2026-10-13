@@ -1,12 +1,11 @@
 import Foundation
-import Observation
+import Combine
 import notify
 
 /// 主面板的充電上限滑桿：讀取與調整 macOS 系統設定「電池 → 充電」裡的充電上限（兩邊是同一個設定）。
 /// 不需要管理者權限；不支援的 Mac 不顯示滑桿
 @MainActor
-@Observable
-final class SystemChargeLimit {
+final class SystemChargeLimit: ObservableObject {
     enum Status: Equatable {
         case idle
         case applying
@@ -14,23 +13,23 @@ final class SystemChargeLimit {
     }
 
     /// 讀到系統的上限之後才為 true（不支援的 Mac 一直是 false）
-    private(set) var supported = false
+    @Published private(set) var supported = false
     /// 系統目前設定的上限，100 表示不限制
-    private(set) var limit = 100
+    @Published private(set) var limit = 100
     /// false 表示有設定上限但系統目前沒有套用
-    private(set) var enabled = true
-    private(set) var options = ChargeLimitLogic.defaultOptions
-    private(set) var status: Status = .idle
+    @Published private(set) var enabled = true
+    @Published private(set) var options = ChargeLimitLogic.defaultOptions
+    @Published private(set) var status: Status = .idle
     /// 拖動中的位置；放開滑桿（或停下 0.6 秒）才寫入系統
-    private(set) var draft: Int?
+    @Published private(set) var draft: Int?
     /// 上限改變（在這裡或系統設定調整）後讓 App 立即重新整理
-    @ObservationIgnored var onChange: (() -> Void)?
+    var onChange: (() -> Void)?
 
-    @ObservationIgnored private let service = PowerUIChargeLimit()
-    @ObservationIgnored private var started = false
-    @ObservationIgnored private var notifyToken: Int32 = 0
-    @ObservationIgnored private var editing = false
-    @ObservationIgnored private var commitTask: Task<Void, Never>?
+    private let service = PowerUIChargeLimit()
+    private var started = false
+    private var notifyToken: Int32 = 0
+    private var editing = false
+    private var commitTask: Task<Void, Never>?
 
     /// 滑桿與數字顯示的值
     var shown: Int { draft ?? limit }
@@ -40,7 +39,7 @@ final class SystemChargeLimit {
         guard !started else { return }
         started = true
         notify_register_dispatch("com.apple.powerui.mclstatuschanged", &notifyToken, .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolatedCompat { self?.refresh() }
         }
         refresh()
     }

@@ -1,32 +1,31 @@
 import Foundation
-import Observation
+import Combine
 
 /// 各模組由 ModuleCoordinator 依更新頻率呼叫 sample()；面板打開時另外接收 top 的程序排行
 
 @MainActor
-@Observable
-final class CPUMonitor {
-    private(set) var usage: CPUUsage?
-    private(set) var cores: [CPUUsage] = []
-    private(set) var gpu: Double?
-    private(set) var gpuMemory: UInt64?
-    private(set) var load: [Double] = []
+final class CPUMonitor: ObservableObject {
+    @Published private(set) var usage: CPUUsage?
+    @Published private(set) var cores: [CPUUsage] = []
+    @Published private(set) var gpu: Double?
+    @Published private(set) var gpuMemory: UInt64?
+    @Published private(set) var load: [Double] = []
     /// a：CPU 總使用率、b：GPU 使用率（0～1）
-    private(set) var history = MonitorHistory()
-    private(set) var topProcesses: [TopProcess] = []
-    private(set) var topLoaded = false
-    private(set) var updated: Date?
+    @Published private(set) var history = MonitorHistory()
+    @Published private(set) var topProcesses: [TopProcess] = []
+    @Published private(set) var topLoaded = false
+    @Published private(set) var updated: Date?
     /// 這台 Mac 的風扇與溫度；沒有風扇時 fans 為空，介面就不顯示風扇區塊
-    private(set) var fans: [FanReading] = []
-    private(set) var temperatures = TemperatureSummary()
+    @Published private(set) var fans: [FanReading] = []
+    @Published private(set) var temperatures = TemperatureSummary()
     let layout = CPUReader.coreLayout
 
-    @ObservationIgnored private var lastTicks: [CPUTicks]?
-    @ObservationIgnored private let thermal = ThermalReader()
-    @ObservationIgnored private var lastThermal: Date?
-    @ObservationIgnored private var thermalBusy = false
+    private var lastTicks: [CPUTicks]?
+    private let thermal = ThermalReader()
+    private var lastThermal: Date?
+    private var thermalBusy = false
     /// 只有 CPU 面板開著時才讀風扇與溫度（讀一次要幾十毫秒），選單列圖示用不到
-    @ObservationIgnored private var thermalActive = false
+    private var thermalActive = false
 
     func setThermalActive(_ active: Bool) {
         thermalActive = active
@@ -79,14 +78,13 @@ final class CPUMonitor {
 }
 
 @MainActor
-@Observable
-final class MemoryMonitor {
-    private(set) var usage: MemoryUsage?
+final class MemoryMonitor: ObservableObject {
+    @Published private(set) var usage: MemoryUsage?
     /// a：已使用比例（0～1）
-    private(set) var history = MonitorHistory()
-    private(set) var topProcesses: [TopProcess] = []
-    private(set) var topLoaded = false
-    private(set) var updated: Date?
+    @Published private(set) var history = MonitorHistory()
+    @Published private(set) var topProcesses: [TopProcess] = []
+    @Published private(set) var topLoaded = false
+    @Published private(set) var updated: Date?
 
     func sample(at now: Date = Date()) {
         if let reading = MemoryReader.read() {
@@ -108,32 +106,31 @@ final class MemoryMonitor {
 }
 
 @MainActor
-@Observable
-final class DiskMonitor {
-    private(set) var volume: DiskReader.Volume?
+final class DiskMonitor: ObservableObject {
+    @Published private(set) var volume: DiskReader.Volume?
     /// 本機磁碟的 SMART 狀態
-    private(set) var volumeHealth: DiskHealth?
+    @Published private(set) var volumeHealth: DiskHealth?
     /// 目前掛載的外接磁碟，與各自的讀寫統計（key 為掛載點）
-    private(set) var externalVolumes: [ExternalVolume] = []
-    private(set) var externalStats: [String: ExternalDiskStats] = [:]
-    private(set) var readRate: Double = 0
-    private(set) var writeRate: Double = 0
+    @Published private(set) var externalVolumes: [ExternalVolume] = []
+    @Published private(set) var externalStats: [String: ExternalDiskStats] = [:]
+    @Published private(set) var readRate: Double = 0
+    @Published private(set) var writeRate: Double = 0
     /// 自開機以來的累計讀寫
-    private(set) var totalRead: UInt64 = 0
-    private(set) var totalWritten: UInt64 = 0
+    @Published private(set) var totalRead: UInt64 = 0
+    @Published private(set) var totalWritten: UInt64 = 0
     /// a：讀取、b：寫入（位元組／秒）
-    private(set) var history = MonitorHistory()
-    private(set) var updated: Date?
+    @Published private(set) var history = MonitorHistory()
+    @Published private(set) var updated: Date?
 
-    @ObservationIgnored private var last: (read: UInt64, written: UInt64, date: Date)?
-    @ObservationIgnored private var externalLast: [String: (read: UInt64, written: UInt64, date: Date)] = [:]
+    private var last: (read: UInt64, written: UInt64, date: Date)?
+    private var externalLast: [String: (read: UInt64, written: UInt64, date: Date)] = [:]
     /// 掛載點 → 上次查 SMART 的時間；SMART 變化很慢，每 10 分鐘在背景查一次
-    @ObservationIgnored private var healthChecked: [String: Date] = [:]
-    @ObservationIgnored private var volumeHealthChecked: Date?
+    private var healthChecked: [String: Date] = [:]
+    private var volumeHealthChecked: Date?
     /// 正在查 SMART 的裝置節點，避免同一顆卡住時重複派工
-    @ObservationIgnored private var healthInFlight: Set<String> = []
+    private var healthInFlight: Set<String> = []
     /// 只有磁碟面板開著時才查 SMART：要啟動 diskutil，還可能喚醒休眠中的外接硬碟
-    @ObservationIgnored private var healthActive = false
+    private var healthActive = false
 
     func setHealthActive(_ active: Bool) { healthActive = active }
 
@@ -213,22 +210,21 @@ final class DiskMonitor {
 }
 
 @MainActor
-@Observable
-final class NetworkMonitor {
-    private(set) var interface: String?
+final class NetworkMonitor: ObservableObject {
+    @Published private(set) var interface: String?
     /// Wi-Fi、乙太網路等
-    private(set) var kind: String?
-    private(set) var address: String?
-    private(set) var downloadRate: Double = 0
-    private(set) var uploadRate: Double = 0
+    @Published private(set) var kind: String?
+    @Published private(set) var address: String?
+    @Published private(set) var downloadRate: Double = 0
+    @Published private(set) var uploadRate: Double = 0
     /// 目前介面自開機以來的累計收發
-    private(set) var totalReceived: UInt64 = 0
-    private(set) var totalSent: UInt64 = 0
+    @Published private(set) var totalReceived: UInt64 = 0
+    @Published private(set) var totalSent: UInt64 = 0
     /// a：下載、b：上傳（位元組／秒）
-    private(set) var history = MonitorHistory()
-    private(set) var updated: Date?
+    @Published private(set) var history = MonitorHistory()
+    @Published private(set) var updated: Date?
 
-    @ObservationIgnored private var last: (interface: String, received: UInt64, sent: UInt64, date: Date)?
+    private var last: (interface: String, received: UInt64, sent: UInt64, date: Date)?
 
     func sample(at now: Date = Date()) {
         let primary = NetworkReader.primaryInterface()

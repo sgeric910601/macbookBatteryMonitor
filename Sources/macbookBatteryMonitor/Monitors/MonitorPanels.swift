@@ -1,31 +1,27 @@
 import AppKit
-import Charts
 import SwiftUI
 
 /// 系統監控模組的面板。只裝 Command Line Tools 時不能用 @State，畫面只讀取各模組的資料
 struct MonitorPanel: View {
     let kind: MonitorKind
-    let cpu: CPUMonitor
-    let memory: MemoryMonitor
-    let disk: DiskMonitor
-    let network: NetworkMonitor
+    @ObservedObject var cpu: CPUMonitor
+    @ObservedObject var memory: MemoryMonitor
+    @ObservedObject var disk: DiskMonitor
+    @ObservedObject var network: NetworkMonitor
     var onSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 10) {
             // 內容比螢幕高時（接了多顆外接磁碟）改成可捲動；太高的 popover 會被系統挪到圖示旁邊，不再置中在圖示下方
-            HeightCap(maxHeight: Self.maxContentHeight) {
-                ScrollView(.vertical) {
-                    VStack(spacing: 10) {
-                        switch kind {
-                        case .cpu: CPUPanel(cpu: cpu)
-                        case .memory: MemoryPanel(memory: memory)
-                        case .disk: DiskPanel(disk: disk)
-                        case .network: NetworkPanel(network: network)
-                        }
+            CappedScroll(maxHeight: Self.maxContentHeight) {
+                VStack(spacing: 10) {
+                    switch kind {
+                    case .cpu: CPUPanel(cpu: cpu)
+                    case .memory: MemoryPanel(memory: memory)
+                    case .disk: DiskPanel(disk: disk)
+                    case .network: NetworkPanel(network: network)
                     }
                 }
-                .scrollIndicators(.never)
             }
             footer
         }
@@ -72,20 +68,30 @@ struct MonitorPanel: View {
     }
 }
 
-/// 子視圖的理想高度超過上限時，只佔上限高度（子視圖是 ScrollView，會自己捲動）
-private struct HeightCap: Layout {
+/// 內容的高度超過上限時，只佔上限高度並可以捲動。
+/// macOS 12 沒有 Layout：先在捲動區裡量出內容高度，再把捲動區設成內容高度與上限中較小的那個
+private struct CappedScroll<Content: View>: View {
     var maxHeight: CGFloat
+    @ViewBuilder var content: Content
+    @State private var contentHeight: CGFloat = 0
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let child = subviews.first else { return .zero }
-        let ideal = child.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
-        return CGSize(width: ideal.width, height: min(ideal.height, maxHeight))
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            content
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: CappedHeightKey.self, value: proxy.size.height)
+                })
+        }
+        .frame(height: contentHeight > 0 ? min(contentHeight, maxHeight) : nil)
+        .onPreferenceChange(CappedHeightKey.self) { height in
+            if height > 0, abs(height - contentHeight) > 0.5 { contentHeight = height }
+        }
     }
+}
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
-                              proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
-    }
+private struct CappedHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 // MARK: - 共用元件
@@ -181,40 +187,16 @@ private struct MonitorChart: View {
     }
 
     private var chart: some View {
-        Chart {
-            ForEach(points) { p in
-                AreaMark(x: .value("時間", p.t), y: .value(a.name, p.a), series: .value("線", a.name))
-                    .foregroundStyle(a.color.opacity(0.18))
-                    .interpolationMethod(.monotone)
-                LineMark(x: .value("時間", p.t), y: .value(a.name, p.a), series: .value("線", a.name))
-                    .foregroundStyle(a.color)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    .interpolationMethod(.monotone)
-            }
-            if let b {
-                ForEach(points) { p in
-                    LineMark(x: .value("時間", p.t), y: .value(b.name, p.b), series: .value("線", b.name))
-                        .foregroundStyle(b.color)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
-                        .interpolationMethod(.monotone)
-                }
-            }
+        // macOS 12 沒有 Swift Charts：用 Canvas 畫，A 線含面積、B 線只有線
+        let xs = points.map { $0.t.timeIntervalSinceReferenceDate }
+        let domain = (xs.first ?? 0)...max((xs.first ?? 0) + 1, xs.last ?? 1)
+        var series = [PlotSeries(points: points.map { PlotPoint(x: $0.t.timeIntervalSinceReferenceDate, y: $0.a, color: a.color) },
+                                 lineWidth: 1.5, fillOpacity: 0.18)]
+        if let b {
+            series.append(PlotSeries(points: points.map { PlotPoint(x: $0.t.timeIntervalSinceReferenceDate, y: $0.b, color: b.color) }))
         }
-        .chartXAxis(.hidden)
-        .chartYScale(domain: 0...axisMax)
-        .chartYAxis {
-            // 固定三條刻度：0、一半、上限（上限往上取整數，最高的資料不會超出格線）
-            AxisMarks(position: .trailing, values: axisTicks) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let v = value.as(Double.self) {
-                        Text(percent ? ByteFormat.percent(v) : ByteFormat.axisRate(v))
-                            .font(.system(size: 9))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-        }
+        return PlotView(series: series, xDomain: domain, yDomain: 0...axisMax, yTicks: axisTicks,
+                        yLabel: { percent ? ByteFormat.percent($0) : ByteFormat.axisRate($0) }, yAxis: .trailing)
     }
 
     private var axisMax: Double {
@@ -292,7 +274,7 @@ private struct TopList: View {
 // MARK: - CPU／GPU
 
 private struct CPUPanel: View {
-    let cpu: CPUMonitor
+    @ObservedObject var cpu: CPUMonitor
 
     var body: some View {
         VStack(spacing: 10) {
@@ -339,7 +321,7 @@ private struct ThermalCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
-                CardTitle(fans.isEmpty ? "溫度" : "風扇與溫度", systemImage: "thermometer.medium")
+                CardTitle(fans.isEmpty ? "溫度" : "風扇與溫度", systemImage: SymbolCompat.name("thermometer.medium"))
                 if !temperatures.isEmpty {
                     if temperatures.coreSensorsAsleep {
                         InfoRow("CPU／GPU", "核心休眠中，暫無讀值")
@@ -390,7 +372,7 @@ private struct CoreBars: View {
                 ForEach(Array(cores.enumerated()), id: \.offset) { _, core in
                     ZStack(alignment: .bottom) {
                         RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.08))
-                        RoundedRectangle(cornerRadius: 2).fill(color.gradient)
+                        RoundedRectangle(cornerRadius: 2).fill(color.softGradient)
                             .frame(height: max(2, 30 * core.total))
                     }
                     .frame(width: 14, height: 30)
@@ -405,7 +387,7 @@ private struct CoreBars: View {
 // MARK: - 記憶體
 
 private struct MemoryPanel: View {
-    let memory: MemoryMonitor
+    @ObservedObject var memory: MemoryMonitor
 
     var body: some View {
         VStack(spacing: 10) {
@@ -487,7 +469,7 @@ private struct MemoryPanel: View {
 // MARK: - 磁碟
 
 private struct DiskPanel: View {
-    let disk: DiskMonitor
+    @ObservedObject var disk: DiskMonitor
 
     var body: some View {
         VStack(spacing: 10) {
@@ -580,7 +562,7 @@ private struct DiskSection: View {
 // MARK: - 網路
 
 private struct NetworkPanel: View {
-    let network: NetworkMonitor
+    @ObservedObject var network: NetworkMonitor
 
     var body: some View {
         VStack(spacing: 10) {

@@ -76,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         Notifier.shared.onOpenUpdate = { [weak self] in
             // 點通知時前景是通知中心：先把 App 帶到前景，等通知收起來再開面板，否則面板一打開就會被當成點到外面而關閉
-            NSApp.activate()
+            NSApp.activateCompat()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 guard let self else { return }
                 self.ui.scrollTarget = UpdateCard.anchor
@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             + "\n\n之後可以在設定 →「系統監控」隨時更改。"
         alert.addButton(withTitle: battery ? "電池＋系統監控" : "耗電＋系統監控")
         alert.addButton(withTitle: battery ? "只看電池" : "只看耗電")
-        NSApp.activate()
+        NSApp.activateCompat()
         settings.chooseMode(systemMonitors: alert.runModal() == .alertFirstButtonReturn)
     }
 
@@ -215,7 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         adapterPreReadTimer = nil
         guard interval > 1, !sleeping else { return }
         let timer = Timer(fire: Date().addingTimeInterval(interval - 1), interval: 0, repeats: false) { _ in
-            MainActor.assumeIsolated { BatteryReader.recordAdapterInput() }
+            MainActor.assumeIsolatedCompat { BatteryReader.recordAdapterInput() }
         }
         timer.tolerance = 0.05
         RunLoop.main.add(timer, forMode: .common)
@@ -224,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func repeating(every interval: TimeInterval, _ action: @escaping (AppDelegate) -> Void) -> Timer {
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
+            MainActor.assumeIsolatedCompat {
                 guard let self else { return }
                 action(self)
             }
@@ -240,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard let source = IOPSNotificationCreateRunLoopSource({ context in
             guard let context else { return }
             let delegate = Unmanaged<AppDelegate>.fromOpaque(context).takeUnretainedValue()
-            MainActor.assumeIsolated { delegate.powerSourceChanged() }
+            MainActor.assumeIsolatedCompat { delegate.powerSourceChanged() }
         }, context)?.takeRetainedValue() else { return }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
     }
@@ -251,7 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         refresh()
         powerTransitionTask = Task { [weak self] in
             for delay in [1, 2, 3] {
-                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                do { try await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000_000) } catch { return }
                 guard let self, !sleeping else { return }
                 refresh()
             }
@@ -379,8 +379,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.chargeLimit.panelOpened()
         refresh()
         // 面板每次打開才建立、關掉就釋放，關著時不會有任何 SwiftUI 畫面在背景更新
-        let hosting = NSHostingController(rootView: RootView(store: store, settings: settings, ui: ui))
-        hosting.sizingOptions = [.preferredContentSize]
+        let hosting = SizingHostingController(rootView: RootView(store: store, settings: settings, ui: ui))
         let popover = NSPopover()
         popover.behavior = store.adminCPU.authorizing ? .applicationDefined : .transient
         popover.delegate = self
@@ -389,7 +388,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.contentSize = hosting.view.fittingSize
         self.popover = popover
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        NSApp.activate()
+        NSApp.activateCompat()
         popover.contentViewController?.view.window?.makeKey()
     }
 

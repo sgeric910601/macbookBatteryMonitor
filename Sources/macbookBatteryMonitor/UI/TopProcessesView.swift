@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 struct TopProcessesView: View {
-    let store: BatteryStore
+    @ObservedObject var store: BatteryStore
 
     var body: some View {
         Card(expand: true) {
@@ -26,7 +26,7 @@ struct TopProcessesView: View {
                                 .truncationMode(.middle)
                             Spacer(minLength: 8)
                             Capsule()
-                                .fill(Color.orange.gradient)
+                                .fill(Color.orange.softGradient)
                                 .frame(width: max(3, 70 * p.power / maxPower), height: 5)
                                 .frame(width: 70, alignment: .leading)
                             Text(String(format: "%.1f", p.power))

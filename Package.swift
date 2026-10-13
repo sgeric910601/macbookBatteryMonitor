@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "macbookBatteryMonitor",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v12)],
     targets: [
         .target(name: "CPUPowerShared", path: "Sources/CPUPowerShared"),
         .executableTarget(name: "CPUPowerHelper", dependencies: ["CPUPowerShared"], path: "Sources/CPUPowerHelper"),

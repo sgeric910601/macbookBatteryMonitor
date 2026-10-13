@@ -8,6 +8,8 @@ enum AppEdition: String {
     case battery
     case status
     case universal
+    /// 舊系統版本（macOS 12、13）
+    case legacy
 
     /// 直接執行未打包的執行檔（開發時）視為通用版
     static let current: AppEdition = {

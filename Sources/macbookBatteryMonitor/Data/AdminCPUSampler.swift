@@ -1,31 +1,31 @@
 import Foundation
-import Observation
+import Combine
 import CPUPowerShared
 
 /// 選用的管理員 CPU 取樣：選項開著才有系統服務，關掉就移除。
 /// - 只有使用者在設定裡打開時才要求授權；授權取消或失敗會自動關回選項，開 App 時不會跳出密碼視窗
 /// - 只在主面板開啟時連線取樣（與更新頻率相同）；面板關閉立即斷線、不再通訊，服務閒置後自行結束
-@MainActor @Observable
-final class AdminCPUSampler {
-    private(set) var status = "未開啟"
-    private(set) var authorizing = false
-    @ObservationIgnored var authorizationChanged: ((Bool) -> Void)?
-    @ObservationIgnored private var process: Process?
-    @ObservationIgnored private var installLease: URL?
-    @ObservationIgnored private var requestID = UUID()
-    @ObservationIgnored private var nextConnectAt: TimeInterval = 0
-    @ObservationIgnored private var connection: NSXPCConnection?
-    @ObservationIgnored private var generation = UUID()
-    @ObservationIgnored private var desiredEnabled: Bool?
-    @ObservationIgnored private var desiredActive = false
-    @ObservationIgnored private var failed = false
-    @ObservationIgnored private var inFlight = false
-    @ObservationIgnored private var lastRequest: TimeInterval = 0
+@MainActor
+final class AdminCPUSampler: ObservableObject {
+    @Published private(set) var status = "未開啟"
+    @Published private(set) var authorizing = false
+    var authorizationChanged: ((Bool) -> Void)?
+    private var process: Process?
+    private var installLease: URL?
+    private var requestID = UUID()
+    private var nextConnectAt: TimeInterval = 0
+    private var connection: NSXPCConnection?
+    private var generation = UUID()
+    private var desiredEnabled: Bool?
+    private var desiredActive = false
+    private var failed = false
+    private var inFlight = false
+    private var lastRequest: TimeInterval = 0
     /// 開始取樣或最後一次拿到有效資料的時間，用來判斷資料逾時
-    @ObservationIgnored private var lastFresh: TimeInterval?
-    @ObservationIgnored private var reading: CPUPowerReading?
-    @ObservationIgnored private var removing = false
-    @ObservationIgnored private let helperBundle: Bundle
+    private var lastFresh: TimeInterval?
+    private var reading: CPUPowerReading?
+    private var removing = false
+    private let helperBundle: Bundle
 
     private static let idleStatus = "已授權，主面板開啟時才取樣"
 

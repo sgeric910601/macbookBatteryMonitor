@@ -7,7 +7,7 @@ struct DetailsGridView: View {
     /// 主面板有充電上限滑桿
     var limitSlider = false
 
-    private var settings: AppSettings { .shared }
+    @ObservedObject private var settings = AppSettings.shared
 
     var body: some View {
         Card(expand: true) {
@@ -19,12 +19,8 @@ struct DetailsGridView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 9) {
-                    ForEach(Array(stride(from: 0, to: fields.count, by: 2)), id: \.self) { index in
-                        row(fields[index], index + 1 < fields.count ? fields[index + 1] : nil)
-                    }
-                }
-                .font(.callout)
+                PairRows(pairs: fields.map { PairRows.Pair(label: $0.title, value: value($0)) })
+                    .font(.callout)
             }
         }
     }
@@ -84,18 +80,4 @@ struct DetailsGridView: View {
         return "已連接"
     }
 
-    private func row(_ first: DetailField, _ second: DetailField?) -> some View {
-        GridRow {
-            Text(first.title).foregroundStyle(.secondary)
-            Text(value(first)).monospacedDigit().frame(maxWidth: .infinity, alignment: .leading)
-            if let second {
-                Text(second.title).foregroundStyle(.secondary)
-                Text(value(second)).monospacedDigit().frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-            }
-        }
-        .lineLimit(1)
-    }
 }

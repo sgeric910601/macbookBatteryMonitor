@@ -13,37 +13,8 @@ struct PowerFlowView: View {
     var body: some View {
         VStack(spacing: 5) {
             if let ui, let breakdown {
-                HStack {
-                    if ui.powerFlowLevel != .overview {
-                        Button {
-                            ui.powerFlowLevel = ui.powerFlowLevel == .chip ? .components : .overview
-                        } label: {
-                            Label(ui.powerFlowLevel == .chip ? "系統細項" : "電力總覽", systemImage: "chevron.left")
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        // 滿電時流向圖可能維持待命拓樸，即時帶正負號的電池功率放在標題列，面板高度不變
-                        Text(e.state == .full ? "電力流向・電池 \(Format.watts(e.batteryWatts))" : "電力流向")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    Spacer()
-                    if ui.powerFlowLevel == .overview {
-                        Button {
-                            ui.powerFlowLevel = .components
-                        } label: { Label("系統細項", systemImage: "chevron.right") }
-                        .buttonStyle(.plain)
-                        .help("展開螢幕背光、晶片運算與其他功耗")
-                    } else {
-                        Text(AppSettings.shared.updateText).foregroundStyle(.secondary)
-                    }
-                }
-                .font(.caption)
-                if ui.powerFlowLevel == .overview {
-                    diagram
-                } else {
-                    ComponentPowerFlowView(breakdown: breakdown, ui: ui, animated: !powerSaving)
-                }
+                // macOS 12 的畫面要明確觀察 PanelState，切換層級時才會重畫
+                FlowLevels(ui: ui, breakdown: breakdown, e: e, powerSaving: powerSaving) { diagram }
             } else {
                 diagram
             }
@@ -62,6 +33,49 @@ struct PowerFlowView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("電力流向")
         .accessibilityValue("\(e.state.title)，系統耗電 \(Format.watts(e.systemWatts))，電池功率 \(Format.watts(e.batteryWatts))")
+    }
+}
+
+/// 電力總覽 ↔ 系統細項 ↔ 晶片運算的標題列與內容
+private struct FlowLevels<Diagram: View>: View {
+    @ObservedObject var ui: PanelState
+    let breakdown: PowerBreakdown
+    let e: Estimates
+    let powerSaving: Bool
+    @ViewBuilder var diagram: Diagram
+
+    var body: some View {
+        HStack {
+            if ui.powerFlowLevel != .overview {
+                Button {
+                    ui.powerFlowLevel = ui.powerFlowLevel == .chip ? .components : .overview
+                } label: {
+                    Label(ui.powerFlowLevel == .chip ? "系統細項" : "電力總覽", systemImage: "chevron.left")
+                }
+                .buttonStyle(.plain)
+            } else {
+                // 滿電時流向圖可能維持待命拓樸，即時帶正負號的電池功率放在標題列，面板高度不變
+                Text(e.state == .full ? "電力流向・電池 \(Format.watts(e.batteryWatts))" : "電力流向")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Spacer()
+            if ui.powerFlowLevel == .overview {
+                Button {
+                    ui.powerFlowLevel = .components
+                } label: { Label("系統細項", systemImage: "chevron.right") }
+                .buttonStyle(.plain)
+                .help("展開螢幕背光、晶片運算與其他功耗")
+            } else {
+                Text(AppSettings.shared.updateText).foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
+        if ui.powerFlowLevel == .overview {
+            diagram
+        } else {
+            ComponentPowerFlowView(breakdown: breakdown, ui: ui, animated: !powerSaving)
+        }
     }
 }
 
@@ -138,7 +152,7 @@ private final class DiagramView: NSView {
             let sourceSplit = 12 + (h - 24) * CGFloat(share)
             node(CGRect(x: 0, y: 12, width: sourceWidth, height: h - 24),
                  symbol: "bolt.fill", value: adapterText, bolt: true)
-            node(CGRect(x: sinkX, y: 0, width: 44, height: split - 4), symbol: "battery.100percent.bolt")
+            node(CGRect(x: sinkX, y: 0, width: 44, height: split - 4), symbol: SymbolCompat.name("battery.100percent.bolt"))
             node(CGRect(x: sinkX, y: split + 10, width: 44, height: h - split - 10), symbol: "laptopcomputer")
             ribbon(x1: x1, x2: x2, sourceTop: 12, sourceBottom: sourceSplit,
                    sinkTop: 0, sinkBottom: split - 4, value: Format.watts(c.batteryWatts), watts: c.batteryWatts, active: active)
@@ -149,7 +163,7 @@ private final class DiagramView: NSView {
             node(CGRect(x: 0, y: 0, width: sourceWidth, height: split - 5),
                  symbol: "bolt.fill", value: adapterText, bolt: true)
             node(CGRect(x: 0, y: split + 5, width: sourceWidth, height: split - 5),
-                 symbol: "battery.75percent", value: Format.watts(-c.batteryWatts))
+                 symbol: SymbolCompat.name("battery.75percent"), value: Format.watts(-c.batteryWatts))
             node(CGRect(x: sinkX, y: 12, width: 44, height: h - 24), symbol: "laptopcomputer")
             let share = max(0.25, min(0.75, abs(c.batteryWatts) / max(0.1, c.systemWatts ?? 0)))
             let join = h - 12 - (h - 24) * CGFloat(share)
@@ -159,7 +173,7 @@ private final class DiagramView: NSView {
                    sinkTop: join, sinkBottom: h - 12, value: Format.watts(-c.batteryWatts), watts: -c.batteryWatts, active: true)
         } else {
             let rect = CGRect(x: 0, y: 12, width: sourceWidth, height: h - 24)
-            node(rect, symbol: c.connected ? "bolt.fill" : "battery.75percent",
+            node(rect, symbol: c.connected ? "bolt.fill" : SymbolCompat.name("battery.75percent"),
                  value: c.connected ? adapterText : nil, bolt: c.connected)
             node(CGRect(x: sinkX, y: 12, width: 44, height: h - 24), symbol: "laptopcomputer")
             ribbon(x1: x1, x2: x2, sourceTop: 12, sourceBottom: h - 12,

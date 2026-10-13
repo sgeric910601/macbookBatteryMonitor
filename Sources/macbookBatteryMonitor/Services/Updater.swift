@@ -1,12 +1,11 @@
 import AppKit
 import CryptoKit
 import Foundation
-import Observation
+import Combine
 
 /// 一鍵更新：從 GitHub Releases 下載同一個版本別的新版，驗證後換掉目前的 App 並重新開啟
 @MainActor
-@Observable
-final class Updater {
+final class Updater: ObservableObject {
     enum State: Equatable {
         case idle
         case checking
@@ -17,8 +16,8 @@ final class Updater {
         case failed(String)
     }
 
-    private(set) var state: State = .idle
-    private(set) var lastChecked: Date?
+    @Published private(set) var state: State = .idle
+    @Published private(set) var lastChecked: Date?
 
     static let releasesAPI = URL(string: "https://api.github.com/repos/sgeric910601/macbookBatteryMonitor/releases/latest")!
     static let releasesPage = URL(string: "https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest")!
@@ -29,7 +28,7 @@ final class Updater {
     private static let notifiedKey = "lastNotifiedUpdate"
 
     /// 自動檢查發現新版本時呼叫，每個版本只呼叫一次；手動檢查時使用者已經看到，不呼叫
-    @ObservationIgnored var onNewRelease: ((ReleaseInfo) -> Void)?
+    var onNewRelease: ((ReleaseInfo) -> Void)?
 
     var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0" }
 
@@ -70,7 +69,9 @@ final class Updater {
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
             lastChecked = Date()
             UserDefaults.standard.set(lastChecked, forKey: Self.lastCheckKey)
-            guard let release = UpdateLogic.release(json: data, edition: AppEdition.current.rawValue),
+            let mainSupported = ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 14, minorVersion: 0, patchVersion: 0))
+                && !Compat.forceMacOS12Paths
+            guard let release = UpdateLogic.release(json: data, edition: AppEdition.current.rawValue, mainSupported: mainSupported),
                   let current = UpdateLogic.version(currentVersion) else {
                 state = userInitiated ? .failed("找不到新版的下載檔") : .idle
                 return

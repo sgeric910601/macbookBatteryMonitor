@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 設定頁的「更新」：檢查 GitHub 上的新版本，按一下就下載、驗證並換上新版
 struct UpdateCard: View {
-    let updater: Updater
-    let settings: AppSettings
+    @ObservedObject var updater: Updater
+    @ObservedObject var settings: AppSettings
     /// macOS 關閉了這個 App 的通知
     var notificationsBlocked = false
 

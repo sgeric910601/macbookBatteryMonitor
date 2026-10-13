@@ -46,6 +46,11 @@ enum UpdateLogic {
         "macbookBatteryMonitor-\(tag)-macOS-universal.zip"
     }
 
+    /// 舊系統版本（macOS 12、13）
+    static func legacyAssetName(tag: String) -> String {
+        "macbookBatteryMonitor-\(tag)-macOS12.zip"
+    }
+
     /// v1.6.1 以前的電池版／系統監控版檔名。每次發布仍會附上，舊版的一鍵更新才找得到
     static func assetName(tag: String, edition: String) -> String {
         "macbookBatteryMonitor-\(tag)-\(edition)-macOS-arm64.zip"
@@ -58,7 +63,8 @@ enum UpdateLogic {
     }
 
     /// 解析 GET /repos/{owner}/{repo}/releases/latest 的回應：優先用通用版，沒有通用版的 Release 才用舊檔名；都找不到就回傳 nil
-    static func release(json: Data, edition: String) -> ReleaseInfo? {
+    /// - Parameter mainSupported: 這台 Mac 能不能跑主版本（macOS 14 以上）；舊系統版本在系統升級後改裝主版本
+    static func release(json: Data, edition: String, mainSupported: Bool = true) -> ReleaseInfo? {
         guard let root = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
               let tag = root["tag_name"] as? String, let version = version(tag),
               root["draft"] as? Bool != true, root["prerelease"] as? Bool != true,
@@ -69,8 +75,13 @@ enum UpdateLogic {
                   let url = (item["browser_download_url"] as? String).flatMap(URL.init(string:)), isTrusted(url) else { return nil }
             return (url, item["size"] as? Int ?? 0)
         }
-        let legacyEdition = edition == "battery" ? "battery" : "status"
-        let candidates = [universalAssetName(tag: tag), assetName(tag: tag, edition: legacyEdition)]
+        let candidates: [String]
+        if edition == "legacy" {
+            candidates = mainSupported ? [universalAssetName(tag: tag), legacyAssetName(tag: tag)] : [legacyAssetName(tag: tag)]
+        } else {
+            let legacyEdition = edition == "battery" ? "battery" : "status"
+            candidates = [universalAssetName(tag: tag), assetName(tag: tag, edition: legacyEdition)]
+        }
         guard let name = candidates.first(where: { asset($0) != nil }), let zip = asset(name) else { return nil }
         return ReleaseInfo(tag: tag, version: version, pageURL: page, assetName: name, assetURL: zip.url,
                            assetSize: zip.size, checksumURL: asset(checksumFile)?.url)

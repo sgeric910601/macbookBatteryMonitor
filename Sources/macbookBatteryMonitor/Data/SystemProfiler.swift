@@ -64,12 +64,15 @@ enum PowerLog {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
-        let pattern = #/Using (AC|Batt)\(Charge: ?(\d+)\)/#
+        // macOS 12 沒有 Swift Regex，改用 NSRegularExpression
+        guard let pattern = try? NSRegularExpression(pattern: #"Using (AC|Batt)\(Charge: ?(\d+)\)"#) else { return [] }
         return output.split(separator: "\n").compactMap { line in
-            guard let date = formatter.date(from: String(line.prefix(25))),
-                  let match = line.firstMatch(of: pattern),
-                  let pct = Int(match.2) else { return nil }
-            let plugged = match.1 == "AC"
+            let text = String(line)
+            guard let date = formatter.date(from: String(text.prefix(25))),
+                  let match = pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let source = Range(match.range(at: 1), in: text), let digits = Range(match.range(at: 2), in: text),
+                  let pct = Int(text[digits]) else { return nil }
+            let plugged = text[source] == "AC"
             return HistorySample(t: date, pct: pct, watts: nil, plugged: plugged, charging: plugged && pct < 100)
         }
     }

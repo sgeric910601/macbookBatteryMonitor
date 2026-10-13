@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 周邊設備分頁：連線中設備的電量，每個設備可以自己設定低電量通知門檻
 struct PeripheralsView: View {
-    let store: PeripheralStore
-    let settings: AppSettings
+    @ObservedObject var store: PeripheralStore
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
         Card(expand: true) {

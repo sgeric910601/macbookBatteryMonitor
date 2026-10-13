@@ -1,11 +1,11 @@
 import SwiftUI
 
 struct SettingsView: View {
-    let settings: AppSettings
-    let ui: PanelState
-    let adminCPU: AdminCPUSampler
-    let updater: Updater
-    let chargeLimit: SystemChargeLimit
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var ui: PanelState
+    @ObservedObject var adminCPU: AdminCPUSampler
+    @ObservedObject var updater: Updater
+    @ObservedObject var chargeLimit: SystemChargeLimit
     /// 桌上型 Mac 沒有電池：不顯示電池通知與充電上限
     var hasBattery = true
 
@@ -93,15 +93,17 @@ struct SettingsView: View {
 
             Card {
                 VStack(alignment: .leading, spacing: 8) {
-                    CardTitle("系統監控", systemImage: "gauge.with.dots.needle.33percent")
+                    CardTitle("系統監控", systemImage: SymbolCompat.name("gauge.with.dots.needle.33percent"))
                     SwitchRow("在選單列顯示系統監控", isOn: binding(\.systemMonitors))
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                        GridRow {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TwoColumns {
                             SwitchRow("CPU／GPU", isOn: binding(\.monitorCPU))
+                        } right: {
                             SwitchRow("記憶體", isOn: binding(\.monitorMemory))
                         }
-                        GridRow {
+                        TwoColumns {
                             SwitchRow("磁碟", isOn: binding(\.monitorDisk))
+                        } right: {
                             SwitchRow("網路", isOn: binding(\.monitorNetwork))
                         }
                     }

@@ -345,6 +345,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統已喚醒") }
         sleeping = false
         monitors.setSleeping(false)
+        store.evaluateChargingPlan(.didWake)
         refresh()
         store.peripherals.refresh()
         store.recordHistory()

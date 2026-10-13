@@ -79,6 +79,25 @@ jobs:
             fi
             ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$zip"
           done
+      - name: 編譯並打包舊系統版本（macOS 12 起）
+        if: ${{ env.TAG != '' }}
+        # legacy-macos12 分支的版本號和這次發布相同時，才把它的 zip 放進同一個 Release
+        run: |
+          if ! git fetch --depth=1 origin legacy-macos12; then
+            echo "沒有 legacy-macos12 分支，這次不附舊系統版本"
+            exit 0
+          fi
+          git worktree add ../legacy FETCH_HEAD
+          legacy="v$(plutil -extract CFBundleShortVersionString raw -o - ../legacy/Resources/Info.plist)"
+          if [[ "$legacy" != "$TAG" ]]; then
+            echo "舊系統版本是 ${legacy}，和 ${TAG} 不同，這次不附"
+            exit 0
+          fi
+          cd ../legacy
+          Scripts/test-power.sh
+          ./build.sh legacy
+          codesign --verify --deep --strict build/macbookBatteryMonitor.app
+          ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-${TAG}-macOS12.zip"
       - name: 建立 Release
         if: ${{ env.TAG != '' }}
         run: |

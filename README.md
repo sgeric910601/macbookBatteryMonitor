@@ -16,6 +16,8 @@ macOS 選單列的電池與系統資訊 App。MacBook 上選單列直接顯示�
 
 到 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases) 下載 `macbookBatteryMonitor-<版本>-macOS-universal.zip`（v1.7.0 起）。Apple 晶片與 Intel 的 MacBook、桌上型 Mac 都用這一個；需求是 macOS 14 以上（2018 年以後的 Intel Mac 也可以）。
 
+macOS 12 或 13 的 Mac（例如 2015～2017 年的 MacBook，或用 OpenCore Legacy Patcher 升級的舊 Mac）請改下載 `macbookBatteryMonitor-<版本>-macOS12.zip`（舊系統版本，v1.7.0 起）：功能和通用版相同，同樣支援 Apple 晶片與 Intel；系統升級到 macOS 14 以後，一鍵更新會自動換成通用版。
+
 Release 裡另外兩個 `…-battery-macOS-arm64.zip`、`…-status-macOS-arm64.zip` 是給 v1.5.0～v1.6.1 一鍵更新用的舊檔名，內容和通用版相同，不需要下載。
 
 | | 只看電池 | 電池＋系統監控 |
@@ -52,7 +54,8 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 - **溫度**：CPU 用各核心的 SMC 溫度鍵（`TC1C` 起；沒有的核心回報 -127 會被過濾），讀不到時改用 PECI／die／proximity（`TCXC`、`TC0F`、`TC0P`）；內顯 `TCGC`、獨立顯卡 `TG0D`／`TG0P`；SSD `TH0a`／`TH0b`；MacBook 電池 `TB0T` 系列
 - **CPU／內顯功耗**：SMC 的 `PCPC`／`PCPG`（有號 8.7 定點數），不需要管理員密碼，所以 Intel 不顯示「管理員 CPU 取樣」
 - **GPU 記憶體**：Intel 內顯讀 `inUseSysMemoryBytes`，負載時偶爾出現的溢位值（超過實體記憶體）會丟掉
-- Intel MacBook 的電池功能目前還沒有在實機上驗證；只能裝到 macOS 13 以下的舊 Mac 另外規劃獨立的舊系統版本
+- Intel MacBook 的電池功能目前還沒有在實機上驗證
+- 只能裝到 macOS 12、13 的 Mac 用舊系統版本（`…-macOS12.zip`）
 
 ### 周邊設備
 
@@ -108,7 +111,7 @@ v1.7.0 起支援 Intel Mac（macOS 14 以上，大約是 2018 年以後的機型
 
 ## 安裝
 
-需求：macOS 14 以上；Apple 晶片或 Intel 的 MacBook、桌上型 Mac 都可以（通用版）。
+需求：macOS 14 以上；Apple 晶片或 Intel 的 MacBook、桌上型 Mac 都可以（通用版）。macOS 12、13 請用舊系統版本（`…-macOS12.zip`），安裝方式相同。
 
 1. 從 Releases 下載 `macbookBatteryMonitor-<版本>-macOS-universal.zip`，解壓縮
 2. 把 App（Finder 顯示「電池監控」或「電池與系統監控」，檔名都是 `macbookBatteryMonitor.app`）拖到「應用程式」資料夾
@@ -367,6 +370,8 @@ $APP --selftest-monitors # 依序打開 CPU、記憶體模組面板各 10 秒再
 $APP --selftest-update   # 檢查 GitHub 上的新版本，有就直接一鍵更新（測試時把副本的版本號改低）
 $APP --screenshots <資料夾> # 用示範數據畫出兩個版本、省電模式與周邊設備的介紹圖（docs/screenshots）
 ```
+
+舊系統版本（macOS 12 起）在 `legacy-macos12` 分支：把 macOS 13／14 才有的寫法（Observation、Swift Charts、Grid、SMAppService 等）換成相容寫法，其他程式與主分支相同。在較新的系統上加 `--macos12-paths` 啟動，可以強制走 macOS 12 的寫法測試。發布時，`legacy-macos12` 分支的版本號和這次發布相同，GitHub Actions 才會一起打包 `…-macOS12.zip`。
 
 `build.sh` 會一次編出 Apple 晶片與 Intel 兩種架構（通用版）；只裝 Command Line Tools、無法一次編兩種架構時，自動改編這台電腦的架構。
 

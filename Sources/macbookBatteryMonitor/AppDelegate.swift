@@ -442,7 +442,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         stopOutsideClickMonitoring()
         // 其他 App、桌面的點擊
         if let global = NSEvent.addGlobalMonitorForEvents(matching: Self.clickMask, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.closeForOutsideClick() }
+            MainActor.assumeIsolatedCompat { self?.closeForOutsideClick() }
         }) {
             outsideClickMonitors.append(global)
         }

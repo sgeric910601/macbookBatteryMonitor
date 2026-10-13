@@ -47,12 +47,12 @@ final class AppSettings: ObservableObject {
     }
 
     /// 只在使用電池時套用省電模式，接上電源就恢復一般模式
-    var powerSavingOnBatteryOnly: Bool {
+    @Published var powerSavingOnBatteryOnly: Bool {
         didSet { defaults.set(powerSavingOnBatteryOnly, forKey: Keys.powerSavingOnBatteryOnly); onIntervalChange?() }
     }
 
     /// 目前是否接著電源（不存檔，由 AppDelegate 每次更新時帶入；桌上型 Mac 一律視為接著電源）
-    var onACPower = false {
+    @Published var onACPower = false {
         didSet { if onACPower != oldValue, powerSaving, powerSavingOnBatteryOnly { onIntervalChange?() } }
     }
 

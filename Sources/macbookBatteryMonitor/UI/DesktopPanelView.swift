@@ -18,7 +18,7 @@ struct DesktopPanelView: View {
         let desktop = current
         VStack(spacing: 10) {
             DesktopHeaderView(desktop: desktop)
-            DesktopPowerSection(breakdown: store.breakdown, ui: ui, powerSaving: settings.powerSaving,
+            DesktopPowerSection(breakdown: store.breakdown, ui: ui, powerSaving: settings.powerSavingActive,
                                 hasBuiltInDisplay: desktop.hasBuiltInDisplay)
             Picker("", selection: ui.binding(\.tab)) {
                 ForEach(BottomTab.allCases, id: \.self) { Text($0.title(desktop: true)).tag($0) }

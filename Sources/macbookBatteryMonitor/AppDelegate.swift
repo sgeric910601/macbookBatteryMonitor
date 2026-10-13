@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     /// 每次打開都建立新的，關閉後整個釋放（連同視窗和 SwiftUI 畫面）
     private var popover: NSPopover?
+    /// 面板開著時監聽面板外的點擊。系統的 .transient 有時不會收起面板，這是第二道保險
+    private var outsideClickMonitors: [Any] = []
     private var refreshTimer: Timer?
     /// 更新頻率慢於每秒時，下一次更新前 1 秒先讀變壓器輸入（見 BatteryReader.recordAdapterInput）
     private var adapterPreReadTimer: Timer?
@@ -219,6 +221,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func refresh() {
         store.refresh()
+        // 接電狀態改變且設定為「只在使用電池時省電」時，這裡會重排計時器；桌上型 Mac 一律視為接著電源
+        if let s = store.snapshot {
+            settings.onACPower = s.externalConnected
+        } else if !BatteryReader.hasBattery {
+            settings.onACPower = true
+        }
         scheduleAdapterPreRead()
         store.setHardwareSampling(active: ui.isVisible && ui.page == .main && !sleeping)
         updateStatusItem()
@@ -425,6 +433,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activateCompat()
         popover.contentViewController?.view.window?.makeKey()
+        startOutsideClickMonitoring()
+    }
+
+    private static let clickMask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+
+    private func startOutsideClickMonitoring() {
+        stopOutsideClickMonitoring()
+        // 其他 App、桌面的點擊
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: Self.clickMask, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.closeForOutsideClick() }
+        }) {
+            outsideClickMonitors.append(global)
+        }
+        // 本 App 其他視窗（例如系統監控圖示的面板）的點擊；面板本身與這個圖示交給原本的處理
+        if let local = NSEvent.addLocalMonitorForEvents(matching: Self.clickMask, handler: { [weak self] event in
+            guard let self, let popover = self.popover else { return event }
+            let inside = event.window === popover.contentViewController?.view.window
+                || event.window === self.statusItem.button?.window
+            if !inside { self.closeForOutsideClick() }
+            return event
+        }) {
+            outsideClickMonitors.append(local)
+        }
+    }
+
+    private func stopOutsideClickMonitoring() {
+        outsideClickMonitors.forEach(NSEvent.removeMonitor)
+        outsideClickMonitors.removeAll()
+    }
+
+    private func closeForOutsideClick() {
+        // 管理員授權視窗是別的程序的視窗，點它不能把面板關掉
+        guard let popover, popover.isShown, !store.adminCPU.authorizing else { return }
+        popover.performClose(nil)
     }
 
     private func showContextMenu() {
@@ -462,6 +504,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func popoverDidClose(_ notification: Notification) {
         guard let closed = notification.object as? NSPopover, closed === popover else { return }
+        stopOutsideClickMonitoring()
         store.panelVisible = false
         store.setHardwareSampling(active: false)
         store.setProcessSampling(active: false)

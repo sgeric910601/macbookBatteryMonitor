@@ -46,8 +46,21 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(powerSaving, forKey: Keys.powerSaving); onIntervalChange?() }
     }
 
+    /// 只在使用電池時套用省電模式，接上電源就恢復一般模式
+    var powerSavingOnBatteryOnly: Bool {
+        didSet { defaults.set(powerSavingOnBatteryOnly, forKey: Keys.powerSavingOnBatteryOnly); onIntervalChange?() }
+    }
+
+    /// 目前是否接著電源（不存檔，由 AppDelegate 每次更新時帶入；桌上型 Mac 一律視為接著電源）
+    var onACPower = false {
+        didSet { if onACPower != oldValue, powerSaving, powerSavingOnBatteryOnly { onIntervalChange?() } }
+    }
+
+    /// 省電模式現在是否生效：開關打開，且（沒有限定電池，或目前用電池）
+    var powerSavingActive: Bool { powerSaving && !(powerSavingOnBatteryOnly && onACPower) }
+
     /// 電池、系統監控、耗電排行共用的取樣間隔（秒）
-    var sampleInterval: TimeInterval { TimeInterval(powerSaving ? max(2, updateInterval) : updateInterval) }
+    var sampleInterval: TimeInterval { TimeInterval(powerSavingActive ? max(2, updateInterval) : updateInterval) }
 
     /// 介面上顯示的更新頻率
     var updateText: String { Self.updateText(seconds: Int(sampleInterval)) }
@@ -167,6 +180,7 @@ final class AppSettings: ObservableObject {
         static let monitorNetwork = "monitorNetwork"
         static let systemMonitors = "systemMonitors"
         static let powerSaving = "powerSaving"
+        static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
         static let updateInterval = "updateInterval"
         static let hiddenFlowItems = "hiddenFlowItems"
         static let hiddenDetailFields = "hiddenDetailFields"
@@ -197,6 +211,7 @@ final class AppSettings: ObservableObject {
             Keys.monitorDisk: true,
             Keys.monitorNetwork: true,
             Keys.powerSaving: false,
+            Keys.powerSavingOnBatteryOnly: false,
             Keys.updateInterval: 1,
             Keys.adminCPUSampling: false,
             Keys.autoCheckUpdates: true,
@@ -224,6 +239,7 @@ final class AppSettings: ObservableObject {
             needsModeChoice = true
         }
         powerSaving = defaults.bool(forKey: Keys.powerSaving)
+        powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
         let interval = defaults.integer(forKey: Keys.updateInterval)
         updateInterval = Self.updateIntervals.contains(interval) ? interval : 1
         hiddenFlowItems = Set(defaults.stringArray(forKey: Keys.hiddenFlowItems) ?? [])

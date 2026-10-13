@@ -33,7 +33,7 @@ struct PanelView: View {
                 HeaderView(s: s, e: e, lowThreshold: settings.lowThreshold)
                 TimeCard(s: s, e: e, unpluggedAt: store.unpluggedAt, fullThreshold: settings.fullThreshold,
                          chargeLimit: store.chargeLimit.supported ? store.chargeLimit : nil)
-                PowerFlowView(s: s, e: e, breakdown: store.breakdown, ui: ui, powerSaving: settings.powerSaving)
+                PowerFlowView(s: s, e: e, breakdown: store.breakdown, ui: ui, powerSaving: settings.powerSavingActive)
                 Picker("", selection: ui.binding(\.tab)) {
                     ForEach(BottomTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }

@@ -9,6 +9,17 @@ struct SettingsView: View {
     /// 桌上型 Mac 沒有電池：不顯示電池通知與充電上限
     var hasBattery = true
 
+    private var powerSavingNote: String {
+        let base = "省電模式：電力流向改用靜態圖示、不播放動畫，更新頻率至少每 2 秒。"
+        if settings.powerSaving, settings.powerSavingOnBatteryOnly, settings.onACPower, hasBattery {
+            return base + "目前接著電源，已暫時恢復一般模式。"
+        }
+        if settings.powerSavingActive, settings.updateInterval < 2 {
+            return base + "（目前\(settings.updateText)）"
+        }
+        return base + "更新越慢越省電。"
+    }
+
     private var limitText: String {
         if chargeLimit.supported { return chargeLimit.limit >= 100 ? "不限制（100%）" : "\(chargeLimit.limit)%" }
         return ChargeLimitReader.lastKnown().map { "\($0.limit)%" } ?? "未設定"
@@ -83,9 +94,12 @@ struct SettingsView: View {
                         ForEach(AppSettings.updateIntervals, id: \.self) { Text(AppSettings.updateText(seconds: $0)).tag($0) }
                     }
                     SwitchRow("省電模式", isOn: binding(\.powerSaving))
-                    Text(settings.powerSaving && settings.updateInterval < 2
-                         ? "省電模式：電力流向改用靜態圖示、不播放動畫，更新頻率至少每 2 秒（目前\(settings.updateText)）。"
-                         : "省電模式：電力流向改用靜態圖示、不播放動畫，更新頻率至少每 2 秒。更新越慢越省電。")
+                    // 桌上型 Mac 一直接著電源，沒有「只在使用電池時」的情況
+                    if hasBattery {
+                        Toggle("只在使用電池時啟用", isOn: binding(\.powerSavingOnBatteryOnly))
+                            .disabled(!settings.powerSaving)
+                    }
+                    Text(powerSavingNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

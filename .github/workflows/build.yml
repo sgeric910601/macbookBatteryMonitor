@@ -109,7 +109,7 @@ jobs:
         run: |
           # 一鍵更新會用這個校驗檔確認下載的 zip 沒有損壞
           shasum -a 256 macbookBatteryMonitor-"$TAG"-*.zip > SHA256SUMS.txt
-          # v1.7.0-beta.1 這種 tag 標成預先發行版本，不會變成「最新版本」
+          # v1.8.0-beta.1 這種 tag 標成預先發行版本，不會變成「最新版本」
           flags=()
           [[ "$TAG" == *-* ]] && flags=(--prerelease --latest=false)
           notes=".github/release-notes/$TAG.md"

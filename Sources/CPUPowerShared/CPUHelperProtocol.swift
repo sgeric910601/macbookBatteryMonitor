@@ -50,7 +50,7 @@ public enum ChargingWakePolicy {
 public struct CPUHelperConfiguration: Codable {
     public let uid: UInt32
     public let version: Int
-    /// 這個服務能排定智慧充電喚醒（v1.7.0 起安裝的服務；舊服務的設定沒有這個值）
+    /// 這個服務能排定智慧充電喚醒（v1.7.1 起安裝的服務；舊服務的設定沒有這個值）
     public let chargingWake: Bool?
     public init(uid: UInt32) { self.uid = uid; version = CPUHelperConstants.version; chargingWake = true }
 }

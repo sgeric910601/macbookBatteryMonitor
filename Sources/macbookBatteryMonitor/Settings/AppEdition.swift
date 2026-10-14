@@ -1,7 +1,7 @@
 import Foundation
 
 /// 打包時寫進 Info.plist 的 MBMEdition。
-/// v1.7.0 起只有一個 App（Apple 晶片與 Intel 通用），系統監控改成可在設定開關，第一次啟動時詢問。
+/// v1.7.1 起只有一個 App（Apple 晶片與 Intel 通用），系統監控改成可在設定開關，第一次啟動時詢問。
 /// 發布時仍附上舊檔名的 battery／status zip，讓 v1.5.0～v1.6.1 的一鍵更新找得到檔案（舊版會檢查 MBMEdition）；
 /// 從舊版升級的使用者依原本的版本別決定系統監控預設開或關，不再詢問
 enum AppEdition: String {

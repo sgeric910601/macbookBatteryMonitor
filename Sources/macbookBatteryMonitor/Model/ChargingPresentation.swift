@@ -83,6 +83,12 @@ struct PowerFlowPresentation {
             pending = nil
             return previous
         }
+        // 方向明顯相反時不沿用舊圖，否則會把電池畫成負瓦數。
+        // Intel 剛插電時電池先放電（電池一起供電），十幾秒後才開始充電，狀態還在確認時就會遇到
+        if (previous == .mixed && watts > 5) || (previous == .charging && watts < -5) {
+            displayed = candidate; pending = nil
+            return candidate
+        }
         if let pending, pending.kind == candidate, uptime - pending.since >= 10 {
             displayed = candidate; self.pending = nil
             return candidate

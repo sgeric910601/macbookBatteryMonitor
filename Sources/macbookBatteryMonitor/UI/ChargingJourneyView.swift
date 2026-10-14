@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import VideoToolbox
 
 /// 主面板資訊卡最上方的「智慧充電」列：左邊是充電夥伴（貓咪）或電量條，右邊是排程狀態，點一下打開智慧充電頁
 struct ChargingJourneyPresentation: Equatable {
@@ -27,11 +28,24 @@ struct ChargingJourneyPresentation: Equatable {
     var badge: Badge?
     var animatedFlow: Bool
 
+    /// 電池夥伴的表情
+    enum Mood: Equatable { case resting, sleeping, charging, happy, worried }
+
+    var mood: Mood {
+        switch badge {
+        case .sleeping: return .sleeping
+        case .ready: return .happy
+        case .late, .paused: return .worried
+        case nil: return onPad ? .charging : .resting
+        }
+    }
+
     static func make(percent: Int, charging: Bool, decision: ChargingPlanDecision?, now: Date = Date()) -> ChargingJourneyPresentation {
         let progress = min(1, max(0, Double(percent) / 100))
         guard let decision else {
+            // 沒有排程時也跟著充電狀態變色：充電中是綠色（電量條、電池夥伴與光點的光暈）
             return .init(title: "智慧充電", detail: "指定時間前充好，平常維持保養上限",
-                         progress: progress, tint: .neutral, onPad: charging, badge: nil, animatedFlow: charging)
+                         progress: progress, tint: charging ? .green : .neutral, onPad: charging, badge: nil, animatedFlow: charging)
         }
         let deadline = time(decision.deadline, now: now)
         let target = "\(decision.targetPercent)%"
@@ -61,6 +75,13 @@ struct ChargingJourneyPresentation: Equatable {
             return .init(title: "可能無法準時", detail: "繼續充電中，原定 \(deadline) 前到 \(target)",
                          progress: progress, tint: .orange, onPad: charging, badge: .late, animatedFlow: charging)
         }
+    }
+
+    /// 不能從 App 調整充電上限的 Mac（Intel、macOS 26 以前）：一樣顯示充電夥伴，旁邊說明沒有智慧充電
+    static func unsupported(percent: Int, charging: Bool) -> ChargingJourneyPresentation {
+        return .init(title: "充電夥伴", detail: "這台 Mac 不支援智慧充電，點一下可換外觀",
+                     progress: min(1, max(0, Double(percent) / 100)), tint: charging ? .green : .neutral,
+                     onPad: charging, badge: nil, animatedFlow: charging)
     }
 
     /// 今天只顯示時間，明天加上「明天」，其他日子加上日期與星期
@@ -99,13 +120,19 @@ struct ChargingJourneyView<Control: View>: View {
         HStack(alignment: .center, spacing: 10) {
             Button(action: open) {
                 Group {
-                    if appearance == .companion {
+                    switch appearance {
+                    case .companion:
                         ChargingCompanion(onPad: presentation.onPad, badge: presentation.badge, tint: tint,
                                           animated: animated && !reduceMotion)
                             .frame(width: 48, height: 50)
-                    } else {
+                    case .mascot:
+                        BatteryMascot(mood: presentation.mood, level: presentation.progress, tint: tint,
+                                      animated: animated && !reduceMotion)
+                            .frame(width: 48, height: 50)
+                    case .energy:
+                        // 和貓咪同高，切換外觀時下面的內容不會跟著移動
                         energyBar
-                            .frame(width: 48, height: 34)
+                            .frame(width: 48, height: 50)
                     }
                 }
                 .contentShape(Rectangle())
@@ -137,23 +164,29 @@ struct ChargingJourneyView<Control: View>: View {
         }
     }
 
-    /// 電力流動：電量條，充電中有一個光點往右流
+    /// 電力流動：電量條，充電中有一個光點往右流。光點用 Core Animation 播放，不逐幀更新 SwiftUI：
+    /// 逐幀更新會讓整個面板每幀重新排版、文字重畫，2015 MacBook Air 實測 CPU 約 26%
     private var energyBar: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24, paused: !animated || reduceMotion || !presentation.animatedFlow)) { context in
-            let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-            ZStack(alignment: .leading) {
-                Capsule().fill(tint.opacity(0.18)).frame(height: 8)
-                Capsule().fill(tint.opacity(0.8)).frame(width: max(8, 48 * presentation.progress), height: 8)
-                if animated && !reduceMotion && presentation.animatedFlow {
-                    Circle().fill(.white).frame(width: 6, height: 6)
-                        .shadow(color: tint, radius: 4)
-                        .offset(x: CGFloat(phase) * 40)
-                }
-                Image(systemName: presentation.badge?.symbol ?? "bolt.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(tint)
-                    .offset(y: -14)
+        ZStack(alignment: .leading) {
+            Capsule().fill(tint.opacity(0.18)).frame(height: 8)
+            Capsule().fill(tint.opacity(0.8)).frame(width: max(8, 48 * presentation.progress), height: 8)
+            if animated && !reduceMotion && presentation.animatedFlow {
+                FlowDot(glow: nsTint, travel: 40)
+                    .frame(width: 48, height: 14)
             }
+            Image(systemName: presentation.badge?.symbol ?? "bolt.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(tint)
+                .offset(y: -14)
+        }
+    }
+
+    private var nsTint: NSColor {
+        switch presentation.tint {
+        case .neutral: return .secondaryLabelColor
+        case .blue: return .systemCyan
+        case .green: return .systemGreen
+        case .orange: return .systemOrange
         }
     }
 
@@ -196,8 +229,10 @@ struct ChargingCompanion: View {
         .accessibilityHidden(true)
     }
 
-    /// 開發用截圖畫不出影片圖層，改用靜態圖
+    /// 開發用截圖畫不出影片圖層，改用靜態圖。沒有 HEVC 硬體解碼的 Mac（例如 2015 年的 Intel 機型）也用靜態圖：
+    /// 帶透明的 HEVC 只能用 CPU 解碼，2015 MacBook Air 實測面板開著時 CPU 約 8%
     static let videoAllowed = !CommandLine.arguments.contains { $0.hasPrefix("--snapshot") || $0.hasPrefix("--screenshots") }
+        && VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
 
     static func resource(_ onPad: Bool, _ ext: String) -> URL? {
         Bundle.main.url(forResource: onPad ? "companion-charging" : "companion-resting", withExtension: ext)
@@ -259,5 +294,177 @@ private final class LoopingVideoView: NSView {
         looper = nil
         player.removeAllItems()
         url = nil
+    }
+}
+
+/// 電量條上往右流的光點（1.6 秒一趟）。動畫交給 Core Animation，SwiftUI 只在設定改變時更新
+private struct FlowDot: NSViewRepresentable {
+    let glow: NSColor
+    let travel: CGFloat
+
+    func makeNSView(context: Context) -> FlowDotView { FlowDotView() }
+
+    func updateNSView(_ view: FlowDotView, context: Context) {
+        view.configure(glow: glow, travel: travel)
+    }
+}
+
+final class FlowDotView: NSView {
+    private let dot = CALayer()
+    private var glow: NSColor?
+    private var travel: CGFloat = 0
+    private var laidOut: CGRect = .zero
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        dot.bounds = CGRect(x: 0, y: 0, width: 6, height: 6)
+        dot.cornerRadius = 3
+        dot.backgroundColor = NSColor.white.cgColor
+        dot.shadowOpacity = 1
+        dot.shadowRadius = 4
+        dot.shadowOffset = .zero
+        layer?.addSublayer(dot)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    /// 面板每秒更新時也會呼叫；設定沒變就不重來，光點才不會每秒跳回起點
+    func configure(glow: NSColor, travel: CGFloat) {
+        guard glow != self.glow || travel != self.travel else { return }
+        self.glow = glow
+        self.travel = travel
+        restart()
+    }
+
+    override func layout() {
+        super.layout()
+        guard bounds != laidOut else { return }
+        laidOut = bounds
+        restart()
+    }
+
+    private func restart() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        dot.shadowColor = glow?.cgColor
+        dot.position = CGPoint(x: 3, y: bounds.midY)
+        dot.removeAnimation(forKey: "flow")
+        let flow = CABasicAnimation(keyPath: "position.x")
+        flow.fromValue = 3
+        flow.toValue = 3 + travel
+        flow.duration = 1.6
+        flow.repeatCount = .infinity
+        dot.add(flow, forKey: "flow")
+        CATransaction.commit()
+    }
+}
+
+/// 電池夥伴：有表情的電池，裡面的底色是目前的電量。
+/// 等待時閉眼睡覺、準備或正在充電時微笑、充好時開心、可能延遲或系統暫停時擔心；面板開著時偶爾眨眼
+struct BatteryMascot: View {
+    let mood: ChargingJourneyPresentation.Mood
+    /// 0…1
+    let level: Double
+    let tint: Color
+    let animated: Bool
+
+    var body: some View {
+        Group {
+            if animated && mood != .sleeping {
+                // 每 4 秒眨一次眼：只在閉眼與張眼的那一刻更新，不必一直重畫；睡覺時本來就閉著眼
+                TimelineView(BlinkSchedule()) { context in
+                    face(blink: context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: BlinkSchedule.period)
+                         < BlinkSchedule.closed)
+                }
+            } else {
+                face(blink: false)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func face(blink: Bool) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(tint.opacity(0.12))
+            // 電量：從左邊填到目前的百分比
+            GeometryReader { proxy in
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(tint.opacity(0.22))
+                    .frame(width: max(6, (proxy.size.width - 6) * level))
+                    .padding(3)
+            }
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(tint.opacity(0.7), lineWidth: 2)
+            HStack(spacing: 9) {
+                eye(closed: blink)
+                eye(closed: blink)
+            }
+            .offset(y: -4)
+            mouth
+                .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .frame(width: 13, height: 7)
+                .offset(y: 7)
+            if mood == .sleeping {
+                Text("z")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(tint)
+                    .offset(x: 14, y: -11)
+            }
+        }
+        .frame(width: 40, height: 30)
+        .overlay(alignment: .trailing) {
+            Capsule().fill(tint.opacity(0.7)).frame(width: 3.5, height: 11).offset(x: 4.5)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func eye(closed: Bool) -> some View {
+        Group {
+            if mood == .sleeping || closed {
+                Capsule().fill(tint).frame(width: 7, height: 2)
+            } else {
+                Circle().fill(tint).frame(width: 4.5, height: 4.5)
+            }
+        }
+        .frame(width: 7, height: 5)
+    }
+
+    private var mouth: Path {
+        Path { path in
+            switch mood {
+            case .happy:
+                // 開心：大大的笑
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addQuadCurve(to: CGPoint(x: 13, y: 0), control: CGPoint(x: 6.5, y: 10))
+            case .charging:
+                path.move(to: CGPoint(x: 2, y: 2))
+                path.addQuadCurve(to: CGPoint(x: 11, y: 2), control: CGPoint(x: 6.5, y: 7))
+            case .worried:
+                path.move(to: CGPoint(x: 1, y: 6))
+                path.addQuadCurve(to: CGPoint(x: 12, y: 6), control: CGPoint(x: 6.5, y: 0))
+            case .resting, .sleeping:
+                path.move(to: CGPoint(x: 3, y: 4))
+                path.addLine(to: CGPoint(x: 10, y: 4))
+            }
+        }
+    }
+}
+
+/// 眨眼的時間點：每 4 秒閉眼 0.18 秒，只產生閉眼與張眼兩個時間
+private struct BlinkSchedule: TimelineSchedule {
+    static let period: TimeInterval = 4
+    static let closed: TimeInterval = 0.18
+
+    func entries(from start: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
+        var base = (start.timeIntervalSinceReferenceDate / Self.period).rounded(.down) * Self.period
+        var opening = false
+        return AnyIterator {
+            let date = Date(timeIntervalSinceReferenceDate: base + (opening ? Self.closed : 0))
+            if opening { base += Self.period }
+            opening.toggle()
+            return date
+        }
     }
 }

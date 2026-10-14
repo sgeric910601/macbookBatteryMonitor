@@ -141,6 +141,7 @@ private final class DiagramView: NSView {
         let x2 = sinkX - 4
         let charging = c.connected && c.flowKind == .charging
         let mixed = c.connected && c.flowKind == .mixed
+        // 流向圖確認期間（10 秒）可能沿用方向相反的舊圖，電池那條最少畫 0 W，不顯示負瓦數
         let active = c.connected || abs(c.batteryWatts) >= 0.05
         let adapterText: String = c.adapterWatts.map { Format.watts($0) }
             ?? c.ratedWatts.map { "\($0) W*" } ?? "—"
@@ -155,7 +156,7 @@ private final class DiagramView: NSView {
             node(CGRect(x: sinkX, y: 0, width: 44, height: split - 4), symbol: SymbolCompat.name("battery.100percent.bolt"))
             node(CGRect(x: sinkX, y: split + 10, width: 44, height: h - split - 10), symbol: "laptopcomputer")
             ribbon(x1: x1, x2: x2, sourceTop: 12, sourceBottom: sourceSplit,
-                   sinkTop: 0, sinkBottom: split - 4, value: Format.watts(c.batteryWatts), watts: c.batteryWatts, active: active)
+                   sinkTop: 0, sinkBottom: split - 4, value: Format.watts(max(0, c.batteryWatts)), watts: max(0, c.batteryWatts), active: active)
             ribbon(x1: x1, x2: x2, sourceTop: sourceSplit, sourceBottom: h - 12,
                    sinkTop: split + 10, sinkBottom: h, value: Format.watts(c.systemWatts), watts: c.systemWatts, active: active)
         } else if mixed {
@@ -163,14 +164,14 @@ private final class DiagramView: NSView {
             node(CGRect(x: 0, y: 0, width: sourceWidth, height: split - 5),
                  symbol: "bolt.fill", value: adapterText, bolt: true)
             node(CGRect(x: 0, y: split + 5, width: sourceWidth, height: split - 5),
-                 symbol: SymbolCompat.name("battery.75percent"), value: Format.watts(-c.batteryWatts))
+                 symbol: SymbolCompat.name("battery.75percent"), value: Format.watts(max(0, -c.batteryWatts)))
             node(CGRect(x: sinkX, y: 12, width: 44, height: h - 24), symbol: "laptopcomputer")
             let share = max(0.25, min(0.75, abs(c.batteryWatts) / max(0.1, c.systemWatts ?? 0)))
             let join = h - 12 - (h - 24) * CGFloat(share)
             ribbon(x1: x1, x2: x2, sourceTop: 0, sourceBottom: split - 5,
                    sinkTop: 12, sinkBottom: join, value: Format.watts(c.adapterWatts), watts: c.adapterWatts, active: true)
             ribbon(x1: x1, x2: x2, sourceTop: split + 5, sourceBottom: h,
-                   sinkTop: join, sinkBottom: h - 12, value: Format.watts(-c.batteryWatts), watts: -c.batteryWatts, active: true)
+                   sinkTop: join, sinkBottom: h - 12, value: Format.watts(max(0, -c.batteryWatts)), watts: max(0, -c.batteryWatts), active: true)
         } else {
             let rect = CGRect(x: 0, y: 12, width: sourceWidth, height: h - 24)
             node(rect, symbol: c.connected ? "bolt.fill" : SymbolCompat.name("battery.75percent"),

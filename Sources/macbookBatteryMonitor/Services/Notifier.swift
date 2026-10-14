@@ -105,7 +105,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let time = plan.deadline.formatted(date: .omitted, time: .shortened)
         switch event {
         case .ready:
-            post(title: "已充到 \(plan.targetPercent)%", body: "智慧充電已在 \(time) 前完成。拔掉電源後會還原原本的充電上限。")
+            // 完成目標就是原本的上限時沒有東西要還原
+            let restore = plan.targetPercent == plan.restoreLimit ? "" : "拔掉電源後會還原原本的充電上限 \(plan.restoreLimit)%。"
+            post(title: "已充到 \(plan.targetPercent)%", body: "智慧充電已在 \(time) 前完成。\(restore)")
         case .late:
             post(title: "智慧充電可能無法準時", body: "macOS 仍在充電，原定 \(time) 前充到 \(plan.targetPercent)%。")
         }

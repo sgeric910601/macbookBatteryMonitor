@@ -60,6 +60,8 @@ final class ChargingPlanController: ObservableObject {
     /// 一次性排程完成時間過後多久還沒拔電就自動結束、還原上限
     static let expiry: TimeInterval = 2 * 3600
     static let retryDelay: TimeInterval = 60
+    /// 提高上限後等 macOS 開始充電的時間
+    static let startGrace: TimeInterval = 120
 
     init(storage: ChargingPlanStorage = DefaultsChargingPlanStorage(), calendar: Calendar = .current,
          log: @escaping (String) -> Void = { ChargingPlanLog.shared.write($0) }) {
@@ -127,7 +129,11 @@ final class ChargingPlanController: ObservableObject {
             }
         }
 
-        let result = ChargingPlanEngine.evaluate(active, input: input)
+        var result = ChargingPlanEngine.evaluate(active, input: input)
+        // 剛提高上限、macOS 還沒開始充：仍是「準備充電」，不是系統暫停
+        if result.phase == .systemPaused, let raisedAt = active.raisedAt, input.now.timeIntervalSince(raisedAt) < Self.startGrace {
+            result.phase = .starting
+        }
         if result.phase != decision?.phase {
             log("狀態：\(result.phase.title)（電量 \(input.percent)%，上限 \(input.currentLimit)%，"
                 + "\(input.connected ? "接著電源" : "沒接電源")，需要約 \(result.requiredMinutes) 分鐘，"
@@ -169,7 +175,10 @@ final class ChargingPlanController: ObservableObject {
                     clear("已還原原本的上限 \(target)%，排程結束")
                 } else if !active.restoring {
                     active.appliedLimit = target
-                    if target == active.targetPercent, target > active.holdPercent { active.raisedFor = active.deadline }
+                    if target == active.targetPercent, target > active.holdPercent {
+                        active.raisedFor = active.deadline
+                        active.raisedAt = now
+                    }
                     plan = active
                     storage.save(active)
                 }

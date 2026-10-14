@@ -79,6 +79,8 @@ struct ChargingPlan: Codable, Equatable, Identifiable {
     var startedFor: Date?
     /// 這一輪曾把上限提高到目標（包含睡眠前提高）：有提高過才發「已充好」通知
     var raisedFor: Date?
+    /// 最近一次把上限提高到目標的時間：macOS 通常要十幾秒才開始充，這段時間不算「系統暫停」
+    var raisedAt: Date?
 
     init(schedule: ChargingSchedule, deadline: Date, targetPercent: Int, holdPercent: Int, restoreLimit: Int,
          sleepStrategy: ChargingSleepStrategy, createdAt: Date) {
@@ -162,23 +164,33 @@ enum ChargingPlanEngine {
     static func evaluate(_ plan: ChargingPlan, input: ChargingPlanInput) -> ChargingPlanDecision {
         let needed = requiredMinutes(plan, input)
         let start = plan.deadline.addingTimeInterval(-Double(needed + bufferMinutes) * 60)
-        let wake = plan.sleepStrategy == .preciseWake && start > input.now ? start.addingTimeInterval(-60) : nil
+        // 精準喚醒排在開始前一分鐘，醒來就提高上限：被叫醒的 Mac 可能只醒十幾秒就又睡回去，等不到開始時間
+        let raiseAt = plan.sleepStrategy == .preciseWake ? start.addingTimeInterval(-60) : start
+        let wake = plan.sleepStrategy == .preciseWake && raiseAt > input.now ? raiseAt : nil
 
+        // 只有還在等待時才需要叫醒 Mac：已經充好、沒接電源或已經開始充，叫醒也沒事做（每週排程不會每天白白喚醒）
         func decide(_ phase: ChargingPlanPhase, limit: Int?) -> ChargingPlanDecision {
             ChargingPlanDecision(phase: phase, targetPercent: plan.targetPercent, deadline: plan.deadline, startAt: start,
-                                 wakeAt: wake, desiredLimit: limit, requiredMinutes: needed)
+                                 wakeAt: phase == .waiting ? wake : nil, desiredLimit: limit, requiredMinutes: needed)
         }
 
         guard input.limitSupported else { return decide(.unsupported, limit: nil) }
         guard input.connected else { return decide(.unplugged, limit: nil) }
         if input.percent >= plan.targetPercent { return decide(.ready, limit: plan.targetPercent) }
         if input.now >= plan.deadline { return decide(.late, limit: plan.targetPercent) }
-        if input.now < start, plan.startedFor != plan.deadline { return decide(.waiting, limit: plan.holdPercent) }
+        if input.now < raiseAt, plan.startedFor != plan.deadline { return decide(.waiting, limit: holdLimit(plan, percent: input.percent)) }
         if input.now.addingTimeInterval(Double(needed) * 60) > plan.deadline { return decide(.late, limit: plan.targetPercent) }
         if input.isCharging { return decide(.charging, limit: plan.targetPercent) }
         // 剛提高上限時 macOS 可能還沒開始充：上限還沒是目標就是「準備充電」，已經是目標卻沒在充才算系統暫停
         if input.systemPaused && input.currentLimit == plan.targetPercent { return decide(.systemPaused, limit: plan.targetPercent) }
         return decide(.starting, limit: plan.targetPercent)
+    }
+
+    /// 等待時的上限：保養上限，但不低於目前電量（進位到 5% 一格，不超過完成目標）。
+    /// 電量已高於保養上限時把上限降下去，macOS 會讓電池先放電到保養上限再充回來，白白多一次充放電
+    static func holdLimit(_ plan: ChargingPlan, percent: Int) -> Int {
+        let current = Int((Double(max(0, percent)) / 5).rounded(.up)) * 5
+        return min(plan.targetPercent, max(plan.holdPercent, current))
     }
 
     /// 鋰電池充到 80% 以上會變慢（定電壓階段）：線性估算的這一段時間乘上這個倍數
@@ -196,6 +208,37 @@ enum ChargingPlanEngine {
         }
         let slowShare = Double(max(0, plan.targetPercent - max(percent, 80))) / Double(plan.targetPercent - percent)
         return min(Int((linear * (1 + (taperFactor - 1) * slowShare)).rounded(.up)), maximumMinutes)
+    }
+}
+
+/// 建立排程前的預估：照目前的充電速度，來不來得及在指定時間前充到目標
+struct ChargingForecast: Equatable {
+    /// 從目前電量充到目標需要的分鐘數（80% 以上變慢的部分已算進去）
+    var neededMinutes: Int
+    /// 來得及
+    var onTime: Bool
+    /// 到時候最多能充到幾 %
+    var reachablePercent: Int
+
+    /// - Parameter percentPerHour: 80% 以下的充電速度（每小時幾 %）
+    static func make(percent: Int, target: Int, minutesAvailable: Double, percentPerHour: Double) -> ChargingForecast {
+        let rate = max(1, percentPerHour)
+        let slowRate = rate / ChargingPlanEngine.taperFactor
+        let start = min(max(0, percent), 100)
+        // 80% 以下用一般速度，80% 以上變慢
+        let fastPart = Double(max(0, min(target, 80) - start))
+        let slowPart = Double(max(0, target - max(start, 80)))
+        let needed = Int((fastPart / rate * 60 + slowPart / slowRate * 60).rounded(.up))
+        let minutes = max(0, minutesAvailable)
+        let minutesTo80 = Double(max(0, 80 - start)) / rate * 60
+        let reachable: Double
+        if minutes <= minutesTo80 {
+            reachable = Double(start) + rate * minutes / 60
+        } else {
+            reachable = Double(max(start, 80)) + slowRate * (minutes - minutesTo80) / 60
+        }
+        return ChargingForecast(neededMinutes: needed, onTime: Double(needed) <= minutes,
+                                reachablePercent: min(100, Int(reachable.rounded(.down))))
     }
 }
 

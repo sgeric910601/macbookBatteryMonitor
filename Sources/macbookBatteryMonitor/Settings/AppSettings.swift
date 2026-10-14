@@ -114,13 +114,17 @@ final class AppSettings: ObservableObject {
     @Published var chargingAppearance: ChargingAppearance {
         didSet { defaults.set(chargingAppearance.rawValue, forKey: Keys.chargingAppearance) }
     }
-    /// 智慧充電的完成目標與保養上限（建立排程時的預設值）
+    /// 智慧充電的完成目標與保養上限（建立排程時的預設值）。完成目標預設是「原本的上限」（存成 0）：
+    /// 建立排程時的系統充電上限，充好後就停在平常的上限，不會多充到 100%
     @Published var chargingTargetPercent: Int {
         didSet {
             defaults.set(chargingTargetPercent, forKey: Keys.chargingTargetPercent)
-            if chargingHoldPercent > chargingTargetPercent { chargingHoldPercent = chargingTargetPercent }
+            if chargingTargetPercent != Self.originalLimitTarget, chargingHoldPercent > chargingTargetPercent {
+                chargingHoldPercent = chargingTargetPercent
+            }
         }
     }
+    static let originalLimitTarget = 0
     @Published var chargingHoldPercent: Int {
         didSet { defaults.set(chargingHoldPercent, forKey: Keys.chargingHoldPercent) }
     }
@@ -249,7 +253,7 @@ final class AppSettings: ObservableObject {
             Keys.autoCheckUpdates: true,
             Keys.updateNotification: true,
             Keys.chargingAppearance: ChargingAppearance.companion.rawValue,
-            Keys.chargingTargetPercent: 100,
+            Keys.chargingTargetPercent: 0,
             Keys.chargingHoldPercent: 80,
             Keys.chargingSleepStrategy: ChargingSleepStrategy.readinessFirst.rawValue,
             Keys.chargingWakeEnabled: false,
@@ -286,9 +290,11 @@ final class AppSettings: ObservableObject {
         autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
         updateNotification = defaults.bool(forKey: Keys.updateNotification)
         chargingAppearance = ChargingAppearance(rawValue: defaults.string(forKey: Keys.chargingAppearance) ?? "") ?? .companion
-        let target = ChargingPlan.clamp(defaults.integer(forKey: Keys.chargingTargetPercent))
+        let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
+        let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target
-        chargingHoldPercent = min(ChargingPlan.clamp(defaults.integer(forKey: Keys.chargingHoldPercent)), target)
+        let hold = ChargingPlan.clamp(defaults.integer(forKey: Keys.chargingHoldPercent))
+        chargingHoldPercent = target == Self.originalLimitTarget ? hold : min(hold, target)
         chargingSleepStrategy = ChargingSleepStrategy(rawValue: defaults.string(forKey: Keys.chargingSleepStrategy) ?? "") ?? .readinessFirst
         chargingWakeEnabled = defaults.bool(forKey: Keys.chargingWakeEnabled)
     }
@@ -298,9 +304,26 @@ final class AppSettings: ObservableObject {
 enum ChargingAppearance: String, CaseIterable, Identifiable {
     /// 充電夥伴：會動的貓咪（充電時躺在充電墊上）
     case companion
+    /// 電池夥伴：有表情的電池（等待時睡覺、充電時微笑、充好時開心、延遲時擔心）
+    case mascot
     /// 電力流動：電量條
     case energy
 
     var id: String { rawValue }
-    var title: String { self == .companion ? "充電夥伴" : "電力流動" }
+    var title: String {
+        switch self {
+        case .companion: return "充電夥伴（貓咪）"
+        case .mascot: return "電池夥伴"
+        case .energy: return "電力流動"
+        }
+    }
+
+    /// 智慧充電頁上方切換外觀用的短名稱
+    var shortTitle: String {
+        switch self {
+        case .companion: return "貓咪"
+        case .mascot: return "電池夥伴"
+        case .energy: return "電量條"
+        }
+    }
 }

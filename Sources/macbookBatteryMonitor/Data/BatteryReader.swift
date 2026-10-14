@@ -29,6 +29,10 @@ struct BatterySnapshot: Codable, Equatable {
     var avgTimeToFull: Int?
     var psTimeToEmpty: Int?
     var psTimeToFull: Int?
+    /// macOS 的電源資訊有剩餘時間欄位（-1 代表還在估算）。有的話以它為準，不改用電池晶片的平均時間
+    var psReportsTime = false
+    /// Intel Mac。快要充滿、充電電流很小時，SMC 推算的電池功率不可靠，改以電池晶片為準（由 BatteryStore 設定）
+    var isIntel = false
     var temperature_C: Double?
     var notChargingReason: Int?
     var adapter: AdapterInfo?
@@ -54,6 +58,9 @@ struct BatterySnapshot: Codable, Equatable {
         guard let system = smcSystemWatts else { return nil }
         if !externalConnected { return -system }
         guard let input = smcAdapterWatts else { return nil }
+        // Intel 在 85% 以上充電電流很小時，SMC 推算會是小負值：實測 2015 MacBook Air 86% 時推算 -3 W，
+        // 電池晶片卻是充電中、+528 mA，macOS 也顯示充電中。晶片明確回報在充電時改用晶片的電流
+        if isIntel, isCharging, amperage_mA > 50, input - system < 0 { return nil }
         return input - system
     }
 
@@ -194,6 +201,7 @@ enum BatteryReader {
         s.avgTimeToFull = validMinutes(int(reg["AvgTimeToFull"]))
         s.psTimeToEmpty = validMinutes(int(ps["Time to Empty"]))
         s.psTimeToFull = validMinutes(int(ps["Time to Full Charge"]))
+        s.psReportsTime = ps["Time to Empty"] != nil || ps["Time to Full Charge"] != nil
         s.notChargingReason = int(charger["NotChargingReason"]) ?? int(reg["NotChargingReason"])
         s.systemLoad_mW = positive(int(telemetry["SystemLoad"]))
         s.systemPowerIn_mW = positive(int(telemetry["SystemPowerIn"]))

@@ -1,4 +1,5 @@
 import AppKit
+import Security
 import ServiceManagement
 
 /// 開機（登入）自動啟動。macOS 13 起優先用 SMAppService，失敗時或 macOS 12 改用 LaunchAgent plist。
@@ -12,12 +13,28 @@ enum LoginItem {
     private static let label = "com.kuan.batterymonitor"
     /// 上次自動註冊時 App 的位置
     static let registeredPathKey = "loginItemRegisteredPath"
+    /// 上次自動註冊時 App 的程式碼雜湊（cdhash）
+    static let registeredCodeKey = "loginItemRegisteredCode"
     /// 使用者在設定裡手動關掉
     static let disabledByUserKey = "loginItemDisabledByUser"
 
     private static var agentURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/\(label).plist")
+    }
+
+    /// 這個 App 的程式碼雜湊（cdhash）。macOS 13 的登入項目用它辨認 App，每次建置、重新簽章都不同；讀不到時用版本號
+    static var codeIdentity: String? {
+        var code: SecCode?
+        var staticCode: SecStaticCode?
+        var info: CFDictionary?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
+              SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
+              SecCodeCopySigningInformation(staticCode, [], &info) == errSecSuccess,
+              let unique = (info as? [String: Any])?[kSecCodeInfoUnique as String] as? Data else {
+            return Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        }
+        return unique.map { String(format: "%02x", $0) }.joined()
     }
 
     static var isInApplications: Bool {

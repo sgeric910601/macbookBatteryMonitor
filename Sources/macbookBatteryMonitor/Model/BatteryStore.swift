@@ -76,6 +76,12 @@ final class BatteryStore: ObservableObject {
     private var flowPresentation = PowerFlowPresentation()
     /// 這次接上電源的時間（判斷充電上限是否已被關掉用）
     private var pluggedSince: Date?
+    /// App 執行中實際插上電源的時間（啟動時就接著電源則為 nil），剛插電還沒開始充電時的說明用
+    private(set) var pluggedInAt: Date?
+    /// 這段充電開始的時間。剛開始充電時電流還在爬升，頭一分鐘不納入平均，否則充滿時間會一直往下掉
+    private var chargingSince: Date?
+    /// Intel 剛拔電的時間：頭一分鐘的放電電流偏低，不納入平均，否則剩餘時間會一直往下掉（實測 31 秒少 9 分鐘）
+    private var dischargingSince: Date?
     private var processStream: ProcessEnergyStream?
     /// 面板開著才允許跑 top，避免關掉後還在背景取樣
     var panelVisible = false
@@ -109,10 +115,13 @@ final class BatteryStore: ObservableObject {
             if !BatteryReader.hasBattery { refreshDesktop() }
             return
         }
+        s.isIntel = ChipInfo.isIntel
         if s.externalConnected {
             if pluggedSince == nil { pluggedSince = s.date }
+            if snapshot?.externalConnected == false { pluggedInAt = s.date }
         } else {
             pluggedSince = nil
+            pluggedInAt = nil
         }
         s.chargeLimit = ChargeLimitReader.resolve(externalConnected: s.externalConnected, pluggedSince: pluggedSince)
         let state = chargingPresentation.state(s, uptime: ProcessInfo.processInfo.systemUptime)
@@ -123,6 +132,9 @@ final class BatteryStore: ObservableObject {
                 avgDischarge = nil
                 avgCharge = nil
             }
+            // App 啟動時已在充電，電流已經穩定，不必等
+            chargingSince = state == .charging ? (lastState == nil ? .distantPast : s.date) : nil
+            dischargingSince = state == .discharging && s.isIntel && lastState != nil ? s.date : nil
             if state == .discharging {
                 if lastState != nil { unpluggedAt = s.date }
             } else {
@@ -130,9 +142,9 @@ final class BatteryStore: ObservableObject {
             }
         }
         let current = Double(abs(s.effectiveAmperage_mA))
-        if s.effectiveAmperage_mA < 0 {
+        if s.effectiveAmperage_mA < 0, s.date.timeIntervalSince(dischargingSince ?? .distantPast) >= 60 {
             avgDischarge = ema(avgDischarge, current, dt)
-        } else if s.effectiveAmperage_mA > 0 {
+        } else if s.effectiveAmperage_mA > 0, s.date.timeIntervalSince(chargingSince ?? .distantPast) >= 60 {
             avgCharge = ema(avgCharge, current, dt)
         }
         lastDate = s.date
@@ -140,6 +152,8 @@ final class BatteryStore: ObservableObject {
 
         snapshot = s
         var computed = Estimator.estimates(s, avgDischarge_mA: avgDischarge, avgCharge_mA: avgCharge, displayState: state)
+        // 剛插電的 30 秒內電池還在放電是充電器還沒開始充電，不算供電不足：選單列不顯示剩餘時間，流向圖也先不畫電池供電
+        if let at = pluggedInAt, s.date.timeIntervalSince(at) < 30 { computed.drainingOnAC = false }
         // 接著電源但沒在充電（滿電、到達上限、暫停）時，電池功率的小幅波動不改變流向圖，與上方的狀態文字一致
         let holding = [.full, .limitReached, .pluggedIdle].contains(state) && !computed.drainingOnAC && !s.drainingAboveLimit
         computed.displayFlow = flowPresentation.kind(connected: s.externalConnected, watts: computed.batteryWatts,
@@ -193,9 +207,17 @@ final class BatteryStore: ObservableObject {
     func startChargingPlan(_ schedule: ChargingSchedule) {
         guard chargingPlanRunning else { return }
         let settings = AppSettings.shared
-        guard chargingPlan.start(schedule, target: settings.chargingTargetPercent, hold: settings.chargingHoldPercent,
+        let target = chargingTarget
+        guard chargingPlan.start(schedule, target: target, hold: min(settings.chargingHoldPercent, target),
                                  currentLimit: chargeLimit.limit, strategy: settings.chargingSleepStrategy) else { return }
         evaluateChargingPlan(.refresh)
+    }
+
+    /// 新排程的完成目標：設定成「原本的上限」時用目前的系統充電上限；排程進行中改排程時，沿用排程開始前的上限
+    var chargingTarget: Int {
+        let value = AppSettings.shared.chargingTargetPercent
+        guard value == AppSettings.originalLimitTarget else { return value }
+        return chargingPlan.plan?.restoreLimit ?? chargeLimit.limit
     }
 
     func setChargingSleepStrategy(_ strategy: ChargingSleepStrategy) {
@@ -217,6 +239,18 @@ final class BatteryStore: ObservableObject {
         let decision = chargingPlan.decision
         let wakeAt = chargingPlan.plan?.sleepStrategy == .preciseWake ? decision?.wakeAt : nil
         chargingWake.sync(wakeAt: wakeAt, enabled: AppSettings.shared.chargingWakeEnabled)
+    }
+
+    /// 建立排程前的預估：充電中用目前的充電電流換算速度，沒在充電時用最近七天的速度，都沒有就以每小時 20% 估算
+    func chargingForecast(until deadline: Date, target: Int) -> ChargingForecast? {
+        guard let s = snapshot else { return nil }
+        var rate = recentChargingRate(now: s.date) ?? ChargingRateEstimator.fallbackPercentPerHour
+        if let e = estimates, e.state == .charging, let full = s.fullCharge_mAh, full > 0,
+           let current = e.avgCharge_mA, current > 10 {
+            rate = current / Double(full) * 100
+        }
+        return ChargingForecast.make(percent: s.percent, target: target,
+                                     minutesAvailable: deadline.timeIntervalSince(s.date) / 60, percentPerHour: rate)
     }
 
     private func recentChargingRate(now: Date) -> Double? {
@@ -354,7 +388,8 @@ final class BatteryStore: ObservableObject {
         for minute in stride(from: 24 * 60, through: 0, by: -10) {
             let t = now.addingTimeInterval(-Double(minute) * 60)
             let plugged = minute > 135
-            let pct = plugged ? min(80, 45 + (24 * 60 - minute) / 12) : 80 - (135 - minute) / 60
+            // 每 3 分鐘 +1%（每小時 20%），和智慧充電沒有資料時的估算一致
+            let pct = plugged ? min(80, 45 + (24 * 60 - minute) / 3) : 80 - (135 - minute) / 60
             let watts = plugged ? 4.5 + 2 * sin(Double(minute) / 37) : 6 + 2.5 * sin(Double(minute) / 9)
             samples.append(HistorySample(t: t, pct: pct, watts: max(1, watts), plugged: plugged, charging: plugged && pct < 80))
         }
@@ -405,7 +440,7 @@ final class BatteryStore: ObservableObject {
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
         let deadline = calendar.date(bySettingHour: 7, minute: 30, second: 0, of: tomorrow) ?? now
         let plan = ChargingPlan(schedule: .weekly(weekdays: [2, 3, 4, 5, 6], minuteOfDay: 7 * 60 + 30), deadline: deadline,
-                                targetPercent: 100, holdPercent: 80, restoreLimit: 80, sleepStrategy: .preciseWake, createdAt: now)
+                                targetPercent: 95, holdPercent: 80, restoreLimit: 95, sleepStrategy: .preciseWake, createdAt: now)
         let input = ChargingPlanInput(now: now, percent: snapshot?.percent ?? 80, connected: true, limitSupported: true,
                                       currentLimit: 80, estimatedMinutes: nil, isCharging: false, systemPaused: true)
         chargingPlan.loadPreview(plan, decision: ChargingPlanEngine.evaluate(plan, input: input))

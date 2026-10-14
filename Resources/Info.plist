@@ -21,12 +21,9 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.7.0</string>
+    <string>1.7.1</string>
     <key>CFBundleVersion</key>
     <string>15</string>
-    <!-- Beta 測試版的序號（例如 beta.1）；正式版不帶這個鍵。發布的 tag 是 v<版本>-<序號> -->
-    <key>MBMPrerelease</key>
-    <string>beta.1</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>LSMinimumSystemVersion</key>

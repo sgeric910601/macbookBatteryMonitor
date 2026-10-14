@@ -34,7 +34,7 @@ final class Updater: ObservableObject {
 
     /// 執行中的版本（Beta 會帶序號）
     let current = AppVersion.current()
-    /// 畫面上顯示的目前版本：1.7.0、1.7.0 beta 1
+    /// 畫面上顯示的目前版本：1.7.1、1.8.0 beta 1
     var currentVersion: String { current.text }
 
     var available: ReleaseInfo? {
@@ -175,7 +175,7 @@ final class Updater: ObservableObject {
         let unpacked = work.appendingPathComponent("unpacked")
         guard run("/usr/bin/ditto", ["-x", "-k", zip.path, unpacked.path]) == 0 else { throw UpdateError(message: "解壓縮失敗") }
         let app = unpacked.appendingPathComponent("macbookBatteryMonitor.app")
-        // v1.7.0 起只有一個 App，系統監控是設定裡的開關，不再比對版本別
+        // v1.7.1 起只有一個 App，系統監控是設定裡的開關，不再比對版本別
         // 版本號與 Beta 序號都要和 Release 的 tag 一致（正式版的 App 不能帶 Beta 序號）
         guard let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")) as? [String: Any],
               info["CFBundleIdentifier"] as? String == "com.kuan.batterymonitor",

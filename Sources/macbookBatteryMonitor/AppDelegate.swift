@@ -73,7 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 周邊設備電量變化很慢，每 60 秒查一次；面板停在周邊設備分頁時連所有藍牙設備一起查
         store.peripherals.refresh()
         // 系統充電上限：啟動時讀一次，之後由系統通知、打開面板時重新讀取；在面板上調整後立即更新選單列與面板
-        store.chargeLimit.onChange = { [weak self] in self?.refresh() }
+        // 睡眠交界時（例如智慧充電在睡前寫入上限）系統也會發出變更通知，睡眠中不重新整理
+        store.chargeLimit.onChange = { [weak self] in
+            guard let self, !self.sleeping else { return }
+            self.refresh()
+        }
         store.chargeLimit.start()
         // 智慧充電：繼續上次的排程；精準喚醒的開關改變時排定或取消喚醒
         store.startChargingPlan()
@@ -117,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         runPanelSelfTestIfRequested()
         runSizingSelfTestIfRequested()
         runUpdateSelfTestIfRequested()
+        runPreciseWakeSelfTestIfRequested()
     }
 
     /// 第一次啟動：只看電池（和以前的電池版一樣），還是另外在選單列加上系統監控
@@ -168,6 +173,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             guard updater.available != nil else { return }
             await updater.install()
             print("selftest: 安裝結果 \(updater.state)")
+        }
+    }
+
+    /// 開發用：`--selftest-precise-wake <分鐘>` 用精準喚醒建立一個這麼多分鐘後完成、充到 100% 的排程（App 會一直執行），
+    /// 讓 Mac 睡著後實測是否準時醒來提高上限。提高上限 2 分鐘後自動取消排程、還原原本的上限與睡眠策略，
+    /// 不讓電池停在 100%；經過記在 charging-plan.log。完成目標的設定不變
+    private func runPreciseWakeSelfTestIfRequested() {
+        guard let index = CommandLine.arguments.firstIndex(of: "--selftest-precise-wake"),
+              let minutes = CommandLine.arguments.dropFirst(index + 1).first.flatMap({ Int($0) }), minutes > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self else { return }
+            let strategy = settings.chargingSleepStrategy
+            let wakeEnabled = settings.chargingWakeEnabled
+            settings.chargingSleepStrategy = .preciseWake
+            settings.chargingWakeEnabled = true
+            let target = settings.chargingTargetPercent
+            settings.chargingTargetPercent = 100
+            store.startChargingPlan(.once(Date().addingTimeInterval(Double(minutes) * 60)))
+            settings.chargingTargetPercent = target
+            let decision = store.chargingPlan.decision
+            print("selftest: 排程 \(store.chargingPlan.plan.map { "\($0.deadline)" } ?? "建立失敗")，"
+                  + "狀態 \(decision?.phase.title ?? "—")，開始 \(decision.map { "\($0.startAt)" } ?? "—")，"
+                  + "喚醒 \(decision?.wakeAt.map { "\($0)" } ?? "—")，上限 \(decision?.desiredLimit.map { "\($0)%" } ?? "不動")")
+            timers.append(repeating(every: 30) { delegate in
+                guard let plan = delegate.store.chargingPlan.plan, let raisedAt = plan.raisedAt,
+                      Date().timeIntervalSince(raisedAt) > 120 else { return }
+                print("selftest: \(raisedAt) 已提高上限，取消排程並還原")
+                delegate.store.cancelChargingPlan()
+                delegate.settings.chargingSleepStrategy = strategy
+                delegate.settings.chargingWakeEnabled = wakeEnabled
+                delegate.store.setChargingSleepStrategy(strategy)
+            })
         }
     }
 
@@ -560,16 +597,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Login item
 
     /// 從 /Applications 啟動、而且這個位置還沒註冊過開機自啟動時（第一次安裝、App 改名或搬移）自動註冊。
-    /// 使用者在設定裡關掉後就不再自動開啟。
+    /// macOS 13 用 cdhash 辨認登入項目，新版覆蓋 App 後（cdhash 不同）系統會清掉登錄，所以 App 換了、登錄又不見時也再註冊一次；
+    /// 同一份 App 在系統設定移除後不會被加回來。使用者在 App 的設定裡關掉後就不再自動開啟。
     private func registerLoginItemIfNeeded() {
         let defaults = UserDefaults.standard
         let path = Bundle.main.bundlePath
-        guard LoginItem.isInApplications,
-              !defaults.bool(forKey: LoginItem.disabledByUserKey),
-              defaults.string(forKey: LoginItem.registeredPathKey) != path else { return }
-        // 登錄成功才記下位置，失敗的話下次啟動會再試
+        guard LoginItem.isInApplications, !defaults.bool(forKey: LoginItem.disabledByUserKey) else { return }
+        let identity = LoginItem.codeIdentity
+        let moved = defaults.string(forKey: LoginItem.registeredPathKey) != path
+        let replacedAndDropped = defaults.string(forKey: LoginItem.registeredCodeKey) != identity && LoginItem.status == .disabled
+        guard moved || replacedAndDropped else { return }
+        // 登錄成功才記下位置與 cdhash，失敗的話下次啟動會再試
         if (try? LoginItem.setEnabled(true)) != nil {
             defaults.set(path, forKey: LoginItem.registeredPathKey)
+            defaults.set(identity, forKey: LoginItem.registeredCodeKey)
         }
     }
 }

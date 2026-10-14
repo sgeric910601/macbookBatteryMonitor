@@ -113,6 +113,11 @@ final class SystemChargeLimit: ObservableObject {
         self.limit = limit
     }
 
+    /// 開發用截圖：不能從 App 調整充電上限的 Mac（Intel、macOS 26 以前）
+    func loadUnsupportedPreview() {
+        supported = false
+    }
+
     private func commit() {
         guard !editing, status != .applying, let target = draft else { return }
         commitTask?.cancel()

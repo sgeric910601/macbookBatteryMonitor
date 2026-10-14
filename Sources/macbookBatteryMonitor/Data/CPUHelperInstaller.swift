@@ -7,7 +7,7 @@ import Darwin
 enum CPUHelperInstaller {
     static var installed: Bool { configuration != nil }
 
-    /// 服務能排定智慧充電喚醒：v1.7.0 以前安裝的服務只有 CPU 取樣，要用喚醒時需重新安裝
+    /// 服務能排定智慧充電喚醒：v1.7.1 以前安裝的服務只有 CPU 取樣，要用喚醒時需重新安裝
     static var supportsChargingWake: Bool { configuration?.chargingWake == true }
 
     /// 已安裝、檔案權限正確且屬於這個使用者的服務設定

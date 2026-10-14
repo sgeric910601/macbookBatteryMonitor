@@ -65,6 +65,12 @@ final class ChargingWakeScheduler: ObservableObject {
             }
             return
         }
+        // 已經排好的喚醒快到了（不到一分鐘）就保留：排定時間前的暗喚醒（Wi-Fi、藍牙維護）也會執行到這裡，
+        // 實測在排定時間前 23 秒被當成「太近」取消，Mac 就沒在該開始充電時醒來
+        if let wakeAt, wakeAt > Date(), let existing = requested ?? scheduledAt,
+           abs(existing.timeIntervalSince(wakeAt)) < 1 {
+            return
+        }
         guard let wakeAt, wakeAt.timeIntervalSinceNow >= ChargingWakePolicy.earliest else {
             if !cancelled { cancel(removeHelperIfUnused: false) }
             setStatus("已授權，目前不需要喚醒")

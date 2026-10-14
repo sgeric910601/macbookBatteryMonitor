@@ -1,6 +1,6 @@
 import Foundation
 
-/// 版本號與 Beta 序號。GitHub 的 tag 是 v1.7.0、v1.7.0-beta.1；App 的 Info.plist 是 1.7.0，
+/// 版本號與 Beta 序號。GitHub 的 tag 是 v1.7.1、v1.8.0-beta.1；App 的 Info.plist 是 1.8.0，
 /// Beta 另外帶 MBMPrerelease = beta.1。同一個版本號的正式版比它的任何 Beta 都新
 struct AppVersion: Equatable, Comparable {
     var numbers: [Int]
@@ -8,7 +8,7 @@ struct AppVersion: Equatable, Comparable {
     var beta: Int?
 
     var isBeta: Bool { beta != nil }
-    /// 畫面上顯示的版本：1.7.0、1.7.0 beta 1
+    /// 畫面上顯示的版本：1.7.1、1.8.0 beta 1
     var text: String { numbers.map(String.init).joined(separator: ".") + (beta.map { " beta \($0)" } ?? "") }
 
     init(numbers: [Int], beta: Int? = nil) {
@@ -16,7 +16,7 @@ struct AppVersion: Equatable, Comparable {
         self.beta = beta
     }
 
-    /// "v1.7.0"、"1.7.0"、"v1.7.0-beta.1"；其他格式回傳 nil
+    /// "v1.7.1"、"1.7.1"、"v1.8.0-beta.1"；其他格式回傳 nil
     init?(_ text: String) {
         let parts = text.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
         guard let numbers = UpdateLogic.version(String(parts[0])) else { return nil }
@@ -92,7 +92,7 @@ enum UpdateLogic {
         return isNewer(candidate, than: last)
     }
 
-    /// v1.7.0 起的通用版（Apple 晶片與 Intel）
+    /// v1.7.1 起的通用版（Apple 晶片與 Intel）
     static func universalAssetName(tag: String) -> String {
         "macbookBatteryMonitor-\(tag)-macOS-universal.zip"
     }
@@ -140,7 +140,7 @@ enum UpdateLogic {
 
     /// 一個 Release：優先用通用版，沒有通用版的 Release 才用舊檔名；都找不到就回傳 nil。
     /// 舊系統版本（legacy）只找 macOS12 檔，系統已升級到 macOS 14 以上（mainSupported）時優先改裝通用版。
-    /// 標成預先發行（prerelease）的必須是 v1.7.0-beta.1 這種 tag，正式版的 tag 不能帶 Beta 序號
+    /// 標成預先發行（prerelease）的必須是 v1.8.0-beta.1 這種 tag，正式版的 tag 不能帶 Beta 序號
     static func release(_ root: [String: Any], edition: String, mainSupported: Bool = true) -> ReleaseInfo? {
         guard let tag = root["tag_name"] as? String, let parsed = AppVersion(tag),
               root["draft"] as? Bool != true,

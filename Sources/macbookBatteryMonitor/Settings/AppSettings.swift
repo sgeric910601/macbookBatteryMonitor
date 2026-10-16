@@ -34,6 +34,8 @@ final class AppSettings: ObservableObject {
     var onIntervalChange: (() -> Void)?
     /// 智慧充電的精準喚醒開關改變時呼叫
     var onChargingWakeChange: (() -> Void)?
+    /// 桌面寵物開關改變時
+    var onDesktopPetChange: (() -> Void)?
 
     /// 可選的更新頻率（秒）
     static let updateIntervals = [1, 2, 5, 10]
@@ -87,6 +89,11 @@ final class AppSettings: ObservableObject {
     @Published var systemMonitors: Bool {
         didSet { defaults.set(systemMonitors, forKey: Keys.systemMonitors); onMonitorsChange?() }
     }
+    /// 合併顯示：選單列只留電池（桌上型為耗電）一個圖示，點一下在下方展開第二條狀態列，列出所有圖示。
+    /// 選單列圖示太多時，macOS 會把放不下的藏起來（尤其有瀏海的 MacBook）
+    @Published var menuBarCombined: Bool {
+        didSet { defaults.set(menuBarCombined, forKey: Keys.menuBarCombined); onMonitorsChange?() }
+    }
     /// 全新安裝、還沒選過要不要開系統監控（第一次啟動時詢問）
     @Published private(set) var needsModeChoice = false
 
@@ -113,6 +120,22 @@ final class AppSettings: ObservableObject {
     /// 智慧充電：主面板那一列左邊顯示充電夥伴（貓咪）或電量條
     @Published var chargingAppearance: ChargingAppearance {
         didSet { defaults.set(chargingAppearance.rawValue, forKey: Keys.chargingAppearance) }
+    }
+    /// 照片外觀換照片時加一，讓用到照片的畫面重畫（照片本身在 CompanionPhoto）
+    @Published var companionPhotoVersion = 0
+    /// 桌面寵物：把充電夥伴放在桌面上（只有 MacBook 有）
+    @Published var desktopPet: Bool {
+        didSet {
+            defaults.set(desktopPet, forKey: Keys.desktopPet)
+            if desktopPet != oldValue { onDesktopPetChange?() }
+        }
+    }
+    /// 桌面寵物放在桌布上（會被視窗蓋住）；關閉時浮在所有視窗上方
+    @Published var desktopPetOnWallpaper: Bool {
+        didSet {
+            defaults.set(desktopPetOnWallpaper, forKey: Keys.desktopPetOnWallpaper)
+            if desktopPetOnWallpaper != oldValue { onDesktopPetChange?() }
+        }
     }
     /// 智慧充電的完成目標與保養上限（建立排程時的預設值）。完成目標預設是「原本的上限」（存成 0）：
     /// 建立排程時的系統充電上限，充好後就停在平常的上限，不會多充到 100%
@@ -210,6 +233,7 @@ final class AppSettings: ObservableObject {
         static let monitorDisk = "monitorDisk"
         static let monitorNetwork = "monitorNetwork"
         static let systemMonitors = "systemMonitors"
+        static let menuBarCombined = "menuBarCombined"
         static let powerSaving = "powerSaving"
         static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
         static let updateInterval = "updateInterval"
@@ -221,13 +245,15 @@ final class AppSettings: ObservableObject {
         static let updateNotification = "updateNotification"
         static let adminCPUSampling = "adminCPUSampling"
         static let chargingAppearance = "chargingAppearance"
+        static let desktopPet = "desktopPet"
+        static let desktopPetOnWallpaper = "desktopPetOnWallpaper"
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
         static let chargingWakeEnabled = "chargingWakeEnabled"
     }
 
-    /// 這台 Mac 以前用過這個 App（有設定或電量歷史），從舊版升級時不再詢問
+    /// 這台 Mac 以前用過這個 App（有設定或電量歷史）
     private static func usedBefore(_ defaults: UserDefaults) -> Bool {
         if let id = Bundle.main.bundleIdentifier, let domain = defaults.persistentDomain(forName: id), !domain.isEmpty { return true }
         let history = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -253,6 +279,9 @@ final class AppSettings: ObservableObject {
             Keys.autoCheckUpdates: true,
             Keys.updateNotification: true,
             Keys.chargingAppearance: ChargingAppearance.companion.rawValue,
+            Keys.desktopPet: false,
+            Keys.menuBarCombined: false,
+            Keys.desktopPetOnWallpaper: false,
             Keys.chargingTargetPercent: 0,
             Keys.chargingHoldPercent: 80,
             Keys.chargingSleepStrategy: ChargingSleepStrategy.readinessFirst.rawValue,
@@ -270,9 +299,10 @@ final class AppSettings: ObservableObject {
         monitorNetwork = defaults.bool(forKey: Keys.monitorNetwork)
         if defaults.object(forKey: Keys.systemMonitors) != nil {
             systemMonitors = defaults.bool(forKey: Keys.systemMonitors)
-        } else if Self.usedBefore(defaults) {
-            // 從 v1.6.1 以前升級：電池版維持只看電池，系統監控版維持開著，不再詢問
-            let previous = AppEdition.current != .battery
+        } else if Self.usedBefore(defaults), AppEdition.current == .battery || AppEdition.current == .status {
+            // 用舊檔名的 zip 從 v1.6.2 以前一鍵更新：電池版維持只看電池，系統監控版維持開著，不再詢問。
+            // 手動下載通用版升級的看不出原本是哪一版，和全新安裝一樣詢問
+            let previous = AppEdition.current == .status
             systemMonitors = previous
             defaults.set(previous, forKey: Keys.systemMonitors)
         } else {
@@ -290,6 +320,9 @@ final class AppSettings: ObservableObject {
         autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
         updateNotification = defaults.bool(forKey: Keys.updateNotification)
         chargingAppearance = ChargingAppearance(rawValue: defaults.string(forKey: Keys.chargingAppearance) ?? "") ?? .companion
+        desktopPet = defaults.bool(forKey: Keys.desktopPet)
+        menuBarCombined = defaults.bool(forKey: Keys.menuBarCombined)
+        desktopPetOnWallpaper = defaults.bool(forKey: Keys.desktopPetOnWallpaper)
         let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
         let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target
@@ -308,6 +341,8 @@ enum ChargingAppearance: String, CaseIterable, Identifiable {
     case mascot
     /// 電力流動：電量條
     case energy
+    /// 照片：預設是貓咪照片，可以換成自己的
+    case photo
 
     var id: String { rawValue }
     var title: String {
@@ -315,6 +350,7 @@ enum ChargingAppearance: String, CaseIterable, Identifiable {
         case .companion: return "充電夥伴（貓咪）"
         case .mascot: return "電池夥伴"
         case .energy: return "電力流動"
+        case .photo: return "照片"
         }
     }
 
@@ -324,6 +360,7 @@ enum ChargingAppearance: String, CaseIterable, Identifiable {
         case .companion: return "貓咪"
         case .mascot: return "電池夥伴"
         case .energy: return "電量條"
+        case .photo: return "照片"
         }
     }
 }

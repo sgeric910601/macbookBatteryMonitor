@@ -1,27 +1,13 @@
 import SwiftUI
 
-/// 設定 → 顯示項目：電力流向細項與詳細資訊欄位要不要顯示
+/// 設定 → 顯示項目：電力流向細項與詳細資訊欄位要不要顯示（接在選單列卡片下面）
 struct DisplayItemsView: View {
     @ObservedObject var settings: AppSettings
-    @ObservedObject var ui: PanelState
     /// 主面板有充電上限滑桿（充電上限不列在詳細資訊）
     var limitSlider = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ZStack {
-                Text("顯示項目").font(.headline)
-                HStack {
-                    Button {
-                        ui.page = .settings
-                    } label: {
-                        Label("設定", systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.borderless)
-                    Spacer()
-                }
-            }
-
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     CardTitle("電力流向細項", systemImage: "arrow.triangle.branch")
@@ -30,7 +16,7 @@ struct DisplayItemsView: View {
                     checkboxes(FlowItem.chipLevel)
                         .disabled(!settings.isVisible(.chip))
                     Text(settings.isVisible(.chip)
-                         ? "讀不到的項目會自動隱藏：例如 M1 MacBook Air 沒有 ANE 通道與螢幕背光感測器，背光改算在「其他」裡。"
+                         ? "這台 Mac 讀不到的項目會自動隱藏。"
                          : "隱藏晶片運算後無法展開 CPU、GPU、ANE。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -67,7 +53,6 @@ struct DisplayItemsView: View {
                 .disabled(settings.hiddenFlowItems.isEmpty && settings.hiddenDetailFields.isEmpty)
             }
         }
-        .padding(14)
     }
 
     private func checkboxes(_ items: [FlowItem]) -> some View {

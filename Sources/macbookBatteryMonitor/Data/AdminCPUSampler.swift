@@ -74,7 +74,7 @@ final class AdminCPUSampler: ObservableObject {
             }
         }
         guard desiredActive else {
-            // 面板關閉或進入設定頁：斷線讓服務停止 powermetrics，之後完全不通訊
+            // 面板關閉或換到其他頁：斷線讓服務停止 powermetrics，之後完全不通訊
             if connection != nil { disconnect(); status = Self.idleStatus }
             return
         }

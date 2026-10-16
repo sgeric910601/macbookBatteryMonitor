@@ -2,8 +2,8 @@
 # 編譯並打包成 macbookBatteryMonitor.app（Apple 晶片與 Intel 通用）
 #   ./build.sh                 → 通用版：系統監控是設定裡的開關，第一次啟動時詢問
 #   ./build.sh install         → 編好後安裝到 /Applications 並啟動
-#   ./build.sh battery|status  → 給 v1.6.1 以前的一鍵更新用的舊版別（內容相同，只有 MBMEdition 不同，
-#                                從舊版升級時用來決定系統監控預設開或關）
+#   ./build.sh battery|status  → 給 v1.5.0～v1.6.2 一鍵更新用的舊版別（內容相同，只有 MBMEdition 不同，
+#                                從舊版升級時用來保留原本的系統監控設定）；v1.7.2 是最後一個附上的版本
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -33,6 +33,8 @@ BIN="$(swift build -c release $ARCH_FLAGS --show-bin-path)/$APP_NAME"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Library/Helpers"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+# 拿掉除錯用的本地符號，執行檔小一半以上；全域符號保留，當機報告仍看得到函式名稱
+strip -x "$APP/Contents/MacOS/$APP_NAME"
 cp "$(dirname "$BIN")/CPUPowerHelper" "$APP/Contents/Library/Helpers/CPUPowerHelper"
 codesign --force --sign - --timestamp=none "$APP/Contents/Library/Helpers/CPUPowerHelper"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
@@ -51,8 +53,8 @@ if [[ -f Resources/AppIcon.icns ]]; then
 fi
 # 設定裡可切換的其他 App 圖示顏色
 cp Resources/AppIcons/icon-*.png "$APP/Contents/Resources/" 2>/dev/null || true
-# 智慧充電的充電夥伴：透明背景的 HEVC 動畫與不播放時的靜態圖
-cp Resources/Companion/companion-* "$APP/Contents/Resources/"
+# 智慧充電的充電夥伴：透明背景的 HEVC 動畫、不播放時的靜態圖與照片外觀的貓咪照片
+cp Resources/Companion/*.mov Resources/Companion/*.png Resources/Companion/*.heic "$APP/Contents/Resources/"
 codesign --force --sign - --timestamp=none "$APP"
 echo "✅ 已產生 ${APP}（MBMEdition=${EDITION}，$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")）"
 

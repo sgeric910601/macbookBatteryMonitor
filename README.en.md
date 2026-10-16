@@ -7,34 +7,41 @@ A macOS menu bar app for battery and system information. On a MacBook the menu b
 The app's interface is in Traditional Chinese.
 
 - **One app for every Mac** (v1.7.1+): Apple silicon and Intel, MacBooks and desktop Macs use the same download, which decides by itself whether to show the battery or system power. Macs on macOS 12 or 13 have a separate build
-- **System monitors on or off** (v1.7.1+): the first launch asks whether you want the battery only or battery plus system monitors; switch any time in Settings → System monitors. With them off, none of the four modules sample anything, as light as the former battery edition
+- **System monitors on or off** (v1.7.1+): the first launch asks whether you want the battery only or battery plus system monitors; switch any time in Settings → Monitoring & power saving. With them off, none of the four modules sample anything, as light as the former battery edition
 - **Charge limit slider**: drag the slider in the info card to change the macOS charge limit (80–100%). It is the same setting as in System Settings and stays in sync; no admin rights needed (v1.6.0+)
 - **Smart charging** (v1.7.1+): choose "charged to X% by a time" (in 1/2/3 hours, a custom time or a weekly schedule). The Mac stays at a care limit, the limit is raised just in time for macOS to charge to the target, and your original limit is restored afterwards
-- **Charging companion** (v1.7.1+): an animated cat next to the charge limit slider that breathes and swishes its tail, and lies on a glowing charging pad while charging. You can switch it to a battery buddy whose face follows the charging state, or a simple energy bar. MacBooks that can't change the charge limit (such as Intel models) show it at the top of the panel too, just without the slider
+- **Charging companion** (v1.7.1+): an animated cat next to the charge limit slider that breathes and swishes its tail, and lies on a glowing charging pad while charging. You can switch it to a battery buddy whose face follows the charging state, a simple energy bar, or a photo (a Ragdoll cat by default, or your own photo, v1.7.2+). MacBooks that can't change the charge limit (such as Intel models) show it at the top of the panel too, just without the slider
+- **Combine into one icon** (v1.7.2+): when the menu bar is crowded and macOS hides icons, keep just one; clicking it opens a second bar below the menu bar with the battery and system monitor icons, and clicking one opens its panel
+- **Desktop pet** (v1.7.2+): puts the charging companion on your desktop at about the size of the Calendar widget; hover for a thought bubble with the current status, click for a speech bubble, and keep it above windows or on the wallpaper
+- **Settings window** (v1.7.2+): all settings live in a window with a sidebar; the gear and the new-version button in the panel and the gear in system monitor panels open the matching section, and smart charging is available both in the panel and in the window
 - **Today** (v1.7.1+): how much battery you used and charged today, how many times you plugged in, and how long you ran on battery
 - **No hidden charging control**: the app only changes the macOS charge limit when you drag the slider (the same as doing it in System Settings) or when you set up smart charging; macOS does the actual charging. No admin rights by default; only the optional admin CPU sampling and the smart charging "precise wake" ask for authorization
 - **Updates every second**: the menu bar and panel refresh every second by default (2, 5 or 10 seconds in Settings). With the panel closed CPU use is about 0.2% (battery only) or about 1% (all four system monitors), and the app never keeps the Mac awake
 - **Power saving mode**: static power flow icons, at most one update every 2 seconds, and no companion animation; can apply only while on battery (v1.7.1+)
 - **Pick what to show**: power flow details (display backlight, chip, CPU/GPU/ANE) and detail fields can be hidden one by one; ANE and backlight hide automatically on Macs that don't report them
-- **One-click update**: when a new version is out, one click downloads, verifies and installs it (v1.5.0+). New versions trigger a notification you can turn off (v1.7.1+). Manual checks also find beta releases, which ask for confirmation before installing (v1.7.1+)
+- **One-click update**: when a new version is out, one click downloads, verifies and installs it (v1.5.0+; from v1.7.2 it uses the DMG, and older versions step up release by release). New versions trigger a notification you can turn off (v1.7.1+). Manual checks also find beta releases, which ask for confirmation before installing (v1.7.1+)
+- **Drag-to-install DMG** (v1.7.2+): open the DMG and drag the app to Applications; the app is about 7.5 MB (13 MB in v1.7.1)
 - **No Xcode needed**: Command Line Tools are enough to build it
 
 ## Download
 
-From [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases):
-
-| Your Mac | File |
+| Your Mac | File (latest version) |
 |---|---|
-| macOS 14 or later (Apple silicon or Intel, laptop or desktop) | `macbookBatteryMonitor-<version>-macOS-universal.zip` (universal) |
-| macOS 12 or 13 (Apple silicon or Intel) | `macbookBatteryMonitor-<version>-macOS12.zip` (older systems) |
+| macOS 14 or later (Apple silicon or Intel, laptop or desktop) | [`macbookBatteryMonitor.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor.dmg) (universal) |
+| macOS 12 or 13 (Apple silicon or Intel) | [`macbookBatteryMonitor-macOS12.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor-macOS12.dmg) (older systems) |
 
-- From v1.7.1 there is a single app: choose battery only or battery plus system monitors on first launch and switch later in Settings. The `…-battery-macOS-arm64.zip` and `…-status-macOS-arm64.zip` files in newer releases only exist for the one-click update of v1.6.2 and earlier; their content is the same as the universal build
+From v1.7.2 the file names are fixed without a version number, so these links always download the latest version; other versions are on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases).
+
+- Open the DMG and drag the app to Applications; the DMG window also explains what to do when the first launch is blocked (see Install)
+
+- From v1.7.1 there is a single app: choose battery only or battery plus system monitors on first launch and switch later in Settings
 - The older-systems build is for Macs on macOS 12 or 13 (for example 2015–2017 MacBooks, or older Macs upgraded with OpenCore Legacy Patcher) and has the same features. Once the system is on macOS 14 or later, one-click update switches to the universal build
-- Already on v1.5.0 or later? Settings → Update → "一鍵更新" (one-click update) installs it
+- Already on v1.5.0 or later? Settings → Update → "一鍵更新" (one-click update) installs it, first updating to the bridge release v1.7.2 and then on to the latest version (see One-click update)
+- The v1.7.2 release also has `…-v1.7.2-macOS-universal.zip` and `…-v1.7.2-macOS12.zip` (for v1.7.1) and `…-v1.7.2-battery-macOS-arm64.zip` and `…-v1.7.2-status-macOS-arm64.zip` (for v1.5.0–v1.6.2), all for the one-click update of older versions; you don't need them. Releases up to v1.7.1 only have zips
 
 | | Battery only | Battery plus system monitors |
 |---|---|---|
-| How to choose | On first launch; later turn off Settings → System monitors | On first launch; later turn on Settings → System monitors |
+| How to choose | On first launch; later turn off Settings → Monitoring & power saving | On first launch; later turn on Settings → Monitoring & power saving |
 | Battery (system power on desktops), power flow, charge limit, smart charging, notifications | ✓ | ✓ |
 | CPU/GPU, memory, disk, network modules | — | ✓ (one menu bar icon each, each can be turned off; fans, temperatures and external drives included) |
 | Peripheral battery levels with per-device alerts, Today recap | ✓ | ✓ |
@@ -43,7 +50,7 @@ From [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases):
 | CPU with the panel closed | about 0.2% | about 1% (all four modules) |
 | CPU with the panel closed, power saving | about 0.15% | about 0.5% (all four modules) |
 
-The app is called "電池與系統監控" (shown as Battery & System Monitor on English systems); the app folder is `macbookBatteryMonitor.app`. Upgrading from v1.6.x doesn't ask anything: the former battery edition stays battery only and the system monitor edition keeps its monitors on. If you only see the battery icon, check the master switch in Settings → System monitors; on MacBooks with a notch macOS may also hide icons that don't fit, so turn off the modules you don't need.
+The app is called "電池與系統監控" (shown as Battery & System Monitor on English systems); the app folder is `macbookBatteryMonitor.app`. Upgrading from v1.6.x with its one-click update doesn't ask anything: the former battery edition stays battery only and the system monitor edition keeps its monitors on; a manual download can't tell which edition you had, so it asks like a fresh install. If you only see the battery icon, check the master switch in Settings → Monitoring & power saving; on MacBooks with a notch macOS may also hide icons that don't fit, so turn off the modules you don't need or turn on "Combine into one icon".
 
 ### Battery only
 
@@ -57,9 +64,15 @@ The app is called "電池與系統監控" (shown as Battery & System Monitor on 
 
 ![Smart charging: plugged in and held at an 80% care limit, charged to the original 95% limit by 7:30 tomorrow; the Today recap on the left and the smart charging page on the right](docs/screenshots/smart-charging.png)
 
+### Settings window
+
+From v1.7.2 Settings is its own window with sections on the left: General, Display items, Monitoring & power saving, Charging, Charging companion, Peripherals and Update (desktop Macs have no Charging or Charging companion). While it's open the app shows up in the Dock and ⌘Tab so you can find it again after visiting System Settings; ⌘W closes it.
+
+![Settings window: sections on the left, display items on the right (menu bar display, power flow details, detail fields)](docs/screenshots/settings.png)
+
 ### Desktop Macs
 
-Macs without a battery (Mac mini, iMac, Mac Studio, Mac Pro) show a computer icon with system power in the menu bar. The panel shows system power with a 3-minute average, a power breakdown (chip, CPU/GPU/ANE, other), power history, the most energy-hungry apps and peripherals. Battery notifications, the charge limit and smart charging are hidden in Settings.
+Macs without a battery (Mac mini, iMac, Mac Studio, Mac Pro) show a computer icon with system power in the menu bar. The panel shows system power with a 3-minute average, a power breakdown (chip, CPU/GPU/ANE, other), power history, the most energy-hungry apps and peripherals. The Settings window has no Charging or Charging companion sections and no battery notifications.
 
 ![Desktop Mac: system power in the menu bar and the power breakdown panel](docs/screenshots/desktop.png)
 
@@ -75,13 +88,13 @@ From v1.7.1, Intel Macs are supported (the universal build needs macOS 14 or lat
 
 ### Peripherals
 
-The Peripherals tab lists connected Bluetooth keyboards, mice, trackpads and headphones. AirPods and similar show "左" (left), "右" (right) and "盒" (case) side by side on one row (v1.7.1+). Non-Apple Bluetooth Low Energy mice and keyboards from Logitech, Razer and others show up too (v1.6.2+, requires Bluetooth permission, asked on first launch; the app has no Apple developer signature, so macOS treats each new version as a new app and may ask again after an update). The bell next to each device sets its own low battery alert: off, or below 10%, 15%, 20%, 30% or 50% (20% by default).
+The Peripherals tab lists connected Bluetooth keyboards, mice, trackpads and headphones. AirPods and similar show "左" (left), "右" (right) and "盒" (case) side by side on one row (v1.7.1+). Non-Apple Bluetooth Low Energy mice and keyboards from Logitech, Razer and others show up too (v1.6.2+, requires Bluetooth permission, asked on first launch; the app has no Apple developer signature, so macOS treats each new version as a new app and may ask again after an update). The bell next to each device sets its own low battery alert: off, or below 10%, 15%, 20%, 30% or 50% (20% by default); Settings → Peripherals sets them for all connected devices at once (v1.7.2+).
 
 ![Peripherals: AirPods, keyboard and mouse battery levels with alert settings](docs/screenshots/peripherals.png)
 
 ### Update interval and power saving
 
-Settings → Update interval and power saving:
+Settings → Monitoring & power saving:
 
 - **Update interval**: every second (default), 2, 5 or 10 seconds. Battery, system monitors and the app rankings all sample at this interval; slower saves more power
 - **Power saving mode**: the power flow uses static icons and arrows (the v1.0.0 style), component flows and the charging companion don't animate, and updates happen at most every 2 seconds. "Only on battery" (v1.7.1+) switches back to normal mode while plugged in
@@ -92,7 +105,7 @@ Settings → Update interval and power saving:
 
 ### Older versions (known bugs, not recommended)
 
-Older versions remain on Releases but have the bugs below, all fixed in the latest version. Versions v1.4.0–v1.6.1 with the Peripherals tab also don't show Logitech, Razer and other Bluetooth Low Energy mice and keyboards, and list some newer AirPods twice (fixed in v1.6.2); up to v1.6.2 headphones show a single number (the lowest of the three) with left, right and case squeezed into small text under the name (three columns since v1.7.1). One-click update exists since v1.5.0. To save power, use the latest version with battery only and power saving mode or a slower interval instead of an old version.
+Older versions remain on Releases but have the bugs below, all fixed in the latest version. Versions v1.4.0–v1.6.1 with the Peripherals tab also don't show Logitech, Razer and other Bluetooth Low Energy mice and keyboards, and list some newer AirPods twice (fixed in v1.6.2); up to v1.6.2 headphones show a single number (the lowest of the three) with left, right and case squeezed into small text under the name (three columns since v1.7.1). One-click update exists since v1.5.0: v1.7.2 is a bridge release that carries files every older version recognizes, so older versions update to v1.7.2 first and then on to the latest version (v1.5.0–v1.6.2 only look at the latest release, so once a version after v1.7.2 is out they need one manual download). To save power, use the latest version with battery only and power saving mode or a slower interval instead of an old version.
 
 | Known bug | v1.0.0 | v1.1.0 | v1.2.1 | v1.2.2 | v1.3.0 | v1.4.1 |
 |---|---|---|---|---|---|---|
@@ -114,11 +127,11 @@ Older versions remain on Releases but have the bugs below, all fixed in the late
 
 | Version | Highlights | Download |
 |---|---|---|
-| v1.6.2 | Logitech, Razer and other Bluetooth Low Energy mice and keyboards (headphones show a single number; one-click update to the latest works) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.2) |
-| v1.6.1 | Separate app names for the two editions (peripheral issues above; one-click update to the latest works) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.1) |
-| v1.6.0 | Charge limit slider (peripheral issues above; one-click update to the latest works) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.0) |
-| v1.5.3 | External drives, fans and temperatures (peripheral issues above; one-click update to the latest works) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.3) |
-| v1.5.0 | One-click update (peripheral issues above; one-click update to the latest works) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.0) |
+| v1.6.2 | Logitech, Razer and other Bluetooth Low Energy mice and keyboards (headphones show a single number; one-click update goes to the bridge release v1.7.2 first) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.2) |
+| v1.6.1 | Separate app names for the two editions (peripheral issues above; one-click update goes to the bridge release v1.7.2 first) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.1) |
+| v1.6.0 | Charge limit slider (peripheral issues above; one-click update goes to the bridge release v1.7.2 first) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.6.0) |
+| v1.5.3 | External drives, fans and temperatures (peripheral issues above; one-click update goes to the bridge release v1.7.2 first) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.3) |
+| v1.5.0 | One-click update (peripheral issues above; one-click update goes to the bridge release v1.7.2 first) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.5.0) |
 | v1.4.1 | New app icon with color choices | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.4.1) |
 | v1.4.0 | Peripherals, adjustable update interval and display items (peripheral issues above, no one-click update) | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.4.0) |
 | v1.3.0 | Battery and system monitor editions, power saving mode | [Release](https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.3.0) |
@@ -129,7 +142,7 @@ Older versions remain on Releases but have the bugs below, all fixed in the late
 
 ## Install
 
-1. Download the zip from the table above and unzip it
+1. Download the DMG from the table above and open it (releases up to v1.7.1 have zips; unzip them)
 2. Drag the app (Finder shows "電池與系統監控", the file is `macbookBatteryMonitor.app`) into Applications
 3. macOS blocks the first launch (the app isn't signed with an Apple developer certificate). Allow it either way:
    - In System Settings → Privacy & Security, find the app near the bottom and click "Open Anyway"
@@ -139,18 +152,18 @@ Older versions remain on Releases but have the bugs below, all fixed in the late
      ```
 4. The first launch (v1.7.1+) asks whether you want battery only or battery plus system monitors (power only / power plus system monitors on desktops), whether to turn on admin CPU sampling (Apple silicon), and for notification and Bluetooth permissions (Bluetooth is only used to read the battery of Logitech, Razer and similar mice and keyboards). It also adds itself to login items (can be turned off in Settings; on macOS 13 the system drops the login item when a new version replaces the app, so the app adds it again)
 
-Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click update) installs the new version without downloading it yourself. The bottom of the Settings page shows the app name and version.
+Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click update) installs the new version without downloading it yourself (older versions go through the bridge release v1.7.2 first). The bottom left of the Settings window shows the app name and version.
 
 ## Features
 
-**Menu bar** (Settings → Menu bar → Display)
+**Menu bar** (Settings → Display items → Menu bar)
 - Icon and percentage, icon only, percentage only, icon and time remaining
 - Percentage inside the icon plus time remaining (v1.2+): shows "—" without a time estimate, and "fully charged", "plugged in" or "limit reached" in those states
 - A bolt while charging, a plug when plugged in but not charging, red when low
 
 **Panel**
 - Charge level, charging state, time remaining or time to full (to the charge limit when one is set)
-- Smart charging (v1.7.1+, Macs that can change the charge limit): the charging companion or an energy bar sits left of the charge limit slider, with the plan status (waiting, charging, ready and so on) below the slider; click either to open the smart charging page. MacBooks without support show only the companion with a note that smart charging isn't available; click it to change its look
+- Smart charging (v1.7.1+, Macs that can change the charge limit): the charging companion or an energy bar sits left of the charge limit slider, with the plan status (waiting, charging, ready and so on) below the slider; click either to open the smart charging page (Settings → Charging has the same one). MacBooks without support show only the companion with a note that smart charging isn't available; click it to change its look
 - Charge limit slider (v1.6.0+): 80–100% in 5% steps (as provided by macOS). The limit is written when you release the slider and read back to confirm macOS applied it; changes made in System Settings show up right away. Dragging it during a smart charging plan ends the plan in favor of your setting. Hidden on Macs that can't change the limit
 - Estimated time to 0% and **to 10%**: the system estimate plus one based on the last 3 minutes of power use
 - Time on battery since unplugging
@@ -163,7 +176,7 @@ Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click up
 - Today (v1.7.1+): battery used and charged today with the net change, how often you plugged in, total time on battery and the longest stretch, computed from the history
 - When the panel would be taller than the screen (small or scaled displays) it scrolls instead of being cut off (v1.7.1+)
 
-**System monitor modules** (Settings → System monitors: a master switch plus one per module)
+**System monitor modules** (Settings → Monitoring & power saving: a master switch plus one per module)
 - CPU/GPU: CPU and GPU usage in the menu bar; the panel has user/system split, a 2-minute chart, per-core bars (performance and efficiency cores), GPU memory, load average, top CPU apps, and fans and temperatures (fan speed and its share of the maximum on Macs with fans; CPU, GPU, SoC, battery and storage temperatures where available)
 - Memory: usage in the menu bar (orange or red under memory pressure); the panel breaks it into app memory, wired, compressed, cached files and free, with a 2-minute chart, swap and top memory apps
 - Disk: used space of the startup disk in the menu bar; the panel lists the startup disk and mounted external drives (USB, Thunderbolt, SD cards; no disk images or network volumes) with used/free space, file system, connection, SMART status, read/write speed with charts and totals
@@ -171,7 +184,7 @@ Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click up
 - Child processes (such as browser tabs) are merged into their app
 
 **Other**
-- Low battery and fully charged notifications (adjustable thresholds; also when the system charge limit is reached). Low battery alerts still fire when plugged in but discharging. When macOS has notifications turned off for the app, the Notifications card in Settings says so and opens the right System Settings page
+- Low battery and fully charged notifications (adjustable thresholds; also when the system charge limit is reached). Low battery alerts still fire when plugged in but discharging. When macOS has notifications turned off for the app, the Notifications card in Settings → General says so and opens the right System Settings page
 - Smart charging notifications (v1.7.1+): one when the plan finishes in time (for example "已充到 95%", charged to 95%) and one when it looks like it won't make it
 - Peripheral alerts: once when a device drops below its threshold, again only after it charges back above it
 - Clicking outside the panel closes it (v1.7.1+)
@@ -185,12 +198,13 @@ Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click up
 - **Left click** the menu bar icon: open the panel
 - **Right click**: open the panel, Settings, Quit
 - **Power flow** (v1.2+): click "系統" (System) for component details, then the chip for CPU/GPU/ANE
-- **System monitor modules** (when on): left click opens the module's panel, right click opens Settings or quits; hold ⌘ and drag to reorder icons
-- **Smart charging**: click the charging companion left of the charge limit slider (or the status below it) and choose 1/2/3 hours, a finish time or a weekly schedule (see below)
-- **Peripherals**: the Peripherals tab at the bottom; the bell next to a device sets its alert, the arrow at the bottom right refreshes now
-- **Charge limit**: drag the slider in the info card and release to apply it to macOS; 100% means no limit
-- **Updates**: a notification and a "有新版本" (new version) button at the bottom of the panel both open Settings → Update, then press "一鍵更新"
-- **Settings**: menu bar display, app icon color, one-click update, display items, update interval and power saving, system monitor switches, admin CPU sampling (Apple silicon), notification thresholds and update notifications, charge limit and whether the companion or an energy bar sits beside the slider, launch at login
+- **System monitor modules** (when on): left click opens the module's panel, right click opens Settings (Monitoring & power saving) or quits; hold ⌘ and drag to reorder icons
+- **Combine into one icon** (v1.7.2+, Settings → Monitoring & power saving): with too many menu bar icons macOS hides the ones that don't fit (especially on MacBooks with a notch), so you can keep just the battery icon (power on desktops). Clicking it opens a second bar right below the menu bar with the system monitor and battery icons, updating live; click one to open its panel (click again to close it), and click elsewhere or press Esc to close the bar. The system monitors only sample while the bar is open. It only shows this app's own icons, so it needs no screen recording or accessibility permission
+- **Smart charging**: click the charging companion left of the charge limit slider (or the status below it, or open Settings → Charging) and choose 1/2/3 hours, a finish time or a weekly schedule (see below)
+- **Peripherals**: the Peripherals tab at the bottom; the bell next to a device sets its alert (so does Settings → Peripherals), the arrow at the bottom right refreshes now
+- **Charge limit**: drag the slider in the info card and release to apply it to macOS; 100% means no limit (Settings → Charging has the same slider)
+- **Updates**: a notification and a "有新版本" (new version) button at the bottom of the panel both open the Update section of the Settings window, then press "一鍵更新"
+- **Settings** (a separate window from v1.7.2): the gear at the bottom right of the panel, or "設定…" (Settings) in the menu bar icon's right-click menu. Sections: General (app icon color, notification thresholds, launch at login), Display items (menu bar display, power flow details, detail fields), Monitoring & power saving (update interval, power saving, system monitor switches, combine into one icon, admin CPU sampling), Charging (charge limit slider, smart charging), Charging companion (look, photo, desktop pet), Peripherals (per-device low battery alerts), Update (one-click update, automatic checks and notifications)
 
 ## Smart charging (v1.7.1+)
 
@@ -198,7 +212,7 @@ Requires a Mac whose charge limit can be changed by apps (an Apple silicon MacBo
 
 **How it works**
 
-1. Click the charging companion left of the charge limit slider (or the status below the slider) and choose "1 小時後" / "2 小時後" / "3 小時後" (in 1/2/3 hours), pick a finish time, or select weekdays and a time to save a weekly schedule (for example workdays at 8:00). Before you press anything, each option shows a forecast from the current level and charging speed: "可準時充到 95%：先維持 80%，約 8:07 開始充" (on time: holds at 80% and starts around 8:07), "會直接充到 95%" (charges straight to 95% when the level is already close) or "來不及充到 100%，預計最多約 90%" (won't make it, about 90% at most). Going from 80% to 100% usually takes over an hour, so "in 1 hour" can't make it
+1. Click the charging companion left of the charge limit slider (or the status below the slider, or open Settings → Charging) and choose "1 小時後" / "2 小時後" / "3 小時後" (in 1/2/3 hours), pick a finish time, or select weekdays and a time to save a weekly schedule (for example workdays at 8:00). Before you press anything, each option shows a forecast from the current level and charging speed: "可準時充到 95%：先維持 80%，約 8:07 開始充" (on time: holds at 80% and starts around 8:07), "會直接充到 95%" (charges straight to 95% when the level is already close) or "來不及充到 100%，預計最多約 90%" (won't make it, about 90% at most). Going from 80% to 100% usually takes over an hour, so "in 1 hour" can't make it
 2. While waiting, the app sets the macOS charge limit to the care limit (80% by default). If the battery is already above it, the limit isn't lowered below the current level (macOS would first drain the battery down to the care limit and then charge it back, an extra cycle for nothing); it stays at the current level rounded up to the next 5% step, for example 95% at 93%
 3. The start time is worked out backwards from the time needed to charge: the current charging speed if the Mac is charging, otherwise the median charging speed of the last seven days, otherwise 20% per hour. Charging slows down above 80%, so that part is multiplied by 1.8, and a 15-minute buffer is added
 4. At the start time the limit is raised to the target (by default your original limit, the system charge limit when the plan was created; pick 100% when you need it) and macOS charges on its own. Once started, the limit isn't lowered again even if the estimate gets shorter, so charging doesn't stop halfway
@@ -220,11 +234,23 @@ The target and the care limit are set under "目標與保養上限" (Target and 
 
 **Log**: every status change, limit write with the value read back, sleep and wake, and wake scheduling is recorded in `~/Library/Logs/macbookBatteryMonitor/charging-plan.log` (local only; trimmed to its second half above 256 KB). `macbookBatteryMonitor --charging-plan-status` (see Development) prints the current plan, the system charge limit, the battery level, scheduled wake events and the latest log lines without changing anything.
 
-**Charging companion**: "滑桿旁顯示" (shown beside the slider; "面板上方顯示" on Macs that can't change the charge limit) at the top of the smart charging page (or in Settings → Charge limit) switches between three looks:
+**Charging companion**: "滑桿旁顯示" (shown beside the slider; "面板上方顯示" on Macs that can't change the charge limit) at the top of the smart charging page, or "外觀" (Look) in Settings → Charging companion, switches between four looks:
 
-- **Charging companion (cat, default)**: a 6-second looping HEVC animation with a transparent background: its belly rises and falls, its tail sweeps slowly now and then and the tip flicks, and the dangling front paw sways. While charging it lies on a glowing charging pad with charging waves above it; it shows a sleep badge while waiting and a check mark when done. It only plays while the panel is open and shows a still image when the panel is closed, in power saving mode, with Reduce Motion on, or on Macs without HEVC hardware decoding (such as 2015 Intel models)
+- **Charging companion (cat, default)**: a 6-second looping HEVC animation with a transparent background: its belly rises and falls, its tail sweeps slowly now and then and the tip flicks, and the dangling front paw sways. While charging it lies on a glowing charging pad with charging waves above it; it shows a sleep badge while waiting and a check mark when done. It plays while the panel is open, even with Reduce Motion on, and shows a still image when the panel is closed or in power saving mode. Older Intel Macs without HEVC hardware decoding animate too (see Performance)
 - **Battery buddy**: a battery with a face, filled to the current level. Neutral without a plan, asleep while waiting, smiling while charging, beaming when done and frowning when late or paused; it blinks now and then while the panel is open
 - **Energy bar**: a level bar with a light dot flowing right while charging
+- **Photo** (v1.7.2+): a photo cropped to a circle, with a level ring around it (colored by the state) and the state badge at the top right. The default is a Ragdoll cat photo (about 5 KB); "選擇照片…" (Choose photo) in Settings → Charging companion (or "換照片…" on the smart charging page and in the desktop pet's right-click menu) switches to your own photo and selects this look. The photo is cropped to a square from the center, scaled to 256 pixels and saved again (no location or other photo metadata), only on this Mac in `~/Library/Application Support/BatteryMonitor/`; "改回貓咪照片" (back to the cat photo) deletes it
+
+**Desktop pet** (v1.7.2+, MacBooks): turn on "在桌面顯示" (Show on desktop) in Settings → Charging companion and the companion appears on your desktop (bottom right by default) at about the size of the Calendar widget.
+
+![Desktop pet: the charging cat with a thought bubble, the battery buddy with a speech bubble, the photo look with a speech bubble, and the cat waiting for a smart charging plan with a bubble below it](docs/screenshots/desktop-pet.png)
+
+- **Look**: the same one you picked for the panel (cat, battery buddy, energy bar or photo). It always animates except in power saving mode; the cat uses a 320-pixel-wide high-resolution animation, with a glowing charging pad under it and a charging sign above it while charging
+- **Hover**: a thought bubble shows the level and state (for example "62%・充電中，36 分鐘後到 80%" or "78%・還能用 7 小時 25 分"), plus a line for a smart charging plan if there is one
+- **Click**: a speech bubble says one line, a different one each click: its mood (low battery, charging, full, sleeping while a plan waits), today's used and recharged percentage, battery health and cycle count, and the Mac's current power draw; it hides after 4 seconds
+- **Double-click** opens the panel; **drag** to move it (the position is remembered); **right-click** to open the panel, change the look or photo, switch where it sits, open the companion settings or hide it
+- **Where it sits**: "浮在視窗上方" (above windows) or "放在桌布上" (on the wallpaper, at the desktop icon level, so windows cover it); it shows on every desktop but not in full-screen apps
+- The bubble is a separate window that ignores the mouse and hugs the pet (below it when there's no room above), so it never blocks what's underneath
 
 ## App icon
 
@@ -240,24 +266,24 @@ The icon is a Ragdoll cat lying on its back on a wireless charging pad (a cut-ou
 
 Settings → Update checks GitHub for new versions; press "一鍵更新" (one-click update) when one is available:
 
-1. Downloads the universal zip (the macOS 12 build downloads `…-macOS12.zip`, or the universal zip once the system is on macOS 14 or later; releases without a universal zip use the older file names), only from `github.com` and `githubusercontent.com`
+1. Downloads the DMG (v1.7.2+; the macOS 12 build downloads `macbookBatteryMonitor-macOS12.dmg`, or the universal one once the system is on macOS 14 or later) and mounts it read-only in a temporary folder to copy the app out, without showing it in Finder or on the desktop; older releases without a DMG use the zip. Only from `github.com` and `githubusercontent.com`
 2. Verifies it against the release's `SHA256SUMS.txt` and checks the app's identifier, version, beta number and signature
 3. Replaces the app after it quits and relaunches it; if the swap fails the original is put back. Settings, history, smart charging plans and your icon color are kept; temporary files are removed if the download or verification fails or the update is interrupted
 
 "自動檢查更新" (check automatically) is on by default: shortly after launch and every 6 hours, but it only contacts `api.github.com` if the last check was more than a day ago. It only tells you; nothing installs on its own. With the app running, a new release is noticed within about a day.
 
-"有新版本時通知" (notify about new versions, v1.7.1+) is on by default: an automatic check that finds a new stable version posts one macOS notification per version; clicking it opens Settings at the Update card. Turn it off in Settings → Update. If the app isn't in a writable location (for example installed by an administrator), one-click update can't run and points you to GitHub.
+"有新版本時通知" (notify about new versions, v1.7.1+) is on by default: an automatic check that finds a new stable version posts one macOS notification per version; clicking it opens the Update section of the Settings window. Turn it off in Settings → Update. If the app isn't in a writable location (for example installed by an administrator), one-click update can't run and points you to GitHub.
 
 **Beta releases** (v1.7.1+): betas marked as pre-releases on GitHub (for example v1.8.0-beta.1) are only listed when you press "檢查更新" (Check for updates). Automatic checks never mention them, the panel doesn't show them and there are no notifications. "安裝 Beta…" (Install beta) first explains that betas may be unstable, and only a second click on "安裝 Beta" downloads and installs it (with the same checksum and signature checks). If a stable version newer than the beta exists, only the stable one is listed. On a beta, the next beta also needs a manual check, while stable versions are announced as usual. To go back to the stable version, download it from GitHub and reinstall.
 
-Versions up to v1.4.1 have no one-click update; download a new version manually once.
+**Stepping up release by release**: v1.7.2 is a bridge release carrying the files each older one-click update recognizes: v1.5.0–v1.6.2 look for the older `battery`/`status` zips (same content as the universal build, keeping the system monitor setting you had), v1.7.1 looks for the universal or macOS 12 zip, and v1.7.2 and later look for DMGs. From v1.7.1 the updater picks the newest version it recognizes among the latest 20 releases, so it updates to v1.7.2 first and then on to the latest version; v1.5.0–v1.6.2 only look at the latest release, so once a version after v1.7.2 is out they need one manual download. The macOS 12 build picks files by system version and switches to the universal build once the system is on macOS 14 or later. v1.4.1 and earlier have no one-click update and need one manual download.
 
 ## Admin CPU sampling (optional, off by default)
 
-On some Macs (such as the M1 and M2 Pro below) the CPU energy counter doesn't update, so the CPU shows 0 W. If you want CPU power, turn on Settings → CPU power → admin CPU sampling to read it with the built-in `powermetrics`. Otherwise leave it off.
+On some Macs (such as the M1 and M2 Pro below) the CPU energy counter doesn't update, so the CPU shows 0 W. If you want CPU power, turn on admin CPU sampling under "CPU 功耗" (CPU power) in Settings → Monitoring & power saving to read it with the built-in `powermetrics`. Otherwise leave it off.
 
 - **Turning on**: asked once on first launch; after that the macOS admin prompt only appears when you turn it on yourself in Settings. It installs a system service, stores no password and doesn't touch sudoers. If you cancel or it fails, the option turns itself off; no password prompt at app launch or login
-- **Sampling**: connects only while the main panel is open, at the update interval. Closing the panel, opening Settings, sleeping or quitting disconnects and stops `powermetrics` immediately; the service exits after 30 seconds of idling
+- **Sampling**: connects only while the main panel is open, at the update interval. Closing the panel, switching to the smart charging page, sleeping or quitting disconnects and stops `powermetrics` immediately; the service exits after 30 seconds of idling
 - **Turning off**: stops and removes the service (no password needed). If smart charging's precise wake also uses it, it only disconnects; the service is removed when both are off
 - **Power**: `powermetrics` runs only while the main panel is open. On an M1 MacBook Air the service and `powermetrics` add about 1% CPU with the panel open (about 0.3% in power saving mode); nothing with the panel closed
 - **Security**: the service only accepts connections from the user who installed it. It can only start and stop `powermetrics` with fixed arguments (intervals of 1, 2, 5 or 10 seconds), schedule or cancel one smart charging wake with a fixed identifier and a bounded time range, or remove itself. It never accepts arbitrary commands, paths or PIDs
@@ -267,7 +293,7 @@ Old values are never shown while waiting for authorization, before data arrives 
 
 ## Power overview and component power (v1.2+)
 
-The main panel samples at the update interval (every second by default) and stops when the panel closes, Settings opens or the Mac sleeps. No admin rights needed (except the optional `powermetrics` CPU sampling).
+The main panel samples at the update interval (every second by default) and stops when the panel closes, the smart charging page opens or the Mac sleeps. No admin rights needed (except the optional `powermetrics` CPU sampling).
 
 **Stable display while plugged in**
 
@@ -321,10 +347,10 @@ Everything live updates every second by default (2/5/10 seconds selectable; at l
 - Each SMC key's format is looked up once; afterwards every value is a single SMC call, and only `PDTR` and `PSTR` are read every second
 - Adapter details are read every 30 seconds while plugged in; the system charge limit is read at launch, when the panel opens and when macOS reports a change, never every second
 - Smart charging only evaluates the plan on each update (nothing at all without a plan) and only calls macOS when the limit has to change; the precise wake service is only contacted to schedule or cancel the wake
-- The charging companion is a small hardware-decoded video (152×160 pixels) that only plays while the panel is open; Macs without HEVC hardware decoding get a still image instead of decoding it on the CPU
+- The charging companion comes from small transparent HEVC videos (152×160 pixels in the panel, 320×212 for the desktop pet). The frames are decoded once when first shown and then played frame by frame by Core Animation, so the app uses almost no CPU and needs no HEVC hardware decoding (v1.7.2+; on an M1 the always-animating desktop pet adds about 0.2% CPU and 16 MB of memory)
 - The panel is built when it opens and released completely with its window when it closes; nothing draws in the background
 - Component details and SMC temperatures are only read while the panel is open; optional admin CPU sampling only connects while the main panel is open
-- Flow animations and the energy bar's moving dot are composited by Core Animation (not redrawn frame by frame in SwiftUI) and only play while the panel is open and that path carries power; Reduce Motion is respected and power saving mode doesn't animate at all
+- Flow animations and the energy bar's moving dot are composited by Core Animation (not redrawn frame by frame in SwiftUI) and only play while the panel is open and that path carries power; the flows respect Reduce Motion while the charging companion (including the energy bar's dot) keeps moving; power saving mode doesn't animate at all
 - System monitors only sample enabled modules; with the master switch off no module icons or timers exist; menu bar icon widths are fixed
 - Disk space is read with `statfs()` every second, with purgeable space recalibrated every 5 minutes; network only queries the active interface; external drives are listed with `getfsstat(MNT_NOWAIT)`, so offline network volumes can't block it
 - SMART status needs `diskutil` and can wake sleeping external drives, so it is only checked while the disk panel is open, at most every 10 minutes per drive
@@ -410,7 +436,7 @@ git checkout v1.7.1          # or another tag; without it you get the latest dev
 ## Development
 
 ```bash
-Scripts/test-power.sh    # unit conversions, power state transitions, stable plugged-in display, lifecycle, animation, system monitors, external drives, temperatures, CPU service protocol, peripherals, one-click update (including betas), charge limit slider and smart charging tests (runs with Command Line Tools)
+Scripts/test-power.sh    # unit conversions, power state transitions, stable plugged-in display, lifecycle, animation, system monitors, external drives, temperatures, CPU service protocol, peripherals, one-click update (including betas and DMGs), charge limit slider and smart charging tests (runs with Command Line Tools)
 ```
 
 Debug arguments:
@@ -422,22 +448,32 @@ $APP --dump-hardware     # component power every second, five JSON samples
 $APP --charging-plan-status # smart charging: plan, system charge limit, level, scheduled wakes and the latest log lines (read only)
 $APP --snapshot <folder> # render each panel tab to PNG off screen
 $APP --selftest-panel    # open the panel for 20 seconds and close it, for power measurements
-$APP --selftest-hardware # expand the chip and switch to Settings to confirm sampling stops and resumes, printing the CPU reading (with admin CPU sampling status)
+$APP --selftest-hardware # expand the chip and switch to the smart charging page to confirm sampling stops and resumes, printing the CPU reading (with admin CPU sampling status)
 $APP --dump-monitors     # system monitor readings (two samples one second apart) as JSON
 $APP --dump-sensors 10   # a temperature sensor and fan table every second, 10 times
 $APP --dump-peripherals  # read peripheral levels once (all Bluetooth devices) with timing
 $APP --notification-status # this app's notification permission (check this first if notifications don't arrive)
 $APP --selftest-monitors # open the CPU and memory module panels for 10 seconds each, for power measurements
 $APP --selftest-update   # check GitHub for a new version and one-click update right away (lower the version of a copy to test)
+$APP --selftest-dmg <DMG> # copy and verify the app from a local DMG the way one-click update does (same version), without installing
+$APP --selftest-settings # open the Settings window from the panel, switch through every section, and check it shows in the Dock while open and goes back to the menu bar only after closing
 $APP --screenshots <folder> # render the README images with demo data (docs/screenshots)
 ```
 
-- The macOS 12 build lives on the `legacy-macos12` branch: macOS 13/14-only APIs (Observation, Swift Charts, Grid, SMAppService and so on) are replaced with compatible code, everything else matches the main branch. Launching with `--macos12-paths` forces the macOS 12 code paths on newer systems. GitHub Actions only packages `…-macOS12.zip` when the `legacy-macos12` branch has the same version (including the beta number) as the release
-- `build.sh` builds Apple silicon and Intel in one go (universal); with Command Line Tools that can't build both, it falls back to this Mac's architecture
-- Releases package three zips: the universal build (`MBMEdition=universal`) and the older `battery`/`status` file names for the one-click update of v1.5.0–v1.6.2 (same content, only `MBMEdition` differs, which decides whether system monitors start on when upgrading)
+- The macOS 12 build lives on the `legacy-macos12` branch: macOS 13/14-only APIs (Observation, Swift Charts, Grid, SMAppService and so on) are replaced with compatible code, everything else matches the main branch. Launching with `--macos12-paths` forces the macOS 12 code paths on newer systems. GitHub Actions only packages `macbookBatteryMonitor-macOS12.dmg` when the `legacy-macos12` branch has the same version (including the beta number) as the release
+- `build.sh` builds Apple silicon and Intel in one go (universal) and strips local symbols from the binary (`strip -x`, from 11 MB down to about 4.8 MB; global symbols stay, so crash reports still show function names); with Command Line Tools that can't build both, it falls back to this Mac's architecture
+- Releases package two DMGs, the universal `macbookBatteryMonitor.dmg` and the older-systems `macbookBatteryMonitor-macOS12.dmg`, plus `SHA256SUMS.txt`. `Scripts/make-dmg.sh` builds them with the built-in `hdiutil` and Finder to lay out the drag-to-install window (without Finder it still builds the DMG with the default layout); `Scripts/make-dmg-background.swift` draws the background. v1.7.2 is a bridge release that also attaches the universal and macOS 12 zips (for v1.7.1) and the older `battery`/`status` zips (for v1.5.0–v1.6.2; same content, only `MBMEdition` differs, which keeps the system monitor setting)
 - When Info.plist has `MBMPrerelease` (such as `beta.1`), the release tag is `v<version>-beta.1` and the release is marked as a pre-release, never as the latest release
-- `build.sh` puts the admin service (`CPUPowerHelper`) into `Contents/Library/Helpers/` and the charging companion's animations and still images (`Resources/Companion/`) into `Contents/Resources/`; the service is only installed into the system when the user turns on admin CPU sampling or precise wake
-- Command Line Tools don't include SwiftUI's macro plugins, so the code doesn't use `@State`; UI state lives in `PanelState`
+- `build.sh` puts the admin service (`CPUPowerHelper`) into `Contents/Library/Helpers/` and the charging companion's animations, still images and the cat photo of the photo look (`Resources/Companion/`) into `Contents/Resources/`; the service is only installed into the system when the user turns on admin CPU sampling or precise wake
+- Command Line Tools don't include SwiftUI's macro plugins, so the code doesn't use `@State`; UI state (including the selected Settings section) lives in `PanelState`
+
+The DMG and its background:
+
+```bash
+Scripts/make-dmg.sh build/macbookBatteryMonitor.app build/macbookBatteryMonitor.dmg   # package and check the app's signature inside the DMG
+swiftc -O Scripts/make-dmg-background.swift -o build/make-dmg-background && build/make-dmg-background
+tiffutil -cathidpicheck build/dmg-background.png build/dmg-background@2x.png -out Resources/DMG/background.tiff
+```
 
 The app icon is generated by `Scripts/make-icon.swift`: the cat is `Resources/icon-cat.png` (a cut-out photo), and the charging pad, waves and background are drawn in code.
 

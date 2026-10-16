@@ -32,6 +32,8 @@ jobs:
           codesign --verify --deep --strict build/macbookBatteryMonitor.app
           lipo -archs build/macbookBatteryMonitor.app/Contents/MacOS/macbookBatteryMonitor | grep -q x86_64
           lipo -archs build/macbookBatteryMonitor.app/Contents/MacOS/macbookBatteryMonitor | grep -q arm64
+      - name: 打包 DMG
+        run: Scripts/make-dmg.sh build/macbookBatteryMonitor.app build/macbookBatteryMonitor.dmg
 
   release:
     if: ${{ github.event_name != 'pull_request' }}
@@ -52,7 +54,8 @@ jobs:
             tag="$INPUT_TAG"
           else
             tag="v$(plutil -extract CFBundleShortVersionString raw -o - Resources/Info.plist)"
-            prerelease="$(plutil -extract MBMPrerelease raw -o - Resources/Info.plist 2>/dev/null || true)"
+            # 沒有這個 key 時 macOS 15 的 plutil 會把錯誤印到標準輸出，所以看結束碼，不看輸出
+            prerelease="$(plutil -extract MBMPrerelease raw -o - Resources/Info.plist 2>/dev/null)" || prerelease=""
             [[ -n "$prerelease" ]] && tag="$tag-$prerelease"
             if [[ ! -f ".github/release-notes/$tag.md" ]]; then
               echo "沒有 .github/release-notes/$tag.md，不發布"
@@ -70,22 +73,25 @@ jobs:
         run: Scripts/test-power.sh
       - name: 編譯並打包
         if: ${{ env.TAG != '' }}
-        # 通用版（universal）給所有人下載；battery／status 是 v1.6.1 以前一鍵更新會找的舊檔名，
-        # 內容相同（也是通用版），只有 MBMEdition 不同，用來決定從舊版升級時系統監控預設開或關
+        # 給人下載、也給 v1.7.2 起的一鍵更新用的 DMG（macOS 14 以上的通用版），檔名固定不帶版本號。
+        # v1.7.2 是過渡版：另附舊版一鍵更新認得的 zip，每個舊版本都能先更新到 v1.7.2，之後改用 DMG 一路更新上去
+        #   - 通用版 zip：v1.7.1
+        #   - battery／status zip：v1.5.0～v1.6.2（內容相同，只有 MBMEdition 不同，用來保留原本的系統監控設定）
         run: |
-          for edition in universal battery status; do
-            ./build.sh "$edition"
-            codesign --verify --deep --strict build/macbookBatteryMonitor.app
-            if [[ "$edition" == universal ]]; then
-              zip="macbookBatteryMonitor-${TAG}-macOS-universal.zip"
-            else
-              zip="macbookBatteryMonitor-${TAG}-${edition}-macOS-arm64.zip"
-            fi
-            ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$zip"
-          done
+          ./build.sh universal
+          codesign --verify --deep --strict build/macbookBatteryMonitor.app
+          Scripts/make-dmg.sh build/macbookBatteryMonitor.app macbookBatteryMonitor.dmg
+          if [[ "$TAG" == v1.7.2 ]]; then
+            ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "macbookBatteryMonitor-${TAG}-macOS-universal.zip"
+            for edition in battery status; do
+              ./build.sh "$edition"
+              codesign --verify --deep --strict build/macbookBatteryMonitor.app
+              ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "macbookBatteryMonitor-${TAG}-${edition}-macOS-arm64.zip"
+            done
+          fi
       - name: 編譯並打包舊系統版本（macOS 12 起）
         if: ${{ env.TAG != '' }}
-        # legacy-macos12 分支的版本號和這次發布相同時，才把它的 zip 放進同一個 Release
+        # legacy-macos12 分支的版本號和這次發布相同時，才把它的 DMG 放進同一個 Release
         run: |
           if ! git fetch --depth=1 origin legacy-macos12; then
             echo "沒有 legacy-macos12 分支，這次不附舊系統版本"
@@ -93,7 +99,7 @@ jobs:
           fi
           git worktree add ../legacy FETCH_HEAD
           legacy="v$(plutil -extract CFBundleShortVersionString raw -o - ../legacy/Resources/Info.plist)"
-          legacy_prerelease="$(plutil -extract MBMPrerelease raw -o - ../legacy/Resources/Info.plist 2>/dev/null || true)"
+          legacy_prerelease="$(plutil -extract MBMPrerelease raw -o - ../legacy/Resources/Info.plist 2>/dev/null)" || legacy_prerelease=""
           [[ -n "$legacy_prerelease" ]] && legacy="$legacy-$legacy_prerelease"
           if [[ "$legacy" != "$TAG" ]]; then
             echo "舊系統版本是 ${legacy}，和 ${TAG} 不同，這次不附"
@@ -103,12 +109,17 @@ jobs:
           Scripts/test-power.sh
           ./build.sh legacy
           codesign --verify --deep --strict build/macbookBatteryMonitor.app
-          ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-${TAG}-macOS12.zip"
+          "$GITHUB_WORKSPACE/Scripts/make-dmg.sh" build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-macOS12.dmg"
+          if [[ "$TAG" == v1.7.2 ]]; then
+            ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-${TAG}-macOS12.zip"
+          fi
       - name: 建立 Release
         if: ${{ env.TAG != '' }}
         run: |
-          # 一鍵更新會用這個校驗檔確認下載的 zip 沒有損壞
-          shasum -a 256 macbookBatteryMonitor-"$TAG"-*.zip > SHA256SUMS.txt
+          # 一鍵更新會用這個校驗檔確認下載的 DMG（v1.7.1 是 zip）沒有損壞
+          shopt -s nullglob
+          files=(macbookBatteryMonitor*.dmg macbookBatteryMonitor-"$TAG"-*.zip)
+          shasum -a 256 "${files[@]}" > SHA256SUMS.txt
           # v1.8.0-beta.1 這種 tag 標成預先發行版本，不會變成「最新版本」
           flags=()
           [[ "$TAG" == *-* ]] && flags=(--prerelease --latest=false)
@@ -116,7 +127,7 @@ jobs:
           if [[ -f "$notes" ]]; then
             title="$(head -n 1 "$notes" | sed 's/^# *//')"
             tail -n +3 "$notes" > release-body.md
-            gh release create "$TAG" macbookBatteryMonitor-"$TAG"-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "$title" --notes-file release-body.md "${flags[@]}"
+            gh release create "$TAG" "${files[@]}" SHA256SUMS.txt --target "$GITHUB_SHA" --title "$title" --notes-file release-body.md "${flags[@]}"
           else
-            gh release create "$TAG" macbookBatteryMonitor-"$TAG"-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "$TAG" --generate-notes "${flags[@]}"
+            gh release create "$TAG" "${files[@]}" SHA256SUMS.txt --target "$GITHUB_SHA" --title "$TAG" --generate-notes "${flags[@]}"
           fi

@@ -1,6 +1,5 @@
-import AVFoundation
+import AppKit
 import SwiftUI
-import VideoToolbox
 
 /// 主面板資訊卡最上方的「智慧充電」列：左邊是充電夥伴（貓咪）或電量條，右邊是排程狀態，點一下打開智慧充電頁
 struct ChargingJourneyPresentation: Equatable {
@@ -114,33 +113,16 @@ struct ChargingJourneyView<Control: View>: View {
     /// 充電上限滑桿
     @ViewBuilder var control: Control
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             Button(action: open) {
-                Group {
-                    switch appearance {
-                    case .companion:
-                        ChargingCompanion(onPad: presentation.onPad, badge: presentation.badge, tint: tint,
-                                          animated: animated && !reduceMotion)
-                            .frame(width: 48, height: 50)
-                    case .mascot:
-                        BatteryMascot(mood: presentation.mood, level: presentation.progress, tint: tint,
-                                      animated: animated && !reduceMotion)
-                            .frame(width: 48, height: 50)
-                    case .energy:
-                        // 和貓咪同高，切換外觀時下面的內容不會跟著移動
-                        energyBar
-                            .frame(width: 48, height: 50)
-                    }
-                }
-                .contentShape(Rectangle())
+                CompanionFigure(presentation: presentation, appearance: appearance, animated: animated, width: 48)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("設定智慧充電")
             .accessibilityLabel("設定智慧充電")
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 8) {
                 control
                 Button(action: open) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -164,44 +146,80 @@ struct ChargingJourneyView<Control: View>: View {
         }
     }
 
+}
+
+/// 充電夥伴的圖案（貓咪、電池夥伴、電量條或照片），主面板和桌面寵物共用；寬度決定大小，高度是寬度的 50/48。
+/// 系統開了「減少動態效果」也照樣會動（使用者的要求），只有面板關閉或省電模式時是靜態圖
+struct CompanionFigure: View {
+    let presentation: ChargingJourneyPresentation
+    let appearance: ChargingAppearance
+    let animated: Bool
+    var width: CGFloat = 48
+
+    var body: some View {
+        Group {
+            switch appearance {
+            case .companion:
+                ChargingCompanion(onPad: presentation.onPad, badge: presentation.badge, tint: presentation.color,
+                                  animated: animated)
+            case .mascot:
+                // 電池夥伴的五官是固定大小，放大時整個等比例縮放（桌面寵物用）
+                BatteryMascot(mood: presentation.mood, level: presentation.progress, tint: presentation.color,
+                              animated: animated)
+                    .frame(width: 48, height: 50)
+                    .scaleEffect(width / 48)
+            case .energy:
+                energyBar
+            case .photo:
+                CompanionPhotoFigure(presentation: presentation, width: width)
+            }
+        }
+        // 各種外觀同樣大小，切換時下面的內容不會跟著移動
+        .frame(width: width, height: width * 50 / 48)
+    }
+
     /// 電力流動：電量條，充電中有一個光點往右流。光點用 Core Animation 播放，不逐幀更新 SwiftUI：
     /// 逐幀更新會讓整個面板每幀重新排版、文字重畫，2015 MacBook Air 實測 CPU 約 26%
     private var energyBar: some View {
-        ZStack(alignment: .leading) {
-            Capsule().fill(tint.opacity(0.18)).frame(height: 8)
-            Capsule().fill(tint.opacity(0.8)).frame(width: max(8, 48 * presentation.progress), height: 8)
-            if animated && !reduceMotion && presentation.animatedFlow {
-                FlowDot(glow: nsTint, travel: 40)
-                    .frame(width: 48, height: 14)
+        let unit = width / 48
+        return ZStack(alignment: .leading) {
+            Capsule().fill(presentation.color.opacity(0.18)).frame(height: 8 * unit)
+            Capsule().fill(presentation.color.opacity(0.8)).frame(width: max(8 * unit, width * presentation.progress), height: 8 * unit)
+            if animated && presentation.animatedFlow {
+                FlowDot(glow: presentation.nsColor, travel: 40 * unit, size: 6 * unit)
+                    .frame(width: width, height: 14 * unit)
             }
             Image(systemName: presentation.badge?.symbol ?? "bolt.fill")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(tint)
-                .offset(y: -14)
+                .font(.system(size: 13 * unit, weight: .bold))
+                .foregroundStyle(presentation.color)
+                .offset(y: -14 * unit)
         }
     }
+}
 
-    private var nsTint: NSColor {
-        switch presentation.tint {
-        case .neutral: return .secondaryLabelColor
-        case .blue: return .systemCyan
-        case .green: return .systemGreen
-        case .orange: return .systemOrange
-        }
-    }
-
-    private var tint: Color {
-        switch presentation.tint {
+extension ChargingJourneyPresentation {
+    var color: Color {
+        switch tint {
         case .neutral: return .secondary
         case .blue: return .cyan
         case .green: return .green
         case .orange: return .orange
         }
     }
+
+    var nsColor: NSColor {
+        switch tint {
+        case .neutral: return .secondaryLabelColor
+        case .blue: return .systemCyan
+        case .green: return .systemGreen
+        case .orange: return .systemOrange
+        }
+    }
 }
 
 /// 充電夥伴：會動的貓咪。充電時躺在發光的充電墊上、上方有充電波紋，其他時候只有貓咪在睡覺。
-/// 動畫是透明背景的 HEVC 影片（6 秒循環）；不播放時（面板關閉、省電模式、減少動態效果、截圖）顯示第一格的靜態圖
+/// 動畫來自透明背景的 HEVC 影片（6 秒循環），畫格解碼一次後交給 Core Animation 播放（見 SpriteLoop）；
+/// 不播放時（面板關閉、省電模式、截圖）顯示第一格的靜態圖
 struct ChargingCompanion: View {
     let onPad: Bool
     let badge: ChargingJourneyPresentation.Badge?
@@ -211,8 +229,8 @@ struct ChargingCompanion: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Group {
-                if animated, Self.videoAllowed, let url = Self.resource(onPad, "mov") {
-                    LoopingVideo(url: url)
+                if SpriteLoop.allowed, let url = Self.resource(onPad, "mov") {
+                    SpriteLoop(url: url, animated: animated)
                 } else if let url = Self.resource(onPad, "png"), let image = NSImage(contentsOf: url) {
                     Image(nsImage: image).resizable().interpolation(.high)
                 }
@@ -229,71 +247,8 @@ struct ChargingCompanion: View {
         .accessibilityHidden(true)
     }
 
-    /// 開發用截圖畫不出影片圖層，改用靜態圖。沒有 HEVC 硬體解碼的 Mac（例如 2015 年的 Intel 機型）也用靜態圖：
-    /// 帶透明的 HEVC 只能用 CPU 解碼，2015 MacBook Air 實測面板開著時 CPU 約 8%
-    static let videoAllowed = !CommandLine.arguments.contains { $0.hasPrefix("--snapshot") || $0.hasPrefix("--screenshots") }
-        && VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
-
     static func resource(_ onPad: Bool, _ ext: String) -> URL? {
         Bundle.main.url(forResource: onPad ? "companion-charging" : "companion-resting", withExtension: ext)
-    }
-}
-
-/// 循環播放一段沒有聲音的透明影片
-private struct LoopingVideo: NSViewRepresentable {
-    let url: URL
-
-    func makeNSView(context: Context) -> LoopingVideoView { LoopingVideoView(url: url) }
-    func updateNSView(_ view: LoopingVideoView, context: Context) { view.play(url) }
-    static func dismantleNSView(_ view: LoopingVideoView, coordinator: ()) { view.stop() }
-}
-
-private final class LoopingVideoView: NSView {
-    private let player = AVQueuePlayer()
-    private let playerLayer = AVPlayerLayer()
-    private var looper: AVPlayerLooper?
-    private var url: URL?
-
-    init(url: URL) {
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.backgroundColor = .clear
-        player.isMuted = true
-        player.preventsDisplaySleepDuringVideoPlayback = false
-        playerLayer.player = player
-        playerLayer.videoGravity = .resizeAspect
-        playerLayer.backgroundColor = .clear
-        // 要求 BGRA 輸出，影片的透明度才會保留
-        playerLayer.pixelBufferAttributes = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        layer?.addSublayer(playerLayer)
-        play(url)
-    }
-
-    required init?(coder: NSCoder) { nil }
-
-    override func layout() {
-        super.layout()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        playerLayer.frame = bounds
-        CATransaction.commit()
-    }
-
-    func play(_ url: URL) {
-        guard url != self.url else { return }
-        self.url = url
-        looper?.disableLooping()
-        player.removeAllItems()
-        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        player.play()
-    }
-
-    func stop() {
-        player.pause()
-        looper?.disableLooping()
-        looper = nil
-        player.removeAllItems()
-        url = nil
     }
 }
 
@@ -301,11 +256,12 @@ private final class LoopingVideoView: NSView {
 private struct FlowDot: NSViewRepresentable {
     let glow: NSColor
     let travel: CGFloat
+    var size: CGFloat = 6
 
     func makeNSView(context: Context) -> FlowDotView { FlowDotView() }
 
     func updateNSView(_ view: FlowDotView, context: Context) {
-        view.configure(glow: glow, travel: travel)
+        view.configure(glow: glow, travel: travel, size: size)
     }
 }
 
@@ -330,10 +286,12 @@ final class FlowDotView: NSView {
     required init?(coder: NSCoder) { nil }
 
     /// 面板每秒更新時也會呼叫；設定沒變就不重來，光點才不會每秒跳回起點
-    func configure(glow: NSColor, travel: CGFloat) {
-        guard glow != self.glow || travel != self.travel else { return }
+    func configure(glow: NSColor, travel: CGFloat, size: CGFloat) {
+        guard glow != self.glow || travel != self.travel || size != dot.bounds.width else { return }
         self.glow = glow
         self.travel = travel
+        dot.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+        dot.cornerRadius = size / 2
         restart()
     }
 
@@ -348,11 +306,12 @@ final class FlowDotView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         dot.shadowColor = glow?.cgColor
-        dot.position = CGPoint(x: 3, y: bounds.midY)
+        let start = dot.bounds.width / 2
+        dot.position = CGPoint(x: start, y: bounds.midY)
         dot.removeAnimation(forKey: "flow")
         let flow = CABasicAnimation(keyPath: "position.x")
-        flow.fromValue = 3
-        flow.toValue = 3 + travel
+        flow.fromValue = start
+        flow.toValue = start + travel
         flow.duration = 1.6
         flow.repeatCount = .infinity
         dot.add(flow, forKey: "flow")

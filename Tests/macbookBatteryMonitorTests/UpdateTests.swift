@@ -60,6 +60,31 @@ final class UpdateTests {
         XCTAssertEqual(UpdateLogic.release(json: Data(legacy.utf8), edition: "legacy", mainSupported: false)?.assetSize, 400)
         XCTAssertEqual(UpdateLogic.release(json: Data(legacy.utf8), edition: "legacy", mainSupported: true)?.assetSize, 300)
         XCTAssertNil(UpdateLogic.release(json: Data(universal.utf8), edition: "legacy", mainSupported: false))
+        // v1.7.2 起有固定檔名的 DMG：優先用 DMG，校驗檔也用同一個檔名查
+        let dmg = universal.replacingOccurrences(of: "{\"name\":\"SHA256SUMS.txt\"", with: """
+          {"name":"macbookBatteryMonitor.dmg","size":400,
+           "browser_download_url":"https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.5.0/macbookBatteryMonitor.dmg"},
+          {"name":"SHA256SUMS.txt"
+        """)
+        XCTAssertEqual(UpdateLogic.release(json: Data(dmg.utf8), edition: "universal")?.assetName, "macbookBatteryMonitor.dmg")
+        XCTAssertEqual(UpdateLogic.release(json: Data(dmg.utf8), edition: "battery")?.assetSize, 400)
+        XCTAssertEqual(UpdateLogic.checksum(in: "\(String(repeating: "c3", count: 32))  macbookBatteryMonitor.dmg\n", for: "macbookBatteryMonitor.dmg"),
+                       String(repeating: "c3", count: 32))
+        // 舊系統版本的 DMG（v1.7.2 起）優先於 zip；系統已升級到 macOS 14 以上時改裝通用版
+        let legacyDMG = legacy.replacingOccurrences(of: "{\"name\":\"SHA256SUMS.txt\"", with: """
+          {"name":"macbookBatteryMonitor-macOS12.dmg","size":500,
+           "browser_download_url":"https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.5.0/macbookBatteryMonitor-macOS12.dmg"},
+          {"name":"SHA256SUMS.txt"
+        """)
+        XCTAssertEqual(UpdateLogic.release(json: Data(legacyDMG.utf8), edition: "legacy", mainSupported: false)?.assetName, "macbookBatteryMonitor-macOS12.dmg")
+        XCTAssertEqual(UpdateLogic.release(json: Data(legacyDMG.utf8), edition: "legacy", mainSupported: true)?.assetSize, 300)
+        let bothDMG = legacyDMG.replacingOccurrences(of: "{\"name\":\"SHA256SUMS.txt\"", with: """
+          {"name":"macbookBatteryMonitor.dmg","size":600,
+           "browser_download_url":"https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.5.0/macbookBatteryMonitor.dmg"},
+          {"name":"SHA256SUMS.txt"
+        """)
+        XCTAssertEqual(UpdateLogic.release(json: Data(bothDMG.utf8), edition: "legacy", mainSupported: true)?.assetSize, 600)
+        XCTAssertEqual(UpdateLogic.release(json: Data(bothDMG.utf8), edition: "legacy", mainSupported: false)?.assetSize, 500)
         // 預覽版、或下載網址不是 GitHub，都不更新
         XCTAssertNil(UpdateLogic.release(json: Data(json.replacingOccurrences(of: "\"prerelease\":false", with: "\"prerelease\":true").utf8), edition: "status"))
         XCTAssertNil(UpdateLogic.release(json: Data(json.replacingOccurrences(of: "https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.5.0/macbookBatteryMonitor-v1.5.0-status", with: "https://evil.example.com/x").utf8), edition: "status"))

@@ -18,7 +18,7 @@ struct PeripheralsView: View {
                         Text("支援會回報電量的藍牙鍵盤、滑鼠、觸控板與耳機")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        if BLEBatteryReader.denied { bluetoothDenied }
+                        if BLEBatteryReader.denied { BluetoothDeniedNote() }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -28,7 +28,7 @@ struct PeripheralsView: View {
                         }
                     }
                 }
-                if BLEBatteryReader.denied, !store.devices.isEmpty { bluetoothDenied }
+                if BLEBatteryReader.denied, !store.devices.isEmpty { BluetoothDeniedNote() }
                 HStack {
                     Text(footerText)
                         .font(.caption2)
@@ -58,22 +58,6 @@ struct PeripheralsView: View {
                     .monospacedDigit()
                     .foregroundStyle(threshold > 0 && level <= threshold ? Color.red : Color.primary)
             }
-        }
-    }
-
-    /// 藍牙權限被拒絕：羅技、Razer 等藍牙低功耗滑鼠與鍵盤的電量讀不到
-    private var bluetoothDenied: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("沒有藍牙權限，讀不到羅技、Razer 等藍牙低功耗滑鼠與鍵盤的電量（Apple 的設備與耳機不受影響）。")
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("打開系統設定的藍牙權限") {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-            .font(.caption)
         }
     }
 
@@ -125,5 +109,66 @@ struct PeripheralsView: View {
             .help(threshold == 0 ? "低電量通知：關閉" : "低於 \(threshold)% 時通知")
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// 藍牙權限被拒絕：羅技、Razer 等藍牙低功耗滑鼠與鍵盤的電量讀不到
+struct BluetoothDeniedNote: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("沒有藍牙權限，讀不到部分藍牙滑鼠與鍵盤的電量。")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("打開系統設定的藍牙權限") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .font(.caption)
+        }
+    }
+}
+
+/// 設定視窗 → 周邊設備：連線中每個設備的低電量通知（和周邊設備分頁每個設備右邊的鈴鐺是同一個設定）
+struct PeripheralAlertsCard: View {
+    @ObservedObject var store: PeripheralStore
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                CardTitle("低電量通知", systemImage: "bell")
+                if store.devices.isEmpty {
+                    Text(store.updated == nil ? "讀取中…" : "目前沒有連線中的周邊設備，連線後會列在這裡。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(store.devices) { device in
+                        HStack(spacing: 8) {
+                            Image(systemName: device.symbol)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 22)
+                            Text(device.name).lineLimit(1)
+                            Spacer(minLength: 8)
+                            Picker(device.name, selection: Binding(get: { settings.peripheralThreshold(for: device.id) },
+                                                                   set: { settings.setPeripheralThreshold($0, for: device.id) })) {
+                                ForEach(AppSettings.peripheralThresholdChoices, id: \.self) { value in
+                                    Text(value == 0 ? "不通知" : "低於 \(value)% 時通知").tag(value)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 170)
+                        }
+                    }
+                }
+                Text("支援會回報電量的藍牙鍵盤、滑鼠、觸控板與耳機；面板的「周邊設備」分頁看得到電量。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if BLEBatteryReader.denied { BluetoothDeniedNote() }
+            }
+        }
+        .onAppear { store.refreshIfStale() }
     }
 }

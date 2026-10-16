@@ -1,12 +1,18 @@
 import AppKit
 import SwiftUI
 
-/// `--screenshots <資料夾>`：用示範數據畫出只看電池、電池＋系統監控、省電模式、周邊設備與桌上型 Mac 的介紹圖（README 與版本說明用），不含使用者的真實資料
+/// `--screenshots <資料夾>`：用示範數據畫出只看電池、電池＋系統監控、省電模式、周邊設備、智慧充電、設定視窗與桌上型 Mac 的介紹圖（README 與版本說明用），不含使用者的真實資料
 @MainActor
 enum ScreenshotCommand {
     static func run(directory: String) {
         let dir = URL(fileURLWithPath: directory, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // 介紹圖一律用預設的貓咪外觀與內建照片；畫完還原使用者原本的外觀
+        let settings = AppSettings.shared
+        let previousAppearance = settings.chargingAppearance
+        settings.chargingAppearance = .companion
+        CompanionPhoto.useBundledForScreenshots()
+        defer { settings.chargingAppearance = previousAppearance }
         let now = Date()
         let store = BatteryStore()
         store.loadPreview(now: now)
@@ -36,7 +42,6 @@ enum ScreenshotCommand {
         SnapshotCommand.render(statusEdition, appearance: .darkAqua, settle: 0.6, to: dir.appendingPathComponent("edition-status.png"))
 
         // 省電模式：主面板改用靜態電力流向；畫完還原使用者原本的設定
-        let settings = AppSettings.shared
         let previous = settings.powerSaving
         settings.powerSaving = true
         let powerSaving = Showcase(menuItems: [battery]) {
@@ -70,6 +75,21 @@ enum ScreenshotCommand {
             Popover { ChargingPlanView(store: planStore, settings: settings, ui: pagesUI).frame(width: 380) }
         }
         SnapshotCommand.render(smartCharging, appearance: .darkAqua, settle: 0.6, to: dir.appendingPathComponent("smart-charging.png"))
+
+        // 設定視窗：左邊分類，右邊是顯示項目
+        let settingsUI = PanelState()
+        settingsUI.settingsSection = .display
+        let settingsWindow = SettingsWindowView(store: store, settings: settings, ui: settingsUI)
+            .frame(width: 720, height: 660)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white.opacity(0.12)))
+            .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
+            .padding(24)
+            .background(LinearGradient(colors: [Color(red: 0.16, green: 0.20, blue: 0.30), Color(red: 0.08, green: 0.09, blue: 0.13)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing))
+            .environment(\.colorScheme, .dark)
+        SnapshotCommand.render(settingsWindow, appearance: .darkAqua, settle: 0.6, to: dir.appendingPathComponent("settings.png"))
 
         // 桌上型 Mac（沒有電池）：選單列電腦圖示加系統耗電，面板是系統耗電與耗電細項
         let desktopStore = BatteryStore()

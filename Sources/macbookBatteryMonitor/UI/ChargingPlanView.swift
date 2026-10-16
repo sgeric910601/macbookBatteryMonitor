@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// 智慧充電頁：目前的排程、快速設定、每週排程、目標與保養上限、睡眠時的策略
+/// 智慧充電頁：目前的排程、快速設定、每週排程、目標與保養上限、睡眠時的策略。
+/// 面板（點充電夥伴打開）與設定視窗的「充電」各一份，用同一份設定
 struct ChargingPlanView: View {
     @ObservedObject var store: BatteryStore
     @ObservedObject var settings: AppSettings
     @ObservedObject var ui: PanelState
+    /// 放在設定視窗裡：不要返回按鈕與外觀（設定視窗另有「充電夥伴」），建立排程後留在原地
+    var embedded = false
 
     /// 星期一排到星期日（Calendar 的 weekday：1 = 星期日）
     private let weekdays = [(2, "一"), (3, "二"), (4, "三"), (5, "四"), (6, "五"), (7, "六"), (1, "日")]
@@ -14,35 +17,44 @@ struct ChargingPlanView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ZStack {
-                Text("智慧充電").font(.headline)
-                HStack {
-                    Button { ui.page = .main } label: { Label("返回", systemImage: "chevron.left") }
-                        .buttonStyle(.borderless)
-                    Spacer()
+            if embedded {
+                CardTitle("智慧充電", systemImage: SymbolCompat.name("bolt.badge.clock"))
+            } else {
+                ZStack {
+                    Text("智慧充電").font(.headline)
+                    HStack {
+                        Button { ui.page = .main } label: { Label("返回", systemImage: "chevron.left") }
+                            .buttonStyle(.borderless)
+                        Spacer()
+                    }
                 }
             }
 
-            Text("平常把充電上限維持在保養上限，算好需要的時間，再把上限提高到目標，讓 Mac 在指定時間前充好；結束後還原原本的上限。實際充電仍由 macOS 控制。")
+            Text("在你要用之前充好，平常維持保養上限。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             // 點貓咪進來的人最常想換外觀：直接放在最上面（不支援智慧充電的 Mac 也能換）
-            HStack(spacing: 8) {
-                Text(supported ? "滑桿旁顯示" : "面板上方顯示").font(.callout)
-                Picker("外觀", selection: Binding(get: { settings.chargingAppearance },
-                                                set: { settings.chargingAppearance = $0 })) {
-                    ForEach(ChargingAppearance.allCases) { Text($0.shortTitle).tag($0) }
+            if !embedded {
+                HStack(spacing: 8) {
+                    Text(supported ? "滑桿旁顯示" : "面板上方顯示").font(.callout)
+                    Picker("外觀", selection: Binding(get: { settings.chargingAppearance },
+                                                    set: { settings.chargingAppearance = $0 })) {
+                        ForEach(ChargingAppearance.allCases) { Text($0.shortTitle).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                if settings.chargingAppearance == .photo {
+                    Button("換照片…") { settings.chooseCompanionPhoto() }
+                        .help("選一張自己的照片；設定 → 充電夥伴可以改回貓咪照片")
+                }
             }
 
             if !supported {
                 Card {
-                    Label("這台 Mac 不支援調整充電上限（需要 Apple 晶片的 MacBook，且系統設定的「電池」裡有充電上限），無法使用智慧充電。",
-                          systemImage: "exclamationmark.triangle")
+                    Label("這台 Mac 無法調整充電上限，不支援智慧充電。", systemImage: "exclamationmark.triangle")
                         .font(.callout)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -53,7 +65,12 @@ struct ChargingPlanView: View {
                 strategyCard
             }
         }
-        .padding(14)
+        .padding(embedded ? 0 : 14)
+    }
+
+    /// 建立排程後回到主面板看狀態；在設定視窗裡留在原地，上方會出現目前的排程
+    private func planStarted() {
+        if !embedded { ui.page = .main }
     }
 
     // MARK: 目前的排程
@@ -104,16 +121,12 @@ struct ChargingPlanView: View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 CardTitle(controller.plan == nil ? "多久後要用" : "改成新的排程", systemImage: "timer")
-                Text("到時候充到 \(store.chargingTarget)%（完成目標，預設是原本的上限，可在下方調整）。來得及的話先維持保養上限 \(min(settings.chargingHoldPercent, store.chargingTarget))%，算好時間才開始充；電量已經比較高時就維持目前的電量，不會先放電再充回來。來不及就立刻開始充，並提醒可能無法準時。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
                 ForEach([1, 2, 3], id: \.self) { hours in
                     let deadline = Date().addingTimeInterval(Double(hours) * 3600)
                     HStack(spacing: 10) {
                         Button("\(hours) 小時後") {
                             store.startChargingPlan(.once(Date().addingTimeInterval(Double(hours) * 3600)))
-                            ui.page = .main
+                            planStarted()
                         }
                         .frame(width: 92, alignment: .leading)
                         forecastLabel(until: deadline)
@@ -126,7 +139,7 @@ struct ChargingPlanView: View {
                 HStack(spacing: 10) {
                     Button("在這個時間前充好") {
                         store.startChargingPlan(.once(ui.chargingCustomDeadline))
-                        ui.page = .main
+                        planStarted()
                     }
                     .disabled(ui.chargingCustomDeadline.timeIntervalSinceNow < 60)
                     forecastLabel(until: ui.chargingCustomDeadline)
@@ -192,7 +205,7 @@ struct ChargingPlanView: View {
                     let parts = Calendar.current.dateComponents([.hour, .minute], from: ui.chargingWeeklyTime)
                     store.startChargingPlan(.weekly(weekdays: ui.chargingWeekdays,
                                                     minuteOfDay: (parts.hour ?? 8) * 60 + (parts.minute ?? 0)))
-                    ui.page = .main
+                    planStarted()
                 }
                 .disabled(ui.chargingWeekdays.isEmpty)
                 Text("例如上班日 8:00 前充到完成目標，其他時間維持保養上限。")
@@ -215,7 +228,7 @@ struct ChargingPlanView: View {
                 Picker("保養上限", selection: holdBinding) {
                     ForEach(options.filter { $0 <= store.chargingTarget }, id: \.self) { Text("\($0)%").tag($0) }
                 }
-                Text("新的排程使用這裡的設定。完成目標預設是原本的上限：充好後就停在平常的上限，不會多充到 100%。")
+                Text("套用到之後建立的排程。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Divider()
@@ -223,8 +236,8 @@ struct ChargingPlanView: View {
                     ForEach(ChargingSleepStrategy.allCases) { Text($0.title).tag($0) }
                 }
                 Text(settings.chargingSleepStrategy == .preciseWake
-                     ? "在該開始充電前叫醒 Mac 調整充電上限，等待期間維持保養上限。需要管理員授權一次（與「管理員 CPU 取樣」共用同一個服務，App 只能排定這一個喚醒事件）；授權失敗或服務無法使用時，自動改用「優先準時完成」。"
-                     : "Mac 睡著時無法準時調整上限：睡眠前若還在等待，會先把上限提高到目標，讓 macOS 在睡眠中充好（可能比預定時間早充滿）。")
+                     ? "時間到時叫醒 Mac 開始充電；需要輸入一次管理員密碼。"
+                     : "睡著前先提高上限，在睡眠中充好，可能會比預定時間早充滿。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

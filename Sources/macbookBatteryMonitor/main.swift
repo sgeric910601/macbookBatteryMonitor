@@ -93,6 +93,27 @@ if CommandLine.arguments.contains("--dump") {
     exit(0)
 }
 
+// 開發用：用一鍵更新的流程從本機的 DMG 取出 App 並驗證（版本號要和這個 App 相同），不安裝
+if let index = CommandLine.arguments.firstIndex(of: "--selftest-dmg"), index + 1 < CommandLine.arguments.count {
+    let dmg = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+    let version = AppVersion.current()
+    let release = ReleaseInfo(tag: "v" + version.numbers.map(String.init).joined(separator: "."), version: version.numbers,
+                              pageURL: dmg, assetName: dmg.lastPathComponent, assetURL: dmg, assetSize: 0, checksumURL: nil,
+                              beta: version.beta)
+    let work = FileManager.default.temporaryDirectory.appendingPathComponent("selftest-dmg-\(UUID().uuidString)")
+    var passed = false
+    do {
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        let app = try Updater.unpack(dmg, release: release, into: work)
+        print("selftest: DMG 取出並驗證通過 \(app.lastPathComponent)")
+        passed = true
+    } catch {
+        print("selftest: DMG 失敗 \((error as? Updater.UpdateError)?.message ?? error.localizedDescription)")
+    }
+    try? FileManager.default.removeItem(at: work)
+    exit(passed ? 0 : 1)
+}
+
 if let index = CommandLine.arguments.firstIndex(of: "--screenshots"), index + 1 < CommandLine.arguments.count {
     MainActor.assumeIsolatedCompat {
         _ = NSApplication.shared

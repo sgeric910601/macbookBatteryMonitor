@@ -8,6 +8,10 @@ struct SettingsView: View {
     @ObservedObject var chargeLimit: SystemChargeLimit
     /// 桌上型 Mac 沒有電池：不顯示電池通知與充電上限
     var hasBattery = true
+    /// 設定視窗目前的分類：只顯示屬於它的卡片
+    var section: SettingsSection = .general
+    /// 智慧充電進行中：充電上限滑桿的提示不同
+    var planActive = false
 
     private var powerSavingNote: String {
         let base = "省電模式：電力流向改用靜態圖示、不播放動畫，更新頻率至少每 2 秒。"
@@ -27,19 +31,6 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ZStack {
-                Text("設定").font(.headline)
-                HStack {
-                    Button {
-                        ui.page = .main
-                    } label: {
-                        Label("返回", systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.borderless)
-                    Spacer()
-                }
-            }
-
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     CardTitle("選單列", systemImage: "menubar.rectangle")
@@ -47,15 +38,14 @@ struct SettingsView: View {
                         ForEach(MenuBarDisplay.allCases) { Text($0.title).tag($0) }
                     }
                     if !hasBattery {
-                        Text("這台 Mac 沒有電池：選單列顯示系統耗電（瓦數），有百分比或時間的選項都會改顯示瓦數，「只有圖示」則不顯示數字。")
+                        Text("沒有電池的 Mac 改顯示系統耗電瓦數。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Button("選擇面板顯示的項目…") { ui.page = .displayItems }
-                        .help("電力流向細項（螢幕背光、晶片、CPU／GPU／ANE）與詳細資訊欄位")
                 }
             }
+            .settingsSection(.display, shown: section)
 
             Card {
                 VStack(alignment: .leading, spacing: 8) {
@@ -86,6 +76,7 @@ struct SettingsView: View {
                         .foregroundStyle(settings.appIconError == nil ? Color.secondary : Color.orange)
                 }
             }
+            .settingsSection(.general, shown: section)
 
             Card {
                 VStack(alignment: .leading, spacing: 8) {
@@ -104,6 +95,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .settingsSection(.monitors, shown: section)
 
             Card {
                 VStack(alignment: .leading, spacing: 8) {
@@ -122,13 +114,18 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!settings.systemMonitors)
-                    Text(settings.systemMonitors
-                         ? "開啟的模組在選單列各有一個圖示，\(settings.updateText)。"
-                         : "關閉時選單列只有\(hasBattery ? "電池" : "耗電")圖示，四個模組都不會取樣，最省電。")
+                    SwitchRow("合併成一個圖示", isOn: binding(\.menuBarCombined))
+                        .disabled(!settings.systemMonitors)
+                    Text(!settings.systemMonitors
+                         ? "關閉時選單列只有\(hasBattery ? "電池" : "耗電")圖示，四個模組都不會取樣，最省電。"
+                         : settings.menuBarCombined
+                         ? "選單列只留一個圖示，點一下在下方展開所有圖示；選單列太擠時用。"
+                         : "開啟的模組在選單列各有一個圖示，\(settings.updateText)。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
+            .settingsSection(.monitors, shown: section)
 
             // Intel 直接由 SMC 讀 CPU 功耗，不需要管理員取樣
             if !ChipInfo.isIntel {
@@ -136,11 +133,12 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         CardTitle("CPU 功耗", systemImage: "cpu")
                         SwitchRow("管理員 CPU 取樣", isOn: binding(\.adminCPUSampling))
-                        Text("選用功能，預設關閉。開啟時需輸入管理員密碼，安裝只讀取 CPU 功耗的系統服務；只在主面板開啟時取樣（\(settings.updateText)），面板關閉後不通訊，服務閒置會自行結束。關閉此選項會移除服務。")
+                        Text("需要輸入一次管理員密碼；只在面板開著時取樣，關閉後會移除服務。")
                             .font(.caption).foregroundStyle(.secondary)
                         Text(adminCPU.status).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                .settingsSection(.monitors, shown: section)
             }
 
             Card {
@@ -160,7 +158,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     if ui.notificationsBlocked {
-                        Text("macOS 已關閉這個 App 的通知，低電量、充電完成、周邊設備與新版本通知都不會出現。請到系統設定 → 通知找到「\(AppEdition.appName)」，打開「允許通知」。")
+                        Text("macOS 已關閉這個 App 的通知。請到系統設定 → 通知 →「\(AppEdition.appName)」打開「允許通知」。")
                             .font(.caption)
                             .foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
@@ -174,47 +172,30 @@ struct SettingsView: View {
                     }
                 }
             }
+            .settingsSection(.general, shown: section)
 
             // 桌上型 Mac 沒有電池，也沒有充電上限
             if hasBattery {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {
-                        CardTitle("充電上限", systemImage: "checkmark.shield")
-                        HStack {
-                            Text("系統充電上限")
-                            Spacer()
-                            Text(limitText)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
                         if chargeLimit.supported {
-                            Text("可在主面板電量下方的滑桿調整（80–100%），與系統設定「電池」裡的充電上限是同一個設定，改哪一邊都會同步。實際停在上限由 macOS 控制；只有設定了智慧充電時，App 才會依排程調整這個上限。")
+                            // 和主面板的滑桿是同一個設定（滑桿自己有「充電上限」標題）
+                            ChargeLimitSlider(control: chargeLimit, planActive: planActive)
+                            Text("和主面板的滑桿、系統設定「電池」裡的充電上限同步。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Divider()
-                            Picker("滑桿旁顯示", selection: binding(\.chargingAppearance)) {
-                                ForEach(ChargingAppearance.allCases) { Text($0.title).tag($0) }
-                            }
-                            Text("主面板充電上限滑桿的左邊顯示充電夥伴（會動的貓咪，充電時躺在充電墊上）、電池夥伴（有表情的電池，會跟著充電狀態換表情）或電量條，點一下打開智慧充電；面板關閉或省電模式時不播放動畫。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Button("設定智慧充電…") { ui.page = .chargingPlan }
                         } else {
-                            if ChargeLimitReader.lastKnown()?.active == false {
-                                Text("用電池時 macOS 不會套用上限，數值是上次接電時讀到的。")
-                                    .font(.caption)
+                            CardTitle("充電上限", systemImage: "checkmark.shield")
+                            HStack {
+                                Text("系統充電上限")
+                                Spacer()
+                                Text(limitText)
                                     .foregroundStyle(.secondary)
+                                    .monospacedDigit()
                             }
-                            Text("這台 Mac 或系統版本無法從 App 調整充電上限，這裡只讀取並顯示。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Divider()
-                            Picker("面板上方顯示", selection: binding(\.chargingAppearance)) {
-                                ForEach(ChargingAppearance.allCases) { Text($0.title).tag($0) }
-                            }
-                            Text("主面板資訊卡最上方顯示充電夥伴（會動的貓咪，充電時躺在充電墊上）、電池夥伴或電量條；面板關閉或省電模式時不播放動畫。")
+                            Text(ChargeLimitReader.lastKnown()?.active == false
+                                 ? "這台 Mac 無法從 App 調整；用電池時顯示的是上次接電時的數值。"
+                                 : "這台 Mac 無法從 App 調整，只顯示目前的設定。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -226,6 +207,29 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .settingsSection(.charging, shown: section)
+
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("充電夥伴", systemImage: "pawprint")
+                        Picker("外觀", selection: binding(\.chargingAppearance)) {
+                            ForEach(ChargingAppearance.allCases) { Text($0.title).tag($0) }
+                        }
+                        photoRow
+                        SwitchRow("在桌面顯示", isOn: binding(\.desktopPet))
+                        if settings.desktopPet {
+                            Picker("位置", selection: binding(\.desktopPetOnWallpaper)) {
+                                Text("浮在視窗上方").tag(false)
+                                Text("放在桌布上").tag(true)
+                            }
+                        }
+                        Text("滑鼠移過去看狀態、點一下聊天；可以拖曳，右鍵可以隱藏。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .settingsSection(.companion, shown: section)
             }
 
             Card {
@@ -255,23 +259,30 @@ struct SettingsView: View {
                     }
                 }
             }
+            .settingsSection(.general, shown: section)
 
             UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked, ui: ui)
-
-            HStack {
-                Text("\(AppEdition.appName) \(updater.currentVersion)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Button("結束\(AppEdition.appName)") {
-                    NSApp.terminate(nil)
-                }
-            }
+                .settingsSection(.update, shown: section)
         }
-        .padding(14)
         .onAppear {
             Notifier.shared.checkBlocked { ui.notificationsBlocked = $0 }
             ui.loginStatus = LoginItem.status
+        }
+    }
+
+    /// 照片外觀用的照片：預覽、換成自己的照片（選好就改用照片外觀）或改回貓咪照片
+    private var photoRow: some View {
+        // 換照片時重畫
+        let _ = settings.companionPhotoVersion
+        return HStack(spacing: 10) {
+            Text("照片")
+            Spacer()
+            CompanionPhotoFigure(presentation: .init(title: "", detail: "", progress: 1, tint: .green, onPad: false, badge: nil,
+                                                     animatedFlow: false), width: 36)
+            Button("選擇照片…") { settings.chooseCompanionPhoto() }
+            if CompanionPhoto.isCustom {
+                Button("改回貓咪照片") { settings.resetCompanionPhoto() }
+            }
         }
     }
 

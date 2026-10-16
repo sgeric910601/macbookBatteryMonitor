@@ -6,6 +6,8 @@ struct DetailsGridView: View {
     let health: SystemHealth?
     /// 主面板有充電上限滑桿
     var limitSlider = false
+    /// 打開設定視窗的「顯示項目」
+    var openDisplayItems: () -> Void = {}
 
     @ObservedObject private var settings = AppSettings.shared
 
@@ -14,10 +16,13 @@ struct DetailsGridView: View {
             // 只顯示設定裡勾選的欄位，依序每列兩欄
             let fields = DetailField.available(limitSlider: limitSlider).filter { settings.isVisible($0) }
             if fields.isEmpty {
-                Text("所有欄位都已隱藏，可在設定 → 顯示項目調整。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("所有欄位都已隱藏。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("在設定 → 顯示項目調整…", action: openDisplayItems)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 PairRows(pairs: fields.map { PairRows.Pair(label: $0.title, value: value($0)) })
                     .font(.callout)

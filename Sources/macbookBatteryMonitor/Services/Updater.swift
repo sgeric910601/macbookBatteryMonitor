@@ -138,7 +138,7 @@ final class Updater: ObservableObject {
         }
     }
 
-    /// 下載 zip、比對 SHA-256、解壓並驗證內容，回傳準備好的新版 App 位置；失敗時清掉暫存資料夾
+    /// 下載 DMG（或舊版 Release 的 zip）、比對 SHA-256、取出 App 並驗證內容，回傳準備好的新版 App 位置；失敗時清掉暫存資料夾
     nonisolated private static func download(_ release: ReleaseInfo) async throws -> URL {
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("update-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
@@ -157,9 +157,9 @@ final class Updater: ObservableObject {
         guard (response as? HTTPURLResponse)?.statusCode == 200, let final = response.url, UpdateLogic.isTrusted(final) else {
             throw UpdateError(message: "下載失敗：伺服器回應異常")
         }
-        let zip = work.appendingPathComponent(release.assetName)
-        try FileManager.default.moveItem(at: temp, to: zip)
-        let data = try Data(contentsOf: zip)
+        let file = work.appendingPathComponent(release.assetName)
+        try FileManager.default.moveItem(at: temp, to: file)
+        let data = try Data(contentsOf: file)
         guard data.count > 0, data.count < 100_000_000 else { throw UpdateError(message: "下載的檔案大小異常") }
 
         // 有校驗檔就一定要對得上
@@ -171,9 +171,17 @@ final class Updater: ObservableObject {
             let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
             guard actual == expected else { throw UpdateError(message: "下載的檔案校驗不符，已取消更新") }
         }
+        return try unpack(file, release: release, into: work)
+    }
 
+    /// 從下載的 DMG 或 zip 取出 App，確認識別碼、版本號與簽章；開發用的 `--selftest-dmg` 也走這裡
+    nonisolated static func unpack(_ file: URL, release: ReleaseInfo, into work: URL) throws -> URL {
         let unpacked = work.appendingPathComponent("unpacked")
-        guard run("/usr/bin/ditto", ["-x", "-k", zip.path, unpacked.path]) == 0 else { throw UpdateError(message: "解壓縮失敗") }
+        if release.assetName.hasSuffix(".dmg") {
+            try copyApp(fromDMG: file, into: unpacked)
+        } else {
+            guard run("/usr/bin/ditto", ["-x", "-k", file.path, unpacked.path]) == 0 else { throw UpdateError(message: "解壓縮失敗") }
+        }
         let app = unpacked.appendingPathComponent("macbookBatteryMonitor.app")
         // v1.7.1 起只有一個 App，系統監控是設定裡的開關，不再比對版本別
         // 版本號與 Beta 序號都要和 Release 的 tag 一致（正式版的 App 不能帶 Beta 序號）
@@ -187,6 +195,22 @@ final class Updater: ObservableObject {
             throw UpdateError(message: "新版 App 的簽章驗證失敗")
         }
         return app
+    }
+
+    /// 把 DMG 唯讀掛載在暫存資料夾裡（不出現在 Finder 與桌面），拷貝出 App 後卸載
+    nonisolated private static func copyApp(fromDMG dmg: URL, into folder: URL) throws {
+        let mount = dmg.deletingLastPathComponent().appendingPathComponent("mount-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: mount) }
+        guard run("/usr/bin/hdiutil", ["attach", dmg.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path]) == 0 else {
+            throw UpdateError(message: "打不開下載的 DMG")
+        }
+        defer { _ = run("/usr/bin/hdiutil", ["detach", mount.path, "-force"]) }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let source = mount.appendingPathComponent("macbookBatteryMonitor.app")
+        guard run("/usr/bin/ditto", [source.path, folder.appendingPathComponent("macbookBatteryMonitor.app").path]) == 0 else {
+            throw UpdateError(message: "DMG 裡找不到 App")
+        }
     }
 
     /// 寫一個小腳本：等這個 App 結束後換上新版（換不過去就放回原本的版本）並重新開啟

@@ -62,8 +62,12 @@ struct ComponentPowerFlowView: View {
                     .accessibilityHidden(true)
                 VStack(spacing: 6) {
                     if rows.isEmpty {
-                        Text("項目都已隱藏\n可在設定 → 顯示項目調整")
-                            .font(.system(size: 9)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        Button { ui.openSettings(.display) } label: {
+                            Text("項目都已隱藏\n點這裡到設定調整")
+                                .font(.system(size: 9)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        }
+                        .buttonStyle(.plain)
+                        .help("打開設定 → 顯示項目")
                     }
                     ForEach(rows, id: \.item) { row in
                         if row.item == .chip {
@@ -86,7 +90,7 @@ struct ComponentPowerFlowView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help("總功耗及背光來自 SMC 感測器；差值只作近似估算，未分類包含缺值項目。\(chipItemsText)來自系統能量模型估算。晶片合計不是完整 SoC 電源軌功耗。")
+                .help("總功耗與背光來自感測器，\(chipItemsText)為系統估算；「其他」是差值，只是近似值。")
         }
     }
 

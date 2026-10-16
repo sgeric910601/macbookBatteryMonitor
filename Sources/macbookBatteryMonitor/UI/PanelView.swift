@@ -12,10 +12,7 @@ struct RootView: View {
             } else {
                 switch ui.page {
                 case .main: MainPage(store: store, settings: settings, ui: ui)
-                case .settings: ScrollingPage(page: .settings, ui: ui) { SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater, chargeLimit: store.chargeLimit,
-                                                                                     hasBattery: store.snapshot != nil) }
                 case .chargingPlan: ScrollingPage(page: .chargingPlan, ui: ui) { ChargingPlanView(store: store, settings: settings, ui: ui) }
-                case .displayItems: ScrollingPage(page: .displayItems, ui: ui) { DisplayItemsView(settings: settings, ui: ui, limitSlider: store.chargeLimit.supported) }
                 }
             }
         }
@@ -57,10 +54,7 @@ struct PanelView: View {
                          fullThreshold: settings.fullThreshold,
                          chargeLimit: store.chargeLimit.supported ? store.chargeLimit : nil,
                          planActive: store.chargingPlan.isActive,
-                         journey: store.chargeLimit.supported
-                            ? ChargingJourneyPresentation.make(percent: s.percent, charging: e.state == .charging,
-                                                               decision: store.chargingPlan.decision, now: s.date)
-                            : ChargingJourneyPresentation.unsupported(percent: s.percent, charging: e.state == .charging),
+                         journey: store.companionPresentation(s, e),
                          appearance: settings.chargingAppearance,
                          animated: ui.isVisible && !settings.powerSavingActive,
                          openPlan: { ui.page = .chargingPlan })
@@ -72,7 +66,8 @@ struct PanelView: View {
                 .labelsHidden()
                 Group {
                     switch ui.tab {
-                    case .details: DetailsGridView(s: s, e: e, health: store.systemHealth, limitSlider: store.chargeLimit.supported)
+                    case .details: DetailsGridView(s: s, e: e, health: store.systemHealth, limitSlider: store.chargeLimit.supported,
+                                                   openDisplayItems: { ui.openSettings(.display) })
                     case .history: HistoryChartView(history: store.history, ui: ui)
                     case .processes: TopProcessesView(store: store)
                     case .peripherals: PeripheralsView(store: store.peripherals, settings: settings)
@@ -106,7 +101,7 @@ struct PanelView: View {
             // Beta 是使用者手動找到的，不在面板上提示
             if let release = store.updater.available, !release.isBeta {
                 Button {
-                    ui.page = .settings
+                    ui.openSettings(.update)
                 } label: {
                     Label("有新版本 v\(release.versionText)", systemImage: "arrow.down.circle.fill")
                         .font(.caption)
@@ -115,7 +110,7 @@ struct PanelView: View {
                 .help("到設定一鍵更新")
             }
             Button {
-                ui.page = .settings
+                ui.openSettings(nil)
             } label: {
                 Image(systemName: "gearshape")
             }
@@ -310,21 +305,21 @@ private struct TimeCard: View {
         case .limitReached:
             let limit = s.chargeLimit?.limit ?? 100
             if s.drainingAboveLimit {
-                return "電量高於充電上限，macOS 正在讓電池慢慢放電到 \(limit)%，期間由變壓器和電池一起供電。"
+                return "電量高於上限，macOS 正在讓電池慢慢降到 \(limit)%。"
             }
             if s.percent > limit {
-                return "已超過系統設定的充電上限，電池暫停充電、由變壓器供電。電量降到 \(limit)% 以下後才會再充到上限。"
+                return "已超過充電上限，暫停充電；降到 \(limit)% 以下才會再充。"
             }
-            return "電池已充到上限，暫停充電，目前由變壓器供電。"
+            return "已充到上限，暫停充電，由變壓器供電。"
         case .full:
-            return "電池已充飽，目前由變壓器供電。"
+            return "已充飽，由變壓器供電。"
         case .pluggedIdle where justPlugged:
             // Intel 的充電器要十幾秒才開始充電，這段期間電池可能還在放電
-            return "剛接上電源，macOS 通常會在幾秒到十幾秒內開始充電。"
+            return "剛接上電源，幾秒後就會開始充電。"
         case .pluggedIdle where e.drainingOnAC:
-            return "已接上電源，但供電不足，電池仍在放電（充電器功率不夠或負載太高）。預估剩餘 \(Format.duration(e.headlineToEmpty))。"
+            return "供電不足，電池仍在放電，預估剩餘 \(Format.duration(e.headlineToEmpty))。"
         default:
-            return "已接上電源，但電池目前沒有在充電。可能是「最佳化電池充電」暫停在 80%，或電池溫度保護。"
+            return "接著電源但沒有在充電，可能是最佳化電池充電或溫度保護。"
         }
     }
 
@@ -351,7 +346,7 @@ private struct TimeCard: View {
     }
 }
 
-/// 內容比螢幕高時（例如設定頁）改成可捲動，面板最高到螢幕可用高度；放得下時維持內容原本的高度。
+/// 內容比螢幕高時（例如智慧充電頁）改成可捲動，面板最高到螢幕可用高度；放得下時維持內容原本的高度。
 /// 否則 macOS 會把超出螢幕的上半部（返回按鈕與第一張卡片）直接切掉
 struct ScrollingPage<Content: View>: View {
     let page: PanelPage
@@ -363,25 +358,16 @@ struct ScrollingPage<Content: View>: View {
     private var maxHeight: CGFloat { Self.maxHeight }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                content
-                    .background(GeometryReader { proxy in
-                        Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
-                    })
-            }
-            .bounceOnlyWhenScrollable()
-            .frame(height: min(ui.pageHeights[page] ?? maxHeight, maxHeight))
-            .onPreferenceChange(ContentHeightKey.self) { height in
-                if height > 0, ui.pageHeights[page] != height { ui.pageHeights[page] = height }
-            }
-            .onAppear {
-                guard let target = ui.scrollTarget else { return }
-                ui.scrollTarget = nil
-                // 等版面排好再捲；macOS 12／13 第一次排版較慢，稍後再捲一次
-                DispatchQueue.main.async { proxy.scrollTo(target, anchor: .top) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { proxy.scrollTo(target, anchor: .top) }
-            }
+        ScrollView {
+            content
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                })
+        }
+        .bounceOnlyWhenScrollable()
+        .frame(height: min(ui.pageHeights[page] ?? maxHeight, maxHeight))
+        .onPreferenceChange(ContentHeightKey.self) { height in
+            if height > 0, ui.pageHeights[page] != height { ui.pageHeights[page] = height }
         }
     }
 }

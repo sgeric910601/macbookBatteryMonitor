@@ -281,6 +281,41 @@ enum DiskReader {
         return DiskHealth.parse(plist["SMARTStatus"] as? String)
     }
 
+    enum LifetimeRead {
+        case data(DiskLifetime)
+        /// 這顆不是 NVMe 或不支援 SMART（SATA 硬碟、多數 USB 外接盒）
+        case unsupported
+        /// 支援但這次沒讀到，下次再試
+        case failed
+    }
+
+    /// NVMe 硬碟自己記錄的 SMART 資料（出廠以來的讀寫量、已用壽命）。從分割區沿著 IORegistry 往上找到支援 NVMe SMART 的裝置，
+    /// 透過系統內建的 NVMeSMARTLib 外掛讀取，不需要管理員權限，一次約 0.2 毫秒。可以在背景執行緒呼叫
+    static func lifetime(forDevice deviceNode: String) -> LifetimeRead {
+        guard ExternalDisk.isValidDeviceNode(deviceNode) else { return .unsupported }
+        let bsdName = String(deviceNode.dropFirst("/dev/".count))
+        let media = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, bsdName))
+        guard media != IO_OBJECT_NULL else { return .failed }
+        defer { IOObjectRelease(media) }
+        var iterator: io_iterator_t = 0
+        guard IORegistryEntryCreateIterator(media, kIOServicePlane,
+                                            IOOptionBits(kIORegistryIterateRecursively | kIORegistryIterateParents),
+                                            &iterator) == KERN_SUCCESS else { return .failed }
+        defer { IOObjectRelease(iterator) }
+        var entry = IOIteratorNext(iterator)
+        while entry != IO_OBJECT_NULL {
+            let capable = IORegistryEntryCreateCFProperty(entry, "NVMe SMART Capable" as CFString, kCFAllocatorDefault, 0)?
+                .takeRetainedValue() as? Bool
+            if capable == true {
+                defer { IOObjectRelease(entry) }
+                return NVMeSMART.read(entry).flatMap(DiskLifetime.parse).map(LifetimeRead.data) ?? .failed
+            }
+            IOObjectRelease(entry)
+            entry = IOIteratorNext(iterator)
+        }
+        return .unsupported
+    }
+
     /// 所有內建與外接儲存裝置自開機以來的累計讀寫位元組
     static func ioBytes() -> (read: UInt64, written: UInt64)? {
         var iterator: io_iterator_t = 0
@@ -298,6 +333,42 @@ enum DiskReader {
             service = IOIteratorNext(iterator)
         }
         return (read, written)
+    }
+}
+
+/// NVMe 硬碟的 SMART 記錄。系統的 NVMeSMARTLib 外掛（IOKit/storage/nvme/NVMeSMARTLibExternal.h）沒有對 Swift 公開，
+/// 這裡照標頭檔的 UUID 與函式表位置呼叫
+private enum NVMeSMART {
+    private static let userClientType: CFUUID = CFUUIDGetConstantUUIDWithBytes(
+        nil, 0xAA, 0x0F, 0xA6, 0xF9, 0xC2, 0xD6, 0x45, 0x7F, 0xB1, 0x0B, 0x59, 0xA1, 0x32, 0x53, 0x29, 0x2F)
+    private static let interfaceID: CFUUID = CFUUIDGetConstantUUIDWithBytes(
+        nil, 0xCC, 0xD1, 0xDB, 0x19, 0xFD, 0x9A, 0x4D, 0xAF, 0xBF, 0x95, 0x12, 0x45, 0x4B, 0x23, 0x0A, 0xB6)
+    /// kIOCFPlugInInterfaceID
+    private static let plugInInterface: CFUUID = CFUUIDGetConstantUUIDWithBytes(
+        nil, 0xC2, 0x44, 0xE8, 0x58, 0x10, 0x9C, 0x11, 0xD4, 0x91, 0xD4, 0x00, 0x50, 0xE4, 0xC6, 0x42, 0x6F)
+
+    private typealias Release = @convention(c) (UnsafeMutableRawPointer?) -> ULONG
+    private typealias ReadData = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> IOReturn
+
+    /// 512 位元組的 SMART／健康資訊記錄；讀不到時回傳 nil
+    static func read(_ device: io_service_t) -> [UInt8]? {
+        var plugIn: UnsafeMutablePointer<UnsafeMutablePointer<IOCFPlugInInterface>?>?
+        var score: Int32 = 0
+        guard IOCreatePlugInInterfaceForService(device, userClientType, plugInInterface, &plugIn, &score) == KERN_SUCCESS,
+              let plugIn, let plugInTable = plugIn.pointee else { return nil }
+        defer { _ = plugInTable.pointee.Release(plugIn) }
+        var object: LPVOID?
+        guard plugInTable.pointee.QueryInterface(plugIn, CFUUIDGetUUIDBytes(interfaceID), &object) == S_OK,
+              let object else { return nil }
+        // 函式表依序是 IUnknown 的保留欄位、QueryInterface、AddRef、Release，兩個 UInt16 版本號（補齊到一格），接著是 SMARTReadData
+        let table = object.load(as: UnsafeRawPointer.self)
+        let slot = MemoryLayout<UnsafeRawPointer>.size
+        let release = table.load(fromByteOffset: 3 * slot, as: Release.self)
+        let readData = table.load(fromByteOffset: 5 * slot, as: ReadData.self)
+        defer { _ = release(object) }
+        var log = [UInt8](repeating: 0, count: 512)
+        let result = log.withUnsafeMutableBytes { readData(object, $0.baseAddress) }
+        return result == kIOReturnSuccess ? log : nil
     }
 }
 

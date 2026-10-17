@@ -7,6 +7,8 @@ struct ChargingJourneyPresentation: Equatable {
     /// 充電夥伴旁邊的小標示
     enum Badge: Equatable {
         case sleeping, paused, ready, late
+        /// 接著電源但沒在充（到達充電上限、充滿）
+        case pluggedIn
 
         var symbol: String {
             switch self {
@@ -14,6 +16,7 @@ struct ChargingJourneyPresentation: Equatable {
             case .paused: return "pause.circle.fill"
             case .ready: return "checkmark.circle.fill"
             case .late: return "exclamationmark.circle.fill"
+            case .pluggedIn: return "powerplug.fill"
             }
         }
     }
@@ -33,18 +36,21 @@ struct ChargingJourneyPresentation: Equatable {
     var mood: Mood {
         switch badge {
         case .sleeping: return .sleeping
-        case .ready: return .happy
+        case .ready, .pluggedIn: return .happy
         case .late, .paused: return .worried
         case nil: return onPad ? .charging : .resting
         }
     }
 
-    static func make(percent: Int, charging: Bool, decision: ChargingPlanDecision?, now: Date = Date()) -> ChargingJourneyPresentation {
+    /// pluggedIn：接著電源但沒在充（到達充電上限、充滿、系統暫停充電）
+    static func make(percent: Int, charging: Bool, pluggedIn: Bool = false, decision: ChargingPlanDecision?,
+                     now: Date = Date()) -> ChargingJourneyPresentation {
         let progress = min(1, max(0, Double(percent) / 100))
         guard let decision else {
-            // 沒有排程時也跟著充電狀態變色：充電中是綠色（電量條、電池夥伴與光點的光暈）
-            return .init(title: "智慧充電", detail: "指定時間前充好，平常維持保養上限",
-                         progress: progress, tint: charging ? .green : .neutral, onPad: charging, badge: nil, animatedFlow: charging)
+            // 沒有排程時也跟著電源狀態變色：充電中是綠色並躺在充電墊上；接著電源沒在充也是綠色，加上插頭標示
+            return .init(title: "智慧充電", detail: "指定時間前充好，平常維持保養上限", progress: progress,
+                         tint: charging || pluggedIn ? .green : .neutral, onPad: charging,
+                         badge: !charging && pluggedIn ? .pluggedIn : nil, animatedFlow: charging)
         }
         let deadline = time(decision.deadline, now: now)
         let target = "\(decision.targetPercent)%"
@@ -77,10 +83,10 @@ struct ChargingJourneyPresentation: Equatable {
     }
 
     /// 不能從 App 調整充電上限的 Mac（Intel、macOS 26 以前）：一樣顯示充電夥伴，旁邊說明沒有智慧充電
-    static func unsupported(percent: Int, charging: Bool) -> ChargingJourneyPresentation {
+    static func unsupported(percent: Int, charging: Bool, pluggedIn: Bool = false) -> ChargingJourneyPresentation {
         return .init(title: "充電夥伴", detail: "這台 Mac 不支援智慧充電，點一下可換外觀",
-                     progress: min(1, max(0, Double(percent) / 100)), tint: charging ? .green : .neutral,
-                     onPad: charging, badge: nil, animatedFlow: charging)
+                     progress: min(1, max(0, Double(percent) / 100)), tint: charging || pluggedIn ? .green : .neutral,
+                     onPad: charging, badge: !charging && pluggedIn ? .pluggedIn : nil, animatedFlow: charging)
     }
 
     /// 今天只顯示時間，明天加上「明天」，其他日子加上日期與星期
@@ -148,13 +154,17 @@ struct ChargingJourneyView<Control: View>: View {
 
 }
 
-/// 充電夥伴的圖案（貓咪、電池夥伴、電量條或照片），主面板和桌面寵物共用；寬度決定大小，高度是寬度的 50/48。
+/// 充電夥伴的圖案（貓咪、電池夥伴、電量條、貓咪大頭照或我的照片），主面板和桌面寵物共用；寬度決定大小，高度是寬度的 50/48。
 /// 系統開了「減少動態效果」也照樣會動（使用者的要求），只有面板關閉或省電模式時是靜態圖
 struct CompanionFigure: View {
     let presentation: ChargingJourneyPresentation
     let appearance: ChargingAppearance
     let animated: Bool
     var width: CGFloat = 48
+    /// 貓咪大頭照的眼睛會動（桌面寵物）
+    var liveEyes = false
+    var mood: CatMood = .awake
+    var followsCursor = true
 
     var body: some View {
         Group {
@@ -171,7 +181,9 @@ struct CompanionFigure: View {
             case .energy:
                 energyBar
             case .photo:
-                CompanionPhotoFigure(presentation: presentation, width: width)
+                CompanionPhotoFigure(presentation: presentation, width: width, liveEyes: liveEyes, mood: mood, followsCursor: followsCursor)
+            case .customPhoto:
+                CompanionPhotoFigure(presentation: presentation, width: width, custom: true)
             }
         }
         // 各種外觀同樣大小，切換時下面的內容不會跟著移動
@@ -238,9 +250,7 @@ struct ChargingCompanion: View {
             .aspectRatio(152.0 / 160.0, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             if let badge {
-                Image(systemName: badge.symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white, tint)
+                CompanionBadgeIcon(badge: badge, tint: tint, size: 15)
                     .background(Circle().fill(Color(nsColor: .windowBackgroundColor)).padding(1))
             }
         }
@@ -249,6 +259,26 @@ struct ChargingCompanion: View {
 
     static func resource(_ onPad: Bool, _ ext: String) -> URL? {
         Bundle.main.url(forResource: onPad ? "companion-charging" : "companion-resting", withExtension: ext)
+    }
+}
+
+/// 充電夥伴右上角的狀態標示：狀態顏色的圓圈裡一個白色符號。size 是字級，圓圈直徑約 1.22 倍（和 .circle.fill 符號相同）
+struct CompanionBadgeIcon: View {
+    let badge: ChargingJourneyPresentation.Badge
+    let tint: Color
+    let size: CGFloat
+
+    var body: some View {
+        if badge == .pluggedIn {
+            // 插頭沒有圓圈版本的符號，自己畫圓圈，大小和其他標示一樣
+            Circle().fill(tint)
+                .frame(width: size * 1.22, height: size * 1.22)
+                .overlay(Image(systemName: badge.symbol).font(.system(size: size * 0.48, weight: .bold)).foregroundStyle(.white))
+        } else {
+            Image(systemName: badge.symbol)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(.white, tint)
+        }
     }
 }
 

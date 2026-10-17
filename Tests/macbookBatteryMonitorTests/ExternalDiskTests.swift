@@ -42,6 +42,36 @@ final class ExternalDiskTests {
         XCTAssertEqual(DiskHealth.parse(nil), .unsupported)
     }
 
+    func testLifetimeParsing() {
+        var log = [UInt8](repeating: 0, count: 512)
+        log[3] = 100; log[4] = 99; log[5] = 3
+        // 讀取 287,021,377 單位、寫入 212,659,173 單位（每單位 512,000 位元組）
+        func put(_ value: UInt64, at offset: Int) { for i in 0..<8 { log[offset + i] = UInt8((value >> (8 * UInt64(i))) & 0xFF) } }
+        put(287_021_377, at: 32)
+        put(212_659_173, at: 48)
+        put(2306, at: 128)
+        let lifetime = DiskLifetime.parse(log)
+        XCTAssertEqual(lifetime?.healthPercent, 97)
+        XCTAssertEqual(lifetime?.bytesRead, 287_021_377 * 512_000)
+        XCTAssertEqual(lifetime?.bytesWritten, 212_659_173 * 512_000)
+        XCTAssertEqual(lifetime?.powerOnHours, 2306)
+        XCTAssertEqual(lifetime?.isFailing, false)
+        // 用超過設計壽命：健康度停在 0%
+        log[5] = 140
+        XCTAssertEqual(DiskLifetime.parse(log)?.healthPercent, 0)
+        // 嚴重警告或備用區塊低於門檻都算異常
+        log[5] = 3; log[0] = 0x04
+        XCTAssertEqual(DiskLifetime.parse(log)?.isFailing, true)
+        log[0] = 0; log[3] = 5; log[4] = 10
+        XCTAssertEqual(DiskLifetime.parse(log)?.isFailing, true)
+        // 128 位元計數器的高位不是 0，或乘上單位會溢位：用最大值，不會崩潰
+        log[56] = 1
+        XCTAssertEqual(DiskLifetime.parse(log)?.bytesWritten, .max)
+        put(.max / 1000, at: 32)
+        XCTAssertEqual(DiskLifetime.parse(log)?.bytesRead, .max)
+        XCTAssertNil(DiskLifetime.parse([UInt8](repeating: 0, count: 100)))
+    }
+
     func testNonASCIIDigitsAndLabelSanitizing() {
         XCTAssertTrue(!ExternalDisk.isValidDeviceNode("/dev/disk\u{0665}"))
         XCTAssertTrue(!ExternalDisk.isValidDeviceNode("/dev/disk5s\u{00B2}"))

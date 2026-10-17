@@ -108,8 +108,10 @@ final class MemoryMonitor: ObservableObject {
 @MainActor
 final class DiskMonitor: ObservableObject {
     @Published private(set) var volume: DiskReader.Volume?
-    /// 本機磁碟的 SMART 狀態
+    /// 本機磁碟的 SMART 狀態（diskutil；讀不到 NVMe SMART 時才查）
     @Published private(set) var volumeHealth: DiskHealth?
+    /// 本機磁碟自己記錄的出廠以來讀寫量與已用壽命（NVMe SMART）
+    @Published private(set) var volumeLifetime: DiskLifetime?
     /// 目前掛載的外接磁碟，與各自的讀寫統計（key 為掛載點）
     @Published private(set) var externalVolumes: [ExternalVolume] = []
     @Published private(set) var externalStats: [String: ExternalDiskStats] = [:]
@@ -131,13 +133,19 @@ final class DiskMonitor: ObservableObject {
     private var healthInFlight: Set<String> = []
     /// 只有磁碟面板開著時才查 SMART：要啟動 diskutil，還可能喚醒休眠中的外接硬碟
     private var healthActive = false
+    /// 讀不到 NVMe SMART 的裝置節點，改用 diskutil；卸載後移除，節點被別的裝置重用時才會重新判斷
+    private var lifetimeUnsupported: Set<String> = []
+    private var lifetimeInFlight: Set<String> = []
+    private static let smartQueue = DispatchQueue(label: "DiskMonitor.smart", qos: .utility)
 
     func setHealthActive(_ active: Bool) { healthActive = active }
 
     func sample(at now: Date = Date()) {
         if let reading = DiskReader.startupVolume() { volume = reading }
         externalVolumes = DiskReader.externalVolumes()
-        DiskReader.pruneDriverCache(keeping: Set(externalVolumes.map(\.deviceNode) + [volume?.deviceNode ?? ""]))
+        let liveNodes = Set(externalVolumes.map(\.deviceNode) + [volume?.deviceNode ?? ""])
+        DiskReader.pruneDriverCache(keeping: liveNodes)
+        lifetimeUnsupported.formIntersection(liveNodes)
         sampleExternal(at: now)
         if healthActive { checkVolumeHealth(at: now) }
         // 優先讀開機磁碟自己的統計，讀不到才退回所有儲存裝置合計
@@ -155,8 +163,34 @@ final class DiskMonitor: ObservableObject {
         updated = now
     }
 
+    /// 讀 NVMe 硬碟自己記錄的 SMART 資料。面板開著時每次取樣都讀（約 0.2 毫秒），總讀寫量會即時增加。
+    /// 這顆讀不到時回傳 false，由呼叫端改用 diskutil
+    private func readLifetime(node: String, apply: @escaping @MainActor (DiskLifetime) -> Void) -> Bool {
+        guard !lifetimeUnsupported.contains(node) else { return false }
+        guard !lifetimeInFlight.contains(node) else { return true }
+        lifetimeInFlight.insert(node)
+        Self.smartQueue.async { [weak self] in
+            let result = DiskReader.lifetime(forDevice: node)
+            Task { @MainActor in
+                guard let self else { return }
+                self.lifetimeInFlight.remove(node)
+                switch result {
+                case .data(let lifetime): apply(lifetime)
+                case .unsupported: self.lifetimeUnsupported.insert(node)
+                case .failed: break
+                }
+            }
+        }
+        return true
+    }
+
     private func checkVolumeHealth(at now: Date) {
-        guard let node = volume?.deviceNode, !node.isEmpty, !healthInFlight.contains(node),
+        guard let node = volume?.deviceNode, !node.isEmpty else { return }
+        let viaSMART = readLifetime(node: node) { [weak self] lifetime in
+            guard let self, volume?.deviceNode == node else { return }
+            volumeLifetime = lifetime
+        }
+        guard !viaSMART, !healthInFlight.contains(node),
               volumeHealthChecked.map({ now.timeIntervalSince($0) > 600 }) ?? true else { return }
         volumeHealthChecked = now
         healthInFlight.insert(node)
@@ -188,10 +222,16 @@ final class DiskMonitor: ObservableObject {
                 usage.totalWritten = io.written
             }
             externalStats[volume.id] = usage
-            if healthActive, !healthInFlight.contains(volume.deviceNode),
-               healthChecked[volume.id].map({ now.timeIntervalSince($0) > 600 }) ?? true {
-                healthChecked[volume.id] = now
-                let id = volume.id, node = volume.deviceNode
+            guard healthActive else { continue }
+            let id = volume.id, node = volume.deviceNode
+            let viaSMART = readLifetime(node: node) { [weak self] lifetime in
+                // 期間若換成別的裝置（同掛載點），不要把舊裝置的結果貼上去
+                guard let self, externalVolumes.first(where: { $0.id == id })?.deviceNode == node else { return }
+                externalStats[id]?.lifetime = lifetime
+            }
+            if !viaSMART, !healthInFlight.contains(node),
+               healthChecked[id].map({ now.timeIntervalSince($0) > 600 }) ?? true {
+                healthChecked[id] = now
                 healthInFlight.insert(node)
                 DispatchQueue.global(qos: .utility).async {
                     let health = DiskReader.smartStatus(forDevice: node)
@@ -312,6 +352,9 @@ extension DiskMonitor {
         volume = DiskReader.Volume(name: "Macintosh HD", total: 494_384_795_648, available: 312_000_000_000,
                                    fileSystem: "apfs", connection: "Apple Fabric")
         volumeHealth = .verified
+        volumeLifetime = DiskLifetime(percentageUsed: 2, availableSpare: 100, spareThreshold: 99, criticalWarning: 0,
+                                      bytesRead: 41_300_000_000_000, bytesWritten: 28_600_000_000_000,
+                                      powerOnHours: 1512, mediaErrors: 0)
         externalVolumes = [
             ExternalVolume(mountPoint: "/Volumes/Backup", name: "Backup", total: 2_000_000_000_000, available: 1_240_000_000_000,
                            fileSystem: "apfs", connection: "Thunderbolt"),
@@ -322,7 +365,10 @@ extension DiskMonitor {
             "/Volumes/Backup": ExternalDiskStats(readRate: 38_000_000, writeRate: 12_000_000, totalRead: 640_000_000_000,
                                                  totalWritten: 210_000_000_000,
                                                  history: previewHistory(now: now) { i in (max(0, 30_000_000 + 20_000_000 * sin(i / 6)), max(0, 9_000_000 + 8_000_000 * sin(i / 9))) },
-                                                 health: .verified),
+                                                 health: .verified,
+                                                 lifetime: DiskLifetime(percentageUsed: 12, availableSpare: 100, spareThreshold: 10,
+                                                                        criticalWarning: 0, bytesRead: 48_200_000_000_000,
+                                                                        bytesWritten: 31_700_000_000_000, powerOnHours: 5120, mediaErrors: 0)),
             "/Volumes/USB": ExternalDiskStats(totalRead: 4_000_000_000, totalWritten: 1_200_000_000, history: previewHistory(now: now) { _ in (0, 0) },
                                               health: .unsupported),
         ]

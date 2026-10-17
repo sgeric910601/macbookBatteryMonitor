@@ -212,7 +212,8 @@ struct SettingsView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {
                         CardTitle("充電夥伴", systemImage: "pawprint")
-                        Picker("外觀", selection: binding(\.chargingAppearance)) {
+                        Picker("外觀", selection: Binding(get: { settings.chargingAppearance },
+                                                        set: { settings.selectAppearance($0) })) {
                             ForEach(ChargingAppearance.allCases) { Text($0.title).tag($0) }
                         }
                         photoRow
@@ -222,8 +223,26 @@ struct SettingsView: View {
                                 Text("浮在視窗上方").tag(false)
                                 Text("放在桌布上").tag(true)
                             }
+                            if settings.chargingAppearance == .photo {
+                                SwitchRow("眼睛跟著游標", isOn: binding(\.desktopPetFollowCursor))
+                                    .help("貓咪大頭照：眼珠看著滑鼠游標；關掉就完全不監聽滑鼠移動")
+                                SwitchRow("會眨眼、睡覺", isOn: binding(\.desktopPetLiveEyes))
+                                    .help("貓咪大頭照：偶爾眨眼，等智慧充電時閉眼睡覺（滑鼠移過去會醒來）")
+                            }
+                            HStack(spacing: 8) {
+                                Text("大小")
+                                // 不用 step：每 5% 一格會畫出一整排刻度；放開時取到 5% 的倍數
+                                Slider(value: Binding(get: { settings.desktopPetScale },
+                                                      set: { settings.desktopPetScale = AppSettings.clampPetScale(($0 * 20).rounded() / 20) }),
+                                       in: AppSettings.desktopPetScaleRange)
+                                    .controlSize(.small)
+                                Text("\(Int((settings.desktopPetScale * 100).rounded()))%")
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 44, alignment: .trailing)
+                            }
                         }
-                        Text("滑鼠移過去看狀態、點一下聊天；可以拖曳，右鍵可以隱藏。")
+                        Text("滑鼠移過去看狀態、點一下聊天、來回移動是摸牠；可以拖曳、用觸控板捏合縮放，右鍵可以換大小或隱藏。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -261,6 +280,32 @@ struct SettingsView: View {
             }
             .settingsSection(.general, shown: section)
 
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("捲動方向", systemImage: "arrow.up.arrow.down")
+                    SwitchRow("滑鼠滾輪反向", isOn: binding(\.scrollReverseMouse))
+                    SwitchRow("觸控板反向", isOn: binding(\.scrollReverseTrackpad))
+                    Text("macOS 的「自然捲動」是滑鼠和觸控板一起變；這裡可以只反轉其中一種，例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向。兩指在觸控板上捲動算觸控板，其他（包括 Magic Mouse）算滑鼠。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if settings.scrollReverseMouse || settings.scrollReverseTrackpad {
+                        if ui.scrollTrusted {
+                            Label("運作中", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        } else {
+                            Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。App 沒有開發者簽章，每次更新後要先移除舊的項目再加一次。")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                        }
+                    }
+                }
+            }
+            .settingsSection(.input, shown: section)
+
             UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked, ui: ui)
                 .settingsSection(.update, shown: section)
         }
@@ -270,18 +315,22 @@ struct SettingsView: View {
         }
     }
 
-    /// 照片外觀用的照片：預覽、換成自己的照片（選好就改用照片外觀）或改回貓咪照片
+    /// 「我的照片」外觀用的照片：預覽與選擇（選好就改用我的照片）。貓咪大頭照是另一個外觀，換照片不影響它
     private var photoRow: some View {
         // 換照片時重畫
         let _ = settings.companionPhotoVersion
         return HStack(spacing: 10) {
-            Text("照片")
+            Text("我的照片")
             Spacer()
-            CompanionPhotoFigure(presentation: .init(title: "", detail: "", progress: 1, tint: .green, onPad: false, badge: nil,
-                                                     animatedFlow: false), width: 36)
-            Button("選擇照片…") { settings.chooseCompanionPhoto() }
-            if CompanionPhoto.isCustom {
-                Button("改回貓咪照片") { settings.resetCompanionPhoto() }
+            if CompanionPhoto.hasCustom {
+                CompanionPhotoFigure(presentation: .init(title: "", detail: "", progress: 1, tint: .green, onPad: false, badge: nil,
+                                                         animatedFlow: false), width: 36, custom: true)
+            }
+            Button(CompanionPhoto.hasCustom ? "換照片…" : "選擇照片…") { settings.chooseCompanionPhoto() }
+                .help("選一張自己的照片，會改用「我的照片」外觀；貓咪大頭照會保留")
+            if CompanionPhoto.hasCustom {
+                Button("移除") { settings.removeCompanionPhoto() }
+                    .help("刪掉這張照片（只存在這台 Mac）")
             }
         }
     }

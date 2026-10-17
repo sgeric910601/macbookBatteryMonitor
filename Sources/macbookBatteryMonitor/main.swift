@@ -93,6 +93,11 @@ if CommandLine.arguments.contains("--dump") {
     exit(0)
 }
 
+if CommandLine.arguments.contains("--selftest-scroll") {
+    MainActor.assumeIsolated { ScrollDirection.shared.selfTest() }
+    exit(0)
+}
+
 // 開發用：用一鍵更新的流程從本機的 DMG 取出 App 並驗證（版本號要和這個 App 相同），不安裝
 if let index = CommandLine.arguments.firstIndex(of: "--selftest-dmg"), index + 1 < CommandLine.arguments.count {
     let dmg = URL(fileURLWithPath: CommandLine.arguments[index + 1])

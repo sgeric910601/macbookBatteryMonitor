@@ -38,9 +38,11 @@ enum MonitorDebug {
             "name": disk.volume?.name ?? "", "total": disk.volume?.total ?? 0, "available": disk.volume?.available ?? 0,
             "readRate": disk.readRate, "writeRate": disk.writeRate,
             "totalRead": disk.totalRead, "totalWritten": disk.totalWritten,
+            "lifetime": lifetimeInfo(disk.volume?.deviceNode ?? ""),
             "external": disk.externalVolumes.map { volume -> [String: Any] in
                 let usage = disk.externalStats[volume.id]
                 return ["name": volume.name, "total": volume.total, "available": volume.available, "device": volume.deviceNode,
+                        "lifetime": lifetimeInfo(volume.deviceNode),
                         "fileSystem": volume.fileSystem, "connection": volume.connection,
                         "totalRead": usage?.totalRead ?? 0, "totalWritten": usage?.totalWritten ?? 0,
                         "readRate": usage?.readRate ?? 0, "writeRate": usage?.writeRate ?? 0]
@@ -59,6 +61,18 @@ enum MonitorDebug {
     }
 
     /// 選單列小圖（截圖用），與 ModuleCoordinator 顯示的內容相同
+    /// 硬碟自己記錄的 SMART 資料；不支援時寫 unsupported
+    private static func lifetimeInfo(_ node: String) -> Any {
+        switch DiskReader.lifetime(forDevice: node) {
+        case .data(let l):
+            return ["health": l.healthPercent, "percentageUsed": l.percentageUsed, "availableSpare": l.availableSpare,
+                    "spareThreshold": l.spareThreshold, "criticalWarning": Int(l.criticalWarning), "bytesRead": l.bytesRead,
+                    "bytesWritten": l.bytesWritten, "powerOnHours": l.powerOnHours, "mediaErrors": l.mediaErrors] as [String: Any]
+        case .unsupported: return "unsupported"
+        case .failed: return "failed"
+        }
+    }
+
     static func menuBarImages(cpu: CPUMonitor, memory: MemoryMonitor, disk: DiskMonitor, network: NetworkMonitor) -> [NSImage] {
         let diskFraction = disk.volume.map { $0.total > 0 ? Double($0.used) / Double($0.total) : 0 }
         return [

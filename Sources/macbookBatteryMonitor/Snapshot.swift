@@ -66,6 +66,7 @@ enum SnapshotCommand {
         renderUpdateCard(directory: dir)
         renderChargingAppearances(directory: dir)
         renderDesktopPet(directory: dir)
+        renderLiveEyes(directory: dir)
         renderPluggedPanels(directory: dir)
         renderDesktopPanels(directory: dir)
         print("已輸出到 \(dir.path)")
@@ -166,7 +167,31 @@ enum SnapshotCommand {
         }
     }
 
-    /// 充電上限滑桿旁的四種外觀（充電夥伴、電池夥伴、電量條、照片）在各種排程狀態下的樣子
+    /// 桌面寵物貓咪大頭照會動的眼睛：看前方、左、右、上、下、睡覺（100% 與 200%）
+    private static func renderLiveEyes(directory dir: URL) {
+        let presentation = ChargingJourneyPresentation.make(percent: 62, charging: true, decision: nil, now: Date())
+        let cases: [(CGPoint, CatMood)] = [(.zero, .awake), (CGPoint(x: -1, y: 0), .awake), (CGPoint(x: 1, y: 0), .awake),
+                                           (CGPoint(x: 0, y: -1), .awake), (CGPoint(x: 0, y: 1), .awake), (.zero, .sleeping)]
+        for scale in [1.0, 2.0] {
+            let view = HStack(spacing: 12) {
+                ForEach(cases.indices, id: \.self) { index in
+                    CompanionPhotoFigure(presentation: presentation, width: 140 * scale, liveEyes: true, mood: cases[index].1, followsCursor: false)
+                }
+            }
+            .padding(12)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, .dark)
+            render(view, appearance: .darkAqua, settle: 0.5, to: dir.appendingPathComponent("live-eyes-\(Int(scale * 100)).png")) { root in
+                func eyes(in view: NSView) -> [CatEyesView] {
+                    (view as? CatEyesView).map { [$0] } ?? view.subviews.flatMap(eyes)
+                }
+                let found = eyes(in: root).sorted { $0.convert(NSPoint.zero, to: nil).x < $1.convert(NSPoint.zero, to: nil).x }
+                for (view, item) in zip(found, cases) { view.setGazeForSnapshot(item.0) }
+            }
+        }
+    }
+
+    /// 充電上限滑桿旁的五種外觀（充電夥伴、電池夥伴、電量條、貓咪大頭照、我的照片）在各種排程狀態下的樣子
     private static func renderChargingAppearances(directory dir: URL) {
         let now = Date()
         let deadline = now.addingTimeInterval(9 * 3600)
@@ -176,6 +201,7 @@ enum SnapshotCommand {
         }
         let states: [(String, ChargingJourneyPresentation)] = [
             ("沒有排程", .make(percent: 78, charging: false, decision: nil, now: now)),
+            ("到達上限", .make(percent: 80, charging: false, pluggedIn: true, decision: nil, now: now)),
             ("等待", .make(percent: 80, charging: false, decision: decision(.waiting), now: now)),
             ("充電中", .make(percent: 86, charging: true, decision: decision(.charging), now: now)),
             ("已準備好", .make(percent: 100, charging: false, decision: decision(.ready), now: now)),
@@ -284,7 +310,8 @@ enum SnapshotCommand {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
     }
 
-    static func render<V: View>(_ view: V, appearance: NSAppearance.Name, settle: TimeInterval, to url: URL) {
+    static func render<V: View>(_ view: V, appearance: NSAppearance.Name, settle: TimeInterval, to url: URL,
+                                prepare: ((NSView) -> Void)? = nil) {
         let hosting = NSHostingView(rootView: view)
         hosting.appearance = NSAppearance(named: appearance)
         let window = NSWindow(contentRect: NSRect(x: -5000, y: 0, width: 380, height: 800),
@@ -297,6 +324,10 @@ enum SnapshotCommand {
         wait(settle)
         hosting.setFrameSize(hosting.fittingSize)
         hosting.layoutSubtreeIfNeeded()
+        if let prepare {
+            prepare(hosting)
+            wait(0.3)
+        }
         save(view: hosting, to: url)
         window.orderOut(nil)
     }

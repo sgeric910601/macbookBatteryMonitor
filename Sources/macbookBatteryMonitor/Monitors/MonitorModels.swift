@@ -277,7 +277,7 @@ struct ExternalVolume: Equatable, Identifiable {
     var connection: String = ""
 }
 
-/// 外接磁碟的 SMART 整體狀態（只有正常／異常，沒有耗損百分比；多數 USB 外接盒不支援）
+/// diskutil 的 SMART 整體狀態，只有正常／異常。讀不到 NVMe SMART（SATA 硬碟、多數 USB 外接盒）時才用
 enum DiskHealth: Equatable {
     case verified, failing, unsupported
     /// diskutil 失敗或逾時，無法判斷
@@ -293,6 +293,45 @@ enum DiskHealth: Equatable {
     }
 }
 
+/// NVMe 硬碟自己記錄的 SMART 資料：從出廠到現在的讀寫量、已用壽命與錯誤，重新開機或重新接上都不會歸零
+struct DiskLifetime: Equatable {
+    /// 已用掉的設計寫入壽命（%），用超過時可能大於 100
+    var percentageUsed: Int
+    /// 剩下的備用區塊（%）與硬碟自己的警告門檻
+    var availableSpare: Int
+    var spareThreshold: Int
+    /// 硬碟回報的嚴重警告位元（備用區塊不足、溫度、可靠度下降、唯讀…），0 表示沒有
+    var criticalWarning: UInt8
+    var bytesRead: UInt64
+    var bytesWritten: UInt64
+    var powerOnHours: UInt64
+    var mediaErrors: UInt64
+
+    /// 健康度：100% 減去已用壽命
+    var healthPercent: Int { max(0, 100 - percentageUsed) }
+
+    /// 硬碟自己回報有問題：有嚴重警告，或備用區塊已低於門檻
+    var isFailing: Bool { criticalWarning != 0 || availableSpare < spareThreshold }
+
+    /// NVMe 規格的「SMART／健康資訊」記錄（512 位元組，小端序）。讀寫量的單位是 512,000 位元組，欄位是 128 位元
+    static func parse(_ log: [UInt8]) -> DiskLifetime? {
+        guard log.count >= 192 else { return nil }
+        func counter(_ offset: Int) -> UInt64 {
+            let low = (0..<8).reduce(UInt64(0)) { $0 | UInt64(log[offset + $1]) << (8 * UInt64($1)) }
+            // 高 64 位元不是 0 時已經大到顯示不下，直接用最大值
+            let high = log[(offset + 8)..<(offset + 16)].contains { $0 != 0 }
+            return high ? .max : low
+        }
+        func bytes(_ offset: Int) -> UInt64 {
+            let (value, overflow) = counter(offset).multipliedReportingOverflow(by: 512_000)
+            return overflow ? .max : value
+        }
+        return DiskLifetime(percentageUsed: Int(log[5]), availableSpare: Int(log[3]), spareThreshold: Int(log[4]),
+                            criticalWarning: log[0], bytesRead: bytes(32), bytesWritten: bytes(48),
+                            powerOnHours: counter(128), mediaErrors: counter(160))
+    }
+}
+
 /// 單一外接磁碟的讀寫統計（計數器從接上那一刻起算）
 struct ExternalDiskStats: Equatable {
     var readRate: Double = 0
@@ -301,6 +340,8 @@ struct ExternalDiskStats: Equatable {
     var totalWritten: UInt64 = 0
     var history = MonitorHistory()
     var health: DiskHealth?
+    /// 支援 NVMe SMART 的外接硬碟（例如 Thunderbolt 外接盒）才有
+    var lifetime: DiskLifetime?
 }
 
 /// 掛載項目的裝置資訊，供判斷是否為實體外接磁碟

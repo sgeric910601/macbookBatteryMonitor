@@ -14,6 +14,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case companion
     /// 每個藍牙設備的低電量通知
     case peripherals
+    /// 滑鼠與觸控板分開的捲動方向
+    case input
     case update
 
     var id: String { rawValue }
@@ -26,6 +28,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .charging: return "充電"
         case .companion: return "充電夥伴"
         case .peripherals: return "周邊設備"
+        case .input: return "滑鼠與觸控板"
         case .update: return "更新"
         }
     }
@@ -39,6 +42,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .charging: return "battery.100.bolt"
         case .companion: return "pawprint"
         case .peripherals: return "keyboard"
+        case .input: return "computermouse"
         case .update: return "arrow.down.circle"
         }
     }
@@ -159,6 +163,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func windowDidBecomeKey(_ notification: Notification) {
         Notifier.shared.checkBlocked { [weak self] in self?.ui.notificationsBlocked = $0 }
         ui.loginStatus = LoginItem.status
+        ui.scrollTrusted = ScrollDirection.trusted
     }
 
     func windowWillClose(_ notification: Notification) {

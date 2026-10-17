@@ -35,6 +35,8 @@ final class AppSettings: ObservableObject {
     /// 智慧充電的精準喚醒開關改變時呼叫
     var onChargingWakeChange: (() -> Void)?
     /// 桌面寵物開關改變時
+    /// 捲動方向的設定改變時
+    var onScrollDirectionChange: (() -> Void)?
     var onDesktopPetChange: (() -> Void)?
 
     /// 可選的更新頻率（秒）
@@ -121,7 +123,7 @@ final class AppSettings: ObservableObject {
     @Published var chargingAppearance: ChargingAppearance {
         didSet { defaults.set(chargingAppearance.rawValue, forKey: Keys.chargingAppearance) }
     }
-    /// 照片外觀換照片時加一，讓用到照片的畫面重畫（照片本身在 CompanionPhoto）
+    /// 換「我的照片」時加一，讓用到照片的畫面重畫（照片本身在 CompanionPhoto）
     @Published var companionPhotoVersion = 0
     /// 桌面寵物：把充電夥伴放在桌面上（只有 MacBook 有）
     @Published var desktopPet: Bool {
@@ -136,6 +138,39 @@ final class AppSettings: ObservableObject {
             defaults.set(desktopPetOnWallpaper, forKey: Keys.desktopPetOnWallpaper)
             if desktopPetOnWallpaper != oldValue { onDesktopPetChange?() }
         }
+    }
+    /// 桌面寵物貓咪大頭照的眼睛會動：眨眼、睡覺時閉眼
+    @Published var desktopPetLiveEyes: Bool {
+        didSet { defaults.set(desktopPetLiveEyes, forKey: Keys.desktopPetLiveEyes) }
+    }
+    /// 眼睛跟著游標：關掉就完全不監聽滑鼠移動
+    @Published var desktopPetFollowCursor: Bool {
+        didSet { defaults.set(desktopPetFollowCursor, forKey: Keys.desktopPetFollowCursor) }
+    }
+    /// 捲動方向：滑鼠與觸控板各自反向（macOS 的「自然捲動」兩者共用一個設定）
+    @Published var scrollReverseMouse: Bool {
+        didSet {
+            defaults.set(scrollReverseMouse, forKey: Keys.scrollReverseMouse)
+            if scrollReverseMouse != oldValue { onScrollDirectionChange?() }
+        }
+    }
+    @Published var scrollReverseTrackpad: Bool {
+        didSet {
+            defaults.set(scrollReverseTrackpad, forKey: Keys.scrollReverseTrackpad)
+            if scrollReverseTrackpad != oldValue { onScrollDirectionChange?() }
+        }
+    }
+    /// 桌面寵物的大小：1 是和日曆小工具差不多大，範圍 0.5～2（設定的地方用 clampPetScale 限制）
+    @Published var desktopPetScale: Double {
+        didSet {
+            defaults.set(desktopPetScale, forKey: Keys.desktopPetScale)
+            if desktopPetScale != oldValue { onDesktopPetChange?() }
+        }
+    }
+    static let desktopPetScaleRange: ClosedRange<Double> = 0.5...2
+
+    static func clampPetScale(_ value: Double) -> Double {
+        min(max(value, desktopPetScaleRange.lowerBound), desktopPetScaleRange.upperBound)
     }
     /// 智慧充電的完成目標與保養上限（建立排程時的預設值）。完成目標預設是「原本的上限」（存成 0）：
     /// 建立排程時的系統充電上限，充好後就停在平常的上限，不會多充到 100%
@@ -245,8 +280,15 @@ final class AppSettings: ObservableObject {
         static let updateNotification = "updateNotification"
         static let adminCPUSampling = "adminCPUSampling"
         static let chargingAppearance = "chargingAppearance"
+        /// v1.7.3 起「照片」分成貓咪大頭照與我的照片；舊設定只轉換一次
+        static let photoAppearanceSplit = "photoAppearanceSplit"
         static let desktopPet = "desktopPet"
         static let desktopPetOnWallpaper = "desktopPetOnWallpaper"
+        static let desktopPetScale = "desktopPetScale"
+        static let desktopPetLiveEyes = "desktopPetLiveEyes"
+        static let desktopPetFollowCursor = "desktopPetFollowCursor"
+        static let scrollReverseMouse = "scrollReverseMouse"
+        static let scrollReverseTrackpad = "scrollReverseTrackpad"
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
@@ -282,6 +324,9 @@ final class AppSettings: ObservableObject {
             Keys.desktopPet: false,
             Keys.menuBarCombined: false,
             Keys.desktopPetOnWallpaper: false,
+            Keys.desktopPetScale: 1.0,
+            Keys.desktopPetLiveEyes: true,
+            Keys.desktopPetFollowCursor: true,
             Keys.chargingTargetPercent: 0,
             Keys.chargingHoldPercent: 80,
             Keys.chargingSleepStrategy: ChargingSleepStrategy.readinessFirst.rawValue,
@@ -319,10 +364,24 @@ final class AppSettings: ObservableObject {
         appIconColor = AppIconColor(rawValue: defaults.string(forKey: Keys.appIconColor) ?? "") ?? .mint
         autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
         updateNotification = defaults.bool(forKey: Keys.updateNotification)
-        chargingAppearance = ChargingAppearance(rawValue: defaults.string(forKey: Keys.chargingAppearance) ?? "") ?? .companion
+        var appearance = ChargingAppearance(rawValue: defaults.string(forKey: Keys.chargingAppearance) ?? "") ?? .companion
+        // v1.7.2 的「照片」外觀換成自己照片的人，改用「我的照片」；貓咪大頭照另外保留
+        if !defaults.bool(forKey: Keys.photoAppearanceSplit) {
+            if appearance == .photo, CompanionPhoto.hasCustom {
+                appearance = .customPhoto
+                defaults.set(appearance.rawValue, forKey: Keys.chargingAppearance)
+            }
+            defaults.set(true, forKey: Keys.photoAppearanceSplit)
+        }
+        chargingAppearance = appearance
         desktopPet = defaults.bool(forKey: Keys.desktopPet)
         menuBarCombined = defaults.bool(forKey: Keys.menuBarCombined)
         desktopPetOnWallpaper = defaults.bool(forKey: Keys.desktopPetOnWallpaper)
+        desktopPetScale = Self.clampPetScale(defaults.double(forKey: Keys.desktopPetScale))
+        desktopPetLiveEyes = defaults.bool(forKey: Keys.desktopPetLiveEyes)
+        desktopPetFollowCursor = defaults.bool(forKey: Keys.desktopPetFollowCursor)
+        scrollReverseMouse = defaults.bool(forKey: Keys.scrollReverseMouse)
+        scrollReverseTrackpad = defaults.bool(forKey: Keys.scrollReverseTrackpad)
         let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
         let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target
@@ -341,8 +400,10 @@ enum ChargingAppearance: String, CaseIterable, Identifiable {
     case mascot
     /// 電力流動：電量條
     case energy
-    /// 照片：預設是貓咪照片，可以換成自己的
+    /// 貓咪大頭照：內建的貓咪照片，桌面寵物的眼睛會跟著游標、眨眼
     case photo
+    /// 我的照片：自己選的照片（眼睛不會動），和貓咪大頭照分開存
+    case customPhoto
 
     var id: String { rawValue }
     var title: String {
@@ -350,7 +411,8 @@ enum ChargingAppearance: String, CaseIterable, Identifiable {
         case .companion: return "充電夥伴（貓咪）"
         case .mascot: return "電池夥伴"
         case .energy: return "電力流動"
-        case .photo: return "照片"
+        case .photo: return "貓咪大頭照"
+        case .customPhoto: return "我的照片"
         }
     }
 
@@ -360,7 +422,8 @@ enum ChargingAppearance: String, CaseIterable, Identifiable {
         case .companion: return "貓咪"
         case .mascot: return "電池夥伴"
         case .energy: return "電量條"
-        case .photo: return "照片"
+        case .photo: return "大頭照"
+        case .customPhoto: return "我的照片"
         }
     }
 }

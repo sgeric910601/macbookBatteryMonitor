@@ -476,20 +476,21 @@ private struct DiskPanel: View {
             let v = disk.volume
             DiskSection(symbol: "internaldrive", name: v?.name ?? "磁碟", total: v?.total, available: v?.available,
                         fileSystem: v?.fileSystem ?? "", connection: v?.connection ?? "", health: disk.volumeHealth,
-                        readRate: disk.readRate, writeRate: disk.writeRate, history: disk.history,
+                        lifetime: disk.volumeLifetime, readRate: disk.readRate, writeRate: disk.writeRate, history: disk.history,
                         totalRead: disk.totalRead, totalWritten: disk.totalWritten, totalsTitle: "開機以來")
             ForEach(disk.externalVolumes) { volume in
                 let usage = disk.externalStats[volume.id] ?? ExternalDiskStats()
                 DiskSection(symbol: "externaldrive", name: volume.name, total: volume.total, available: volume.available,
                             fileSystem: volume.fileSystem, connection: volume.connection, health: usage.health,
-                            readRate: usage.readRate, writeRate: usage.writeRate, history: usage.history,
+                            lifetime: usage.lifetime, readRate: usage.readRate, writeRate: usage.writeRate, history: usage.history,
                             totalRead: usage.totalRead, totalWritten: usage.totalWritten, totalsTitle: "接上以來")
             }
         }
     }
 }
 
-/// 一顆磁碟的完整資訊：標題、容量、檔案系統、健康度、讀寫速度與累計。本機與外接磁碟共用
+/// 一顆磁碟的完整資訊：標題、容量、檔案系統、健康度、讀寫速度與累計。本機與外接磁碟共用。
+/// 讀得到 NVMe SMART 時，健康度改成百分比，累計讀寫改成硬碟自己記錄的出廠以來總量
 private struct DiskSection: View {
     let symbol: String
     let name: String
@@ -498,6 +499,7 @@ private struct DiskSection: View {
     let fileSystem: String
     let connection: String
     let health: DiskHealth?
+    let lifetime: DiskLifetime?
     let readRate: Double
     let writeRate: Double
     let history: MonitorHistory
@@ -530,6 +532,28 @@ private struct DiskSection: View {
         InfoRow("總容量", total.map(ByteFormat.size) ?? "—")
         if !fileSystem.isEmpty { InfoRow("檔案系統", fileSystem.uppercased()) }
         if !connection.isEmpty { InfoRow("連線類型", connection) }
+        if let lifetime {
+            lifetimeRows(lifetime)
+        } else {
+            smartStatusRow
+        }
+    }
+
+    @ViewBuilder
+    private func lifetimeRows(_ lifetime: DiskLifetime) -> some View {
+        let percent = lifetime.healthPercent
+        if lifetime.isFailing {
+            InfoRow("健康度", "\(percent)%・硬碟回報異常，建議立即備份", tint: .red)
+        } else {
+            InfoRow("健康度", "\(percent)%", tint: percent >= 70 ? .green : percent >= 30 ? .orange : .red)
+        }
+        if lifetime.mediaErrors > 0 {
+            InfoRow("媒體錯誤", "\(lifetime.mediaErrors) 次", tint: .orange)
+        }
+    }
+
+    @ViewBuilder
+    private var smartStatusRow: some View {
         switch health {
         case .verified: InfoRow("健康度（SMART）", "正常", tint: .green)
         case .failing: InfoRow("健康度（SMART）", "異常，建議立即備份", tint: .red)
@@ -550,12 +574,27 @@ private struct DiskSection: View {
             }
             Card {
                 VStack(alignment: .leading, spacing: 6) {
-                    CardTitle(totalsTitle, systemImage: "clock.arrow.circlepath")
-                    InfoRow("累計讀取", ByteFormat.size(totalRead))
-                    InfoRow("累計寫入", ByteFormat.size(totalWritten))
+                    if let lifetime {
+                        CardTitle("出廠以來", systemImage: "clock.arrow.circlepath")
+                        InfoRow("累計讀取", ByteFormat.size(lifetime.bytesRead))
+                        InfoRow("累計寫入", ByteFormat.size(lifetime.bytesWritten))
+                        InfoRow("通電時間", DiskSection.hours(lifetime.powerOnHours))
+                    } else {
+                        CardTitle(totalsTitle, systemImage: "clock.arrow.circlepath")
+                        InfoRow("累計讀取", ByteFormat.size(totalRead))
+                        InfoRow("累計寫入", ByteFormat.size(totalWritten))
+                    }
                 }
             }
         }
+    }
+}
+
+extension DiskSection {
+    /// 通電時間："2,306 小時（約 96 天）"
+    static func hours(_ hours: UInt64) -> String {
+        let text = "\(hours.formatted()) 小時"
+        return hours >= 48 ? text + "（約 \((hours / 24).formatted()) 天）" : text
     }
 }
 

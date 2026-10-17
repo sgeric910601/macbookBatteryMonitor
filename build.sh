@@ -3,7 +3,7 @@
 #   ./build.sh                 → 通用版：系統監控是設定裡的開關，第一次啟動時詢問
 #   ./build.sh install         → 編好後安裝到 /Applications 並啟動
 #   ./build.sh battery|status  → 給 v1.5.0～v1.6.2 一鍵更新用的舊版別（內容相同，只有 MBMEdition 不同，
-#                                從舊版升級時用來保留原本的系統監控設定）；v1.7.2 是最後一個附上的版本
+#                                從舊版升級時用來保留原本的系統監控設定）；每個 Release 都附
 set -euo pipefail
 cd "$(dirname "$0")"
 

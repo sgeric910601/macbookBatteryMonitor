@@ -27,6 +27,9 @@ struct DesktopPetStatus: Equatable {
 
 /// 桌面寵物的想像框（滑鼠移過去，目前的狀態）與對話框（點一下，每點一次換一句）
 enum DesktopPetMessages {
+    /// 用滑鼠來回摸牠時說的話
+    static let purrs = ["呼嚕呼嚕～", "好舒服喔", "再摸一下嘛", "喵～"]
+
     static func thought(_ s: DesktopPetStatus) -> String {
         var lines = ["\(s.percent)%・\(stateText(s))"]
         if let title = s.planTitle {

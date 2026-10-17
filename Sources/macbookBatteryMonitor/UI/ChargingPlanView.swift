@@ -40,15 +40,15 @@ struct ChargingPlanView: View {
                 HStack(spacing: 8) {
                     Text(supported ? "滑桿旁顯示" : "面板上方顯示").font(.callout)
                     Picker("外觀", selection: Binding(get: { settings.chargingAppearance },
-                                                    set: { settings.chargingAppearance = $0 })) {
+                                                    set: { settings.selectAppearance($0) })) {
                         ForEach(ChargingAppearance.allCases) { Text($0.shortTitle).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                 }
-                if settings.chargingAppearance == .photo {
+                if settings.chargingAppearance == .customPhoto {
                     Button("換照片…") { settings.chooseCompanionPhoto() }
-                        .help("選一張自己的照片；設定 → 充電夥伴可以改回貓咪照片")
+                        .help("換一張自己的照片；貓咪大頭照會保留")
                 }
             }
 

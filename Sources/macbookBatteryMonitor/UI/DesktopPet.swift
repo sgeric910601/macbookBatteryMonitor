@@ -12,13 +12,17 @@ final class DesktopPetState: ObservableObject {
 }
 
 /// 桌面寵物：把充電夥伴放在桌面上。滑鼠移過去出現想像框（目前的狀態），點一下出現對話框（每點一次換一句），
-/// 拖曳可以移動（記住位置），連點兩下打開面板，右鍵可以換外觀或隱藏。只有 MacBook 有（桌上型 Mac 沒有電池）。
+/// 拖曳可以移動（記住位置），觸控板捏合或設定裡的滑桿可以調整大小，連點兩下打開面板，右鍵可以換外觀、大小或隱藏。
+/// 用滑鼠在牠身上來回移動是在摸牠：會冒愛心、說呼嚕呼嚕。
+/// 只有 MacBook 有（桌上型 Mac 沒有電池）。
 /// 對話框是另一個不接收滑鼠的視窗，跟著寵物移動，不會擋到下面的東西
 @MainActor
 final class DesktopPetController {
-    /// 和日曆小工具差不多大
-    private static let size = CGSize(width: 176, height: 176)
+    /// 大小 100% 時和日曆小工具差不多大
+    static let baseSize: CGFloat = 176
     private static let originKey = "desktopPetOrigin"
+    /// 右鍵選單的大小選項
+    private static let sizePresets: [(String, Double)] = [("小", 0.75), ("標準", 1), ("大", 1.5), ("特大", 2)]
     /// 對話框顯示幾秒
     private static let speechSeconds: TimeInterval = 4
 
@@ -32,6 +36,12 @@ final class DesktopPetController {
     private var speechEnd: DispatchWorkItem?
     private var sayingIndex = 0
     private var observers: [NSObjectProtocol] = []
+    /// 摸牠：記錄滑鼠在寵物上左右換方向的時間，1.5 秒內換 3 次就算摸了一下
+    private var strokeX: CGFloat?
+    private var strokeDirection: CGFloat = 0
+    private var strokeTurns: [TimeInterval] = []
+    private var lastPetted: TimeInterval = 0
+    private weak var container: PetContainerView?
 
     /// 連點兩下或從選單打開面板
     var openPanel: (() -> Void)?
@@ -43,11 +53,27 @@ final class DesktopPetController {
         self.settings = settings
     }
 
-    /// 依設定顯示或收起來，並套用位置（浮在視窗上方或放在桌布上）
+    /// 依設定顯示或收起來，並套用位置（浮在視窗上方或放在桌布上）與大小
     func sync() {
         if settings.desktopPet && BatteryReader.hasBattery { show() } else { hide() }
         pet?.level = level
         bubble?.level = level
+        applySize()
+    }
+
+    private var size: CGSize {
+        let side = (Self.baseSize * settings.desktopPetScale).rounded()
+        return CGSize(width: side, height: side)
+    }
+
+    /// 改大小時腳底的位置不動（以下緣中間為準），再收進螢幕裡
+    private func applySize() {
+        guard let pet, pet.frame.size != size else { return }
+        pet.setFrame(NSRect(x: (pet.frame.midX - size.width / 2).rounded(), y: pet.frame.minY,
+                            width: size.width, height: size.height), display: true)
+        keepOnScreen()
+        saveOrigin()
+        layoutBubble()
     }
 
     /// 放在桌布上時和桌面圖示同一層（視窗會蓋住它）；否則浮在所有視窗上方
@@ -57,14 +83,28 @@ final class DesktopPetController {
 
     private func show() {
         guard pet == nil else { return }
-        let panel = Self.makePanel(size: Self.size, ignoresMouse: false)
+        let panel = Self.makePanel(size: size, ignoresMouse: false)
         panel.level = level
-        let container = PetContainerView(frame: NSRect(origin: .zero, size: Self.size))
-        container.host(DesktopPetFigureView(store: store, settings: settings))
+        // 摸牠：要收到滑鼠在寵物上移動的事件
+        panel.acceptsMouseMovedEvents = true
+        let container = PetContainerView(frame: NSRect(origin: .zero, size: size))
+        container.autoresizingMask = [.width, .height]
+        container.host(DesktopPetFigureView(store: store, settings: settings, state: state))
         container.onHover = { [weak self] in self?.setHovering($0) }
+        container.onStroke = { [weak self] in self?.stroke(x: $0) }
+        container.onDragEnd = { [weak self] in
+            self?.keepOnScreen()
+            self?.saveOrigin()
+        }
+        self.container = container
         container.onClick = { [weak self] in self?.speak() }
         container.onDoubleClick = { [weak self] in self?.openPanel?() }
         container.menuProvider = { [weak self] in self?.menu() }
+        // 觸控板兩指捏合：放大或縮小
+        container.onMagnify = { [weak self] magnification in
+            guard let self else { return }
+            settings.desktopPetScale = AppSettings.clampPetScale(settings.desktopPetScale * (1 + magnification))
+        }
         panel.contentView = container
         panel.setFrameOrigin(savedOrigin() ?? defaultOrigin())
         panel.orderFrontRegardless()
@@ -102,15 +142,46 @@ final class DesktopPetController {
 
     private func setHovering(_ hovering: Bool) {
         state.hovering = hovering
+        if !hovering {
+            strokeX = nil
+            strokeTurns.removeAll()
+        }
         updateBubble()
+    }
+
+    /// 滑鼠在寵物上移動：左右來回換方向夠快就算在摸牠
+    private func stroke(x: CGFloat) {
+        let now = CACurrentMediaTime()
+        defer { strokeX = x }
+        guard let last = strokeX, abs(x - last) > 2 else { return }
+        let direction: CGFloat = x > last ? 1 : -1
+        if strokeDirection != 0, direction != strokeDirection { strokeTurns.append(now) }
+        strokeDirection = direction
+        strokeTurns.removeAll { now - $0 > 1.5 }
+        if strokeTurns.count >= 3, now - lastPetted > 1.2 {
+            strokeTurns.removeAll()
+            petted(now)
+        }
+    }
+
+    /// 被摸了：冒愛心、說一句呼嚕（眼睛維持張開）
+    private func petted(_ now: TimeInterval) {
+        lastPetted = now
+        container?.burstHearts(scale: settings.desktopPetScale)
+        say(DesktopPetMessages.purrs.randomElement() ?? "呼嚕呼嚕～")
     }
 
     /// 點一下：說下一句話，幾秒後收起來
     private func speak() {
         guard let status = status(includeToday: true) else { return }
         let sayings = DesktopPetMessages.sayings(status)
-        state.speech = sayings[sayingIndex % sayings.count]
+        say(sayings[sayingIndex % sayings.count])
         sayingIndex += 1
+    }
+
+    /// 對話框說一句話，幾秒後收起來
+    private func say(_ text: String) {
+        state.speech = text
         speechEnd?.cancel()
         let end = DispatchWorkItem { [weak self] in
             self?.state.speech = nil
@@ -127,11 +198,21 @@ final class DesktopPetController {
         menu.addItem(.separator())
         for appearance in ChargingAppearance.allCases {
             menu.addItem(ClosureMenuItem(appearance.shortTitle, checked: settings.chargingAppearance == appearance) { [weak self] in
-                self?.settings.chargingAppearance = appearance
+                self?.settings.selectAppearance(appearance)
             })
         }
         menu.addItem(ClosureMenuItem("換照片…") { [weak self] in self?.settings.chooseCompanionPhoto() })
         menu.addItem(.separator())
+        let sizes = NSMenu()
+        for (title, scale) in Self.sizePresets {
+            let current = abs(settings.desktopPetScale - scale) < 0.01
+            sizes.addItem(ClosureMenuItem("\(title)（\(Int(scale * 100))%）", checked: current) { [weak self] in
+                self?.settings.desktopPetScale = scale
+            })
+        }
+        let sizeItem = NSMenuItem(title: "大小", action: nil, keyEquivalent: "")
+        sizeItem.submenu = sizes
+        menu.addItem(sizeItem)
         menu.addItem(ClosureMenuItem("浮在視窗上方", checked: !settings.desktopPetOnWallpaper) { [weak self] in
             self?.settings.desktopPetOnWallpaper = false
         })
@@ -142,6 +223,65 @@ final class DesktopPetController {
         menu.addItem(ClosureMenuItem("充電夥伴設定…") { [weak self] in self?.openSettings?() })
         menu.addItem(ClosureMenuItem("隱藏桌面寵物") { [weak self] in self?.settings.desktopPet = false })
         return menu
+    }
+
+    // MARK: 自我測試
+
+    /// 開發用：`--selftest-pet` 調整大小、模擬摸牠、切換游標追蹤、放到選單列高度，最後模擬滑鼠持續移動 30 秒（量 CPU 用）。
+    /// 會暫時改大小與游標追蹤，結束時還原
+    func runSelfTest() {
+        let originalScale = settings.desktopPetScale
+        let originalFollow = settings.desktopPetFollowCursor
+        func report(_ label: String) {
+            let frame = pet.map { "\(Int($0.frame.minX)),\(Int($0.frame.minY)) \(Int($0.frame.width))×\(Int($0.frame.height))" } ?? "沒有顯示"
+            print("selftest-pet: \(label)：寵物 \(frame)、大小 \(Int(settings.desktopPetScale * 100))%、"
+                  + "游標追蹤 \(CursorWatcher.shared.isWatching ? "監聽中" : "停止")、對話框 \(state.speech ?? "無")")
+        }
+        func after(_ seconds: Double, _ step: @escaping () -> Void) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: step)
+        }
+        after(2) { report("開始") }
+        after(3) { [self] in settings.desktopPetScale = 2; report("改成 200%（下緣中間不動）") }
+        after(4) { [self] in settings.desktopPetScale = 0.5; report("改成 50%") }
+        after(5) { [self] in settings.desktopPetScale = originalScale; report("還原大小") }
+        after(6) { [self] in
+            for (index, x) in [20.0, 80, 20, 80, 20, 80, 20].enumerated() {
+                after(Double(index) * 0.1) { self.stroke(x: x) }
+            }
+        }
+        after(7) { report("來回摸之後") }
+        after(8) { [self] in settings.desktopPetFollowCursor = false }
+        after(8.6) { report("關掉游標追蹤") }
+        after(9) { [self] in settings.desktopPetFollowCursor = originalFollow }
+        after(9.6) { report("還原游標追蹤") }
+        var savedOrigin: NSPoint?
+        after(10) { [self] in
+            guard let pet, let screen = pet.screen ?? NSScreen.main else { return }
+            savedOrigin = pet.frame.origin
+            pet.setFrameOrigin(NSPoint(x: pet.frame.minX, y: screen.frame.maxY - pet.frame.height / 2))
+            keepOnScreen()
+            report("放到選單列高度（螢幕頂端 \(Int(screen.frame.maxY))）")
+        }
+        after(11) { [self] in
+            if let savedOrigin { pet?.setFrameOrigin(savedOrigin) }
+            saveOrigin()
+            report("放回原位")
+            print("selftest-pet: 模擬滑鼠移動 30 秒")
+            fflush(stdout)
+            let start = CACurrentMediaTime()
+            Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { timer in
+                MainActor.assumeIsolatedCompat {
+                    let t = CACurrentMediaTime() - start
+                    guard t < 30 else {
+                        timer.invalidate()
+                        print("selftest-pet: 結束")
+                        fflush(stdout)
+                        return
+                    }
+                    CursorWatcher.shared.simulateMove(to: NSPoint(x: 400 + 300 * cos(t), y: 400 + 200 * sin(t * 1.3)))
+                }
+            }
+        }
     }
 
     // MARK: 對話框
@@ -196,7 +336,7 @@ final class DesktopPetController {
         let visible = screen.visibleFrame
         let size = DesktopPetBubbleView.size
         // 貓咪的身體在視窗中間偏下，頭上方要往下疊一點才看起來貼著
-        let above = NSPoint(x: pet.frame.midX - size.width / 2, y: pet.frame.maxY - 30)
+        let above = NSPoint(x: pet.frame.midX - size.width / 2, y: pet.frame.maxY - 30 * settings.desktopPetScale)
         let below = above.y + size.height > visible.maxY
         if host.rootView.tailUp != below {
             host.rootView = DesktopPetBubbleView(text: host.rootView.text, thought: host.rootView.thought, tailUp: below)
@@ -251,26 +391,28 @@ final class DesktopPetController {
     /// 預設在主螢幕右下角
     private func defaultOrigin() -> NSPoint {
         let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero
-        return NSPoint(x: visible.maxX - Self.size.width - 24, y: visible.minY + 24)
+        return NSPoint(x: visible.maxX - size.width - 24, y: visible.minY + 24)
     }
 
-    /// 顯示時、換螢幕或拔掉外接螢幕後，把整隻寵物收進它所在的螢幕；不在任何螢幕上就放回預設位置
+    /// 寵物可以放在螢幕上任何地方，也可以有一部分超出螢幕；只確保至少留一角（約 48 點）在螢幕上找得到。
+    /// 顯示時、放開拖曳、換螢幕或拔掉外接螢幕後檢查；不在任何螢幕上就放回預設位置
     private func keepOnScreen() {
         guard let pet else { return }
-        guard let screen = NSScreen.screens.first(where: { $0.visibleFrame.intersects(pet.frame) }) else {
+        let keep = min(48, pet.frame.width / 2)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(pet.frame) }) else {
             pet.setFrameOrigin(defaultOrigin())
             return
         }
-        let visible = screen.visibleFrame
+        let frame = screen.frame
         var origin = pet.frame.origin
-        origin.x = min(max(origin.x, visible.minX), visible.maxX - pet.frame.width)
-        origin.y = min(max(origin.y, visible.minY), visible.maxY - pet.frame.height)
+        origin.x = min(max(origin.x, frame.minX - pet.frame.width + keep), frame.maxX - keep)
+        origin.y = min(max(origin.y, frame.minY - pet.frame.height + keep), frame.maxY - keep)
         if origin != pet.frame.origin { pet.setFrameOrigin(origin) }
     }
 
     private static func makePanel(size: CGSize, ignoresMouse: Bool) -> NSPanel {
-        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size),
-                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let panel = PetPanel(contentRect: NSRect(origin: .zero, size: size),
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.isFloatingPanel = true
         panel.level = .floating
@@ -281,32 +423,40 @@ final class DesktopPetController {
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = ignoresMouse
-        panel.isMovable = !ignoresMouse
+        // 拖曳由寵物自己處理（見 PetContainerView），不讓系統移動或並排這個視窗
+        panel.isMovable = false
         panel.becomesKeyOnlyIfNeeded = true
         return panel
     }
 }
 
-/// 桌面寵物的圖案：和主面板同一個充電夥伴，一直會動，只有省電模式時是靜態圖
+/// 桌面寵物的圖案：和主面板同一個充電夥伴，一直會動，只有省電模式時是靜態圖；依設定的大小縮放。
+/// 貓咪大頭照的眼睛會跟著游標，等智慧充電時閉眼睡覺（滑鼠移過去就醒來）
 struct DesktopPetFigureView: View {
     @ObservedObject var store: BatteryStore
     @ObservedObject var settings: AppSettings
+    @ObservedObject var state: DesktopPetState
 
     var body: some View {
+        let scale = settings.desktopPetScale
         Group {
             if let s = store.snapshot, let e = store.estimates {
                 let presentation = store.companionPresentation(s, e)
                 // 換照片時重畫
                 let _ = settings.companionPhotoVersion
                 if settings.chargingAppearance == .companion {
-                    DesktopPetCompanion(presentation: presentation, animated: !settings.powerSavingActive)
+                    DesktopPetCompanion(presentation: presentation, animated: !settings.powerSavingActive, scale: scale)
                 } else {
                     CompanionFigure(presentation: presentation, appearance: settings.chargingAppearance,
-                                    animated: !settings.powerSavingActive, width: 140)
+                                    animated: !settings.powerSavingActive, width: 140 * scale,
+                                    liveEyes: (settings.desktopPetLiveEyes || settings.desktopPetFollowCursor) && !settings.powerSavingActive,
+                                    mood: !settings.desktopPetLiveEyes ? .awake
+                                        : presentation.badge == .sleeping && !state.hovering ? .sleeping : .awake,
+                                    followsCursor: settings.desktopPetFollowCursor)
                 }
             }
         }
-        .frame(width: 176, height: 176)
+        .frame(width: DesktopPetController.baseSize * scale, height: DesktopPetController.baseSize * scale)
     }
 }
 
@@ -315,23 +465,23 @@ struct DesktopPetFigureView: View {
 struct DesktopPetCompanion: View {
     let presentation: ChargingJourneyPresentation
     let animated: Bool
+    /// 大小（1 是 160 點寬）
+    var scale: CGFloat = 1
 
     var body: some View {
-        VStack(spacing: -2) {
+        VStack(spacing: -2 * scale) {
             if presentation.onPad { chargingSign }
             ZStack(alignment: .bottom) {
                 if presentation.onPad { pad }
-                cat.padding(.bottom, presentation.onPad ? 12 : 0)
+                cat.padding(.bottom, presentation.onPad ? 12 * scale : 0)
             }
         }
-        .frame(width: 160, height: 160, alignment: .bottom)
+        .frame(width: 160 * scale, height: 160 * scale, alignment: .bottom)
         .overlay(alignment: .topTrailing) {
             if let badge = presentation.badge {
-                Image(systemName: badge.symbol)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white, presentation.color)
-                    .background(Circle().fill(Color(nsColor: .windowBackgroundColor)).padding(2))
-                    .padding(.top, 22)
+                CompanionBadgeIcon(badge: badge, tint: presentation.color, size: 26 * scale)
+                    .background(Circle().fill(Color(nsColor: .windowBackgroundColor)).padding(2 * scale))
+                    .padding(.top, 22 * scale)
             }
         }
         .accessibilityHidden(true)
@@ -345,7 +495,7 @@ struct DesktopPetCompanion: View {
                 Image(nsImage: image).resizable().interpolation(.high)
             }
         }
-        .frame(width: 160, height: 106)
+        .frame(width: 160 * scale, height: 106 * scale)
     }
 
     /// 發光的充電墊
@@ -353,25 +503,25 @@ struct DesktopPetCompanion: View {
         ZStack {
             Ellipse()
                 .fill(LinearGradient(colors: [Color(white: 0.97), Color(white: 0.82)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 138, height: 28)
+                .frame(width: 138 * scale, height: 28 * scale)
             Ellipse()
-                .stroke(Color.green, lineWidth: 3)
-                .frame(width: 112, height: 17)
-                .shadow(color: .green.opacity(0.9), radius: 4)
+                .stroke(Color.green, lineWidth: 3 * scale)
+                .frame(width: 112 * scale, height: 17 * scale)
+                .shadow(color: .green.opacity(0.9), radius: 4 * scale)
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 2 * scale)
     }
 
     /// 充電標示：上方訊號波紋，下面接綠色圓圈裡的閃電（和主面板的貓咪相同）
     private var chargingSign: some View {
-        VStack(spacing: -9) {
+        VStack(spacing: -9 * scale) {
             Image(systemName: "wifi")
-                .font(.system(size: 26, weight: .semibold))
+                .font(.system(size: 26 * scale, weight: .semibold))
                 .foregroundStyle(Color.green.opacity(0.55))
             Image(systemName: "bolt.fill")
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 12 * scale, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
+                .frame(width: 24 * scale, height: 24 * scale)
                 .background(Circle().fill(Color.green))
         }
     }
@@ -565,15 +715,28 @@ private struct BubbleTail: Shape {
     }
 }
 
+/// 寵物與對話框的視窗：位置完全照使用者放的，不被系統推回選單列下方
+private final class PetPanel: NSPanel {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+}
+
 /// 寵物視窗的內容：SwiftUI 只負責畫，滑鼠都由這裡處理（移過去、點一下、連點兩下、拖曳、右鍵）
 private final class PetContainerView: NSView {
     var onHover: ((Bool) -> Void)?
     var onClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
     var menuProvider: (() -> NSMenu?)?
+    /// 觸控板捏合的放大比例（正數放大、負數縮小）
+    var onMagnify: ((CGFloat) -> Void)?
+    /// 滑鼠在寵物上移動（視窗座標的 x），用來判斷是不是在摸牠
+    var onStroke: ((CGFloat) -> Void)?
 
     private var mouseDownEvent: NSEvent?
     private var dragged = false
+    /// 拖曳開始時的游標（螢幕座標）與視窗位置
+    private var dragStart: (mouse: NSPoint, origin: NSPoint)?
+    /// 放開拖曳時（把位置記下來）
+    var onDragEnd: (() -> Void)?
     private var pendingClick: DispatchWorkItem?
     private var tracking: NSTrackingArea?
 
@@ -582,6 +745,43 @@ private final class PetContainerView: NSView {
         hosting.frame = bounds
         hosting.autoresizingMask = [.width, .height]
         addSubview(hosting)
+        wantsLayer = true
+    }
+
+    /// 被摸的時候從頭上冒出幾顆愛心，往上飄、慢慢變透明
+    func burstHearts(scale: CGFloat) {
+        guard let root = layer else { return }
+        let config = NSImage.SymbolConfiguration(pointSize: 18 * scale, weight: .bold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.systemPink]))
+        guard let heart = NSImage(systemSymbolName: "heart.fill", accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return }
+        let backing = window?.backingScaleFactor ?? 2
+        for index in 0..<3 {
+            let item = CALayer()
+            item.contents = heart.cgImage(forProposedRect: nil, context: nil, hints: [.ctm: AffineTransform(scale: backing)])
+            item.contentsScale = backing
+            item.bounds = CGRect(origin: .zero, size: heart.size)
+            let start = CGPoint(x: bounds.midX + CGFloat(index - 1) * 16 * scale, y: bounds.maxY * 0.62)
+            item.position = start
+            item.opacity = 0
+            root.addSublayer(item)
+            let rise = CABasicAnimation(keyPath: "position")
+            rise.fromValue = start
+            rise.toValue = CGPoint(x: start.x + .random(in: -10...10) * scale, y: start.y + 46 * scale)
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 1, 1, 0]
+            fade.keyTimes = [0, 0.15, 0.6, 1]
+            let grow = CABasicAnimation(keyPath: "transform.scale")
+            grow.fromValue = 0.6
+            grow.toValue = 1.1
+            let group = CAAnimationGroup()
+            group.animations = [rise, fade, grow]
+            group.duration = 1.3
+            group.beginTime = CACurrentMediaTime() + Double(index) * 0.15
+            group.fillMode = .backwards
+            group.isRemovedOnCompletion = true
+            item.add(group, forKey: "heart")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3 + Double(index) * 0.15) { item.removeFromSuperlayer() }
+        }
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
@@ -594,7 +794,7 @@ private final class PetContainerView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
                                   owner: self, userInfo: nil)
         addTrackingArea(area)
         tracking = area
@@ -602,25 +802,37 @@ private final class PetContainerView: NSView {
 
     override func mouseEntered(with event: NSEvent) { onHover?(true) }
     override func mouseExited(with event: NSEvent) { onHover?(false) }
+    override func mouseMoved(with event: NSEvent) { onStroke?(event.locationInWindow.x) }
 
     override func mouseDown(with event: NSEvent) {
         mouseDownEvent = event
         dragged = false
+        dragStart = window.map { (NSEvent.mouseLocation, $0.frame.origin) }
     }
 
+    /// 自己跟著游標移動視窗，不交給系統拖曳：系統拖曳時 macOS 會把拖到螢幕頂端的視窗當成要並排，
+    /// 自動放大到螢幕中間。這樣寵物可以停在任何地方，連選單列旁邊、Dock 上方都可以
     override func mouseDragged(with event: NSEvent) {
-        guard !dragged, let down = mouseDownEvent, let window else { return }
-        let dx = event.locationInWindow.x - down.locationInWindow.x
-        let dy = event.locationInWindow.y - down.locationInWindow.y
-        guard dx * dx + dy * dy > 9 else { return }
-        dragged = true
-        pendingClick?.cancel()
-        window.performDrag(with: down)
+        guard let start = dragStart, let window else { return }
+        let mouse = NSEvent.mouseLocation
+        let dx = mouse.x - start.mouse.x, dy = mouse.y - start.mouse.y
+        if !dragged {
+            guard dx * dx + dy * dy > 9 else { return }
+            dragged = true
+            pendingClick?.cancel()
+        }
+        window.setFrameOrigin(NSPoint(x: start.origin.x + dx, y: start.origin.y + dy))
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { mouseDownEvent = nil }
-        guard !dragged else { return }
+        defer {
+            mouseDownEvent = nil
+            dragStart = nil
+        }
+        if dragged {
+            onDragEnd?()
+            return
+        }
         if event.clickCount >= 2 {
             pendingClick?.cancel()
             onDoubleClick?()
@@ -630,6 +842,10 @@ private final class PetContainerView: NSView {
         let click = DispatchWorkItem { [weak self] in self?.onClick?() }
         pendingClick = click
         DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: click)
+    }
+
+    override func magnify(with event: NSEvent) {
+        onMagnify?(event.magnification)
     }
 
     override func rightMouseDown(with event: NSEvent) {
@@ -655,11 +871,16 @@ private final class ClosureMenuItem: NSMenuItem {
 }
 
 extension BatteryStore {
-    /// 主面板與桌面寵物共用的充電夥伴狀態：支援調整充電上限時跟著智慧充電，不支援時只看是否在充電
+    /// 主面板與桌面寵物共用的充電夥伴狀態：支援調整充電上限時跟著智慧充電，不支援時只看電源狀態
     func companionPresentation(_ s: BatterySnapshot, _ e: Estimates) -> ChargingJourneyPresentation {
         chargeLimit.supported
-            ? ChargingJourneyPresentation.make(percent: s.percent, charging: e.state == .charging,
+            ? ChargingJourneyPresentation.make(percent: s.percent, charging: e.state == .charging, pluggedIn: pluggedIn(e),
                                                decision: chargingPlan.decision, now: s.date)
-            : ChargingJourneyPresentation.unsupported(percent: s.percent, charging: e.state == .charging)
+            : ChargingJourneyPresentation.unsupported(percent: s.percent, charging: e.state == .charging, pluggedIn: pluggedIn(e))
+    }
+
+    /// 接著電源但沒在充：到達充電上限、充滿，或系統暫停充電
+    private func pluggedIn(_ e: Estimates) -> Bool {
+        e.state == .limitReached || e.state == .full || e.state == .pluggedIdle
     }
 }

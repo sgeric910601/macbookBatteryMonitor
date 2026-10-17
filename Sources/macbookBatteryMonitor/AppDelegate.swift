@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 面板開著時監聽面板外的點擊。系統的 .transient 有時不會收起面板，這是第二道保險
     private var outsideClickMonitors: [Any] = []
     private var refreshTimer: Timer?
+    /// 等使用者允許「輔助使用」：允許了就開始分開設定捲動方向
+    private var scrollTrustTimer: Timer?
     /// 更新頻率慢於每秒時，下一次更新前 1 秒先讀變壓器輸入（見 BatteryReader.recordAdapterInput）
     private var adapterPreReadTimer: Timer?
     private var processTimer: Timer?
@@ -103,9 +105,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.startChargingPlan()
         settings.onChargingWakeChange = { [weak self] in self?.store.syncChargingWake() }
         settings.onDesktopPetChange = { [weak self] in self?.desktopPet.sync() }
+        settings.onScrollDirectionChange = { [weak self] in self?.applyScrollDirection(prompt: true) }
+        applyScrollDirection(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
+        if CommandLine.arguments.contains("--selftest-pet") { desktopPet.runSelfTest() }
         // 自動檢查發現新版本時發通知（可在設定 → 更新關閉），點通知打開設定視窗的「更新」
         store.updater.onNewRelease = { [weak self] release in
             guard let self, self.settings.updateNotification else { return }
@@ -216,6 +221,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + end + 3) {
             state("結束")
             fflush(stdout)
+        }
+    }
+
+    /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
+    /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
+    private func applyScrollDirection(prompt: Bool) {
+        let wanted = settings.scrollReverseMouse || settings.scrollReverseTrackpad
+        let running = ScrollDirection.shared.apply(reverseMouse: settings.scrollReverseMouse, reverseTrackpad: settings.scrollReverseTrackpad)
+        ui.scrollTrusted = ScrollDirection.trusted
+        scrollTrustTimer?.invalidate()
+        scrollTrustTimer = nil
+        guard wanted, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        scrollTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyScrollDirection(prompt: false)
         }
     }
 

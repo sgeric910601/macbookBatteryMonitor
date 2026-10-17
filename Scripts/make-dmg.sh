@@ -10,7 +10,7 @@ out="$2"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 volume="電池與系統監控"
 [[ -d "$app" ]] || { echo "找不到 $app" >&2; exit 1; }
-[[ ! -d "/Volumes/$volume" ]] || { echo "已經有同名的磁碟 /Volumes/$volume，請先退出" >&2; exit 1; }
+[[ ! -d "/Volumes/$volume" ]] || { echo "已經有同名的磁碟 /Volumes/${volume}，請先退出" >&2; exit 1; }
 
 work="$(mktemp -d)"
 mounted=""     # 目前掛著的位置，結束或出錯時要卸載
@@ -123,4 +123,4 @@ attach_ro "$out" "$check"
 codesign --verify --deep --strict "$check/macbookBatteryMonitor.app"
 detach
 mounted=""
-echo "✅ 已產生 $out（$(du -h "$out" | cut -f1)）"
+echo "✅ 已產生 ${out}（$(du -h "$out" | cut -f1)）"

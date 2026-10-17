@@ -13,12 +13,55 @@ volume="電池與系統監控"
 [[ ! -d "/Volumes/$volume" ]] || { echo "已經有同名的磁碟 /Volumes/$volume，請先退出" >&2; exit 1; }
 
 work="$(mktemp -d)"
-mounted=""
+mounted=""     # 目前掛著的位置，結束或出錯時要卸載
+mounted_by=""  # 掛載用的工具（diskutil 或 hdiutil），卸載時用同一套
 cleanup() {
-    [[ -n "$mounted" ]] && hdiutil detach "$mounted" -force >/dev/null 2>&1 || true
+    [[ -n "$mounted" ]] && detach force >/dev/null 2>&1 || true
     rm -rf "$work"
 }
 trap cleanup EXIT
+
+# 掛載、卸載先用 diskutil image attach／diskutil eject（macOS 27 起 hdiutil 的這些用法標為不建議使用，以後可能拿掉）；
+# 舊系統（可能包括 GitHub Actions 的 macos-15）沒有這個指令，diskutil 回報不認得、結束碼非 0，改用原本的 hdiutil
+
+# 從 diskutil 的 plist 輸出取出第一個 <key>$1</key> 的字串
+plist_string() { sed -n "/<key>$1<\/key>/{n;s:.*<string>\(.*\)</string>.*:\1:p;q;}"; }
+
+# 可寫入掛載在 /Volumes/磁碟名稱，Finder 才排得到圖示
+attach_rw() {
+    local plist dev
+    if plist="$(diskutil image attach --plist "$1" 2>/dev/null)"; then
+        mounted="$(plist_string mount-point <<<"$plist")"
+        mounted_by=diskutil
+        [[ "$mounted" != "/Volumes/$volume" ]] || return 0
+        # 掛上了但讀不到位置或位置不對：退出整個映像檔，交給 hdiutil 再試一次
+        dev="$(plist_string dev-entry <<<"$plist")"
+        [[ -z "$dev" ]] || diskutil eject force "/dev/$dev" >/dev/null 2>&1 || true
+    fi
+    mounted_by=hdiutil
+    mounted="$(hdiutil attach "$1" -readwrite -noverify -noautoopen | grep -o '/Volumes/.*$' | head -n 1)"
+}
+
+# 唯讀掛載在指定的資料夾，不出現在 Finder 與桌面
+attach_ro() {
+    if diskutil image attach --readOnly --nobrowse --mountPoint "$2" "$1" >/dev/null 2>&1; then
+        mounted_by=diskutil
+    else
+        mkdir -p "$2"
+        hdiutil attach "$1" -readonly -nobrowse -noautoopen -mountpoint "$2" >/dev/null
+        mounted_by=hdiutil
+    fi
+    mounted="$2"
+}
+
+# 卸載目前掛著的映像檔；參數是 force 時強制卸載
+detach() {
+    local force="${1:-}"
+    case "$mounted_by" in
+        diskutil) diskutil eject $force "$mounted" >/dev/null ;;
+        hdiutil) hdiutil detach "$mounted" -quiet ${force:+-force} ;;
+    esac
+}
 
 stage="$work/stage"
 mkdir -p "$stage/.background"
@@ -29,7 +72,7 @@ cp "$root/Resources/DMG/background.tiff" "$stage/.background/background.tiff"
 # 先做可寫入的映像檔，掛載後讓 Finder 排好圖示，再壓縮成唯讀的 DMG
 size_mb=$(( $(du -sm "$stage" | cut -f1) + 20 ))
 hdiutil create -quiet -volname "$volume" -srcfolder "$stage" -fs HFS+ -format UDRW -size "${size_mb}m" "$work/rw.dmg"
-mounted="$(hdiutil attach "$work/rw.dmg" -readwrite -noverify -noautoopen | grep -o '/Volumes/.*$' | head -n 1)"
+attach_rw "$work/rw.dmg"
 [[ "$mounted" == "/Volumes/$volume" ]] || { echo "掛載位置不對：$mounted" >&2; exit 1; }
 
 if osascript - "$volume" <<'APPLESCRIPT'
@@ -68,7 +111,7 @@ fi
 rm -rf "$mounted/.fseventsd"
 chmod -Rf go-w "$mounted" 2>/dev/null || true
 sync
-hdiutil detach "$mounted" -quiet || hdiutil detach "$mounted" -force -quiet
+detach || detach force
 mounted=""
 rm -f "$out"
 hdiutil convert "$work/rw.dmg" -quiet -format UDZO -imagekey zlib-level=9 -o "$out"
@@ -76,9 +119,8 @@ hdiutil convert "$work/rw.dmg" -quiet -format UDZO -imagekey zlib-level=9 -o "$o
 # 檢查：唯讀掛載後 App 還在、簽章完整
 check="$work/check"
 mkdir -p "$check"
-hdiutil attach "$out" -readonly -nobrowse -noautoopen -mountpoint "$check" >/dev/null
-mounted="$check"
+attach_ro "$out" "$check"
 codesign --verify --deep --strict "$check/macbookBatteryMonitor.app"
-hdiutil detach "$check" -quiet
+detach
 mounted=""
 echo "✅ 已產生 $out（$(du -h "$out" | cut -f1)）"

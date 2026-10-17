@@ -287,7 +287,7 @@ macOS 的「自然捲動」是滑鼠和觸控板共用一個設定：觸控板�
 
 設定 → 更新可以檢查 GitHub 上的新版本，有新版時按「一鍵更新」：
 
-1. 下載 DMG（v1.7.2 起；舊系統版本下載 `macbookBatteryMonitor-macOS12.dmg`，系統已是 macOS 14 以上時改下載通用版），唯讀掛載在暫存資料夾取出 App，不會出現在 Finder 或桌面；沒有 DMG 的舊 Release 改用 zip。只從 `github.com` 與 `githubusercontent.com` 下載
+1. 下載 DMG（v1.7.2 起；舊系統版本下載 `macbookBatteryMonitor-macOS12.dmg`，系統已是 macOS 14 以上時改下載通用版），唯讀掛載在暫存資料夾取出 App，不會出現在 Finder 或桌面：用系統內建的 `diskutil image attach` 掛載、`diskutil eject` 卸載，沒有這個指令的舊系統改用 `hdiutil`（macOS 27 起 hdiutil 的這種掛載方式標為不建議使用）；沒有 DMG 的舊 Release 改用 zip。只從 `github.com` 與 `githubusercontent.com` 下載
 2. 驗證：比對 Release 附的 `SHA256SUMS.txt`，並確認 App 的識別碼、版本號、Beta 序號與簽章
 3. App 結束後換上新版並重新開啟；換不過去會放回原本的版本。設定、電量歷史、智慧充電排程與自訂的 App 圖示顏色都會保留；下載或驗證失敗、或更新中途被中斷時，暫存檔會清掉
 

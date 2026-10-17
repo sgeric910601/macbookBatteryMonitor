@@ -290,7 +290,7 @@ The icon is a Ragdoll cat lying on its back on a wireless charging pad (a cut-ou
 
 Settings → Update checks GitHub for new versions; press "一鍵更新" (one-click update) when one is available:
 
-1. Downloads the DMG (v1.7.2+; the macOS 12 build downloads `macbookBatteryMonitor-macOS12.dmg`, or the universal one once the system is on macOS 14 or later) and mounts it read-only in a temporary folder to copy the app out, without showing it in Finder or on the desktop; older releases without a DMG use the zip. Only from `github.com` and `githubusercontent.com`
+1. Downloads the DMG (v1.7.2+; the macOS 12 build downloads `macbookBatteryMonitor-macOS12.dmg`, or the universal one once the system is on macOS 14 or later) and mounts it read-only in a temporary folder to copy the app out, without showing it in Finder or on the desktop. It mounts with the built-in `diskutil image attach` and unmounts with `diskutil eject`, falling back to `hdiutil` on older systems without that command (macOS 27 deprecates this use of hdiutil); older releases without a DMG use the zip. Only from `github.com` and `githubusercontent.com`
 2. Verifies it against the release's `SHA256SUMS.txt` and checks the app's identifier, version, beta number and signature
 3. Replaces the app after it quits and relaunches it; if the swap fails the original is put back. Settings, history, smart charging plans and your icon color are kept; temporary files are removed if the download or verification fails or the update is interrupted
 

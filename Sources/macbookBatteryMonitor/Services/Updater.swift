@@ -202,15 +202,28 @@ final class Updater: ObservableObject {
         let mount = dmg.deletingLastPathComponent().appendingPathComponent("mount-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: mount) }
-        guard run("/usr/bin/hdiutil", ["attach", dmg.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path]) == 0 else {
-            throw UpdateError(message: "打不開下載的 DMG")
-        }
-        defer { _ = run("/usr/bin/hdiutil", ["detach", mount.path, "-force"]) }
+        guard let detach = attach(dmg, at: mount) else { throw UpdateError(message: "打不開下載的 DMG") }
+        defer { _ = run(detach.tool, detach.arguments) }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let source = mount.appendingPathComponent("macbookBatteryMonitor.app")
         guard run("/usr/bin/ditto", [source.path, folder.appendingPathComponent("macbookBatteryMonitor.app").path]) == 0 else {
             throw UpdateError(message: "DMG 裡找不到 App")
         }
+    }
+
+    /// 把 DMG 唯讀掛載在 mount（不出現在 Finder 與桌面），回傳卸載用的指令；兩種方式都掛不上時回傳 nil。
+    /// 先用 `diskutil image attach`（macOS 27 起 hdiutil 的這種掛載方式標為不建議使用，以後可能拿掉）；
+    /// 舊系統沒有這個指令（diskutil 回報不認得、結束碼非 0），改用原本的 hdiutil
+    nonisolated private static func attach(_ dmg: URL, at mount: URL) -> (tool: String, arguments: [String])? {
+        if run("/usr/sbin/diskutil", ["image", "attach", "--readOnly", "--nobrowse", "--mountPoint", mount.path, dmg.path]) == 0 {
+            return ("/usr/sbin/diskutil", ["eject", "force", mount.path])
+        }
+        // 保險起見確認掛載點還在，再交給 hdiutil
+        try? FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
+        if run("/usr/bin/hdiutil", ["attach", dmg.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path]) == 0 {
+            return ("/usr/bin/hdiutil", ["detach", mount.path, "-force"])
+        }
+        return nil
     }
 
     /// 寫一個小腳本：等這個 App 結束後換上新版（換不過去就放回原本的版本）並重新開啟

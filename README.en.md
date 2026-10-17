@@ -266,8 +266,15 @@ macOS's "natural scrolling" is one setting for both mouse and trackpad: if you l
 - **"滑鼠滾輪反向"** (reverse mouse wheel): reverses regular mouse wheels and Magic Mouse, for example to keep natural scrolling on the trackpad and the traditional direction on the mouse
 - **"觸控板反向"** (reverse trackpad): reverses only the trackpad
 - **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad (including the momentum after lifting your fingers); everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Vertical and horizontal scrolling are reversed together
-- **Permission**: intercepting and rewriting scroll events requires Accessibility permission. Turning a switch on asks you to enable the app in System Settings → Privacy & Security → Accessibility; it starts working within seconds, no relaunch needed. The app has no Apple developer signature, so macOS treats every new version as a new app: **after each update, remove the old entry under Accessibility and add it again**. The settings page warns you when the permission is missing and has a button to open it
+- **Permission**: intercepting and rewriting scroll events requires Accessibility permission. Turning a switch on asks you to enable the app in System Settings → Privacy & Security → Accessibility; it starts working within seconds, no relaunch needed. The app has no Apple developer signature, so macOS treats every new version as a new app: **after each update, remove the old entry under Accessibility and add it again** (see the steps below). The settings page warns you when the permission is missing and has a button to open it
 - **Power**: nothing is intercepted while both switches are off; when on, events are only handled at the moment you scroll
+
+**If reversed scrolling suddenly stops working** (usually after an update or reinstall), allow Accessibility again:
+
+1. Open the app's Settings → Mouse & trackpad; it shows an orange note starting with "需要允許「輔助使用」" (Accessibility needed). Click "打開輔助使用設定" (open Accessibility settings), or go to System Settings → Privacy & Security → Accessibility yourself
+2. Select "電池與系統監控" in the list and click "−" below it to remove it. Remove it even if its switch still looks on: that approval belongs to the old version and does nothing for the new one
+3. Click "+", choose `macbookBatteryMonitor` in Applications, click Open and make sure its switch is on
+4. Back in the app's settings the status turns to "運作中" (working) within seconds and scrolling is reversed again, no relaunch needed
 
 ## App icon
 

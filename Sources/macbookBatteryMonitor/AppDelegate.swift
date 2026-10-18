@@ -106,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onChargingWakeChange = { [weak self] in self?.store.syncChargingWake() }
         settings.onDesktopPetChange = { [weak self] in self?.desktopPet.sync() }
         settings.onScrollDirectionChange = { [weak self] in self?.applyScrollDirection(prompt: true) }
+        ScrollDirection.shared.onChange = { [weak self] in
+            self?.ui.scrollTrusted = ScrollDirection.trusted
+            self?.ui.scrollRunning = ScrollDirection.shared.isRunning
+        }
         applyScrollDirection(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
@@ -229,7 +233,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func applyScrollDirection(prompt: Bool) {
         let wanted = settings.scrollReverseMouse || settings.scrollReverseTrackpad
         let running = ScrollDirection.shared.apply(reverseMouse: settings.scrollReverseMouse, reverseTrackpad: settings.scrollReverseTrackpad)
-        ui.scrollTrusted = ScrollDirection.trusted
         scrollTrustTimer?.invalidate()
         scrollTrustTimer = nil
         guard wanted, !running else { return }

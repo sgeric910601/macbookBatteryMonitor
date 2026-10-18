@@ -164,6 +164,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         Notifier.shared.checkBlocked { [weak self] in self?.ui.notificationsBlocked = $0 }
         ui.loginStatus = LoginItem.status
         ui.scrollTrusted = ScrollDirection.trusted
+        ui.scrollRunning = ScrollDirection.shared.isRunning
     }
 
     func windowWillClose(_ notification: Notification) {

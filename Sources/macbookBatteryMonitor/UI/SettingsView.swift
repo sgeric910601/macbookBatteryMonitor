@@ -290,10 +290,15 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if settings.scrollReverseMouse || settings.scrollReverseTrackpad {
-                        if ui.scrollTrusted {
+                        if ui.scrollRunning {
                             Label("運作中", systemImage: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundStyle(.green)
+                        } else if ui.scrollTrusted {
+                            // 有權限、還沒開始：每 5 秒會再試一次
+                            Label("啟動中…", systemImage: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         } else {
                             Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。App 沒有開發者簽章，每次更新後要先移除舊的項目再加一次。")
                                 .font(.caption)

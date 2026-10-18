@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import OSLog
 
 /// 分開設定滑鼠與觸控板的捲動方向。macOS 的「自然捲動」是兩者共用一個設定，這裡攔截捲動事件，
 /// 把選了「反向」的那一種的方向反過來（例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向）。
@@ -17,6 +18,11 @@ final class ScrollDirection {
     private var lastTrackpadTouches: TimeInterval = 0
     /// 一段捲動（含放開手指後的慣性）從頭到尾算同一種裝置
     private var currentIsTrackpad = false
+    /// 開發用：`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，每個捲動事件的判斷與改寫前後的值
+    /// 會寫進系統記錄（`log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'`）
+    private var debug = false
+    private var lastLoggedTouches = -1
+    private static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "scroll")
 
     /// 有沒有「輔助使用」權限
     static var trusted: Bool { AXIsProcessTrusted() }
@@ -28,6 +34,7 @@ final class ScrollDirection {
     func apply(reverseMouse: Bool, reverseTrackpad: Bool) -> Bool {
         self.reverseMouse = reverseMouse
         self.reverseTrackpad = reverseTrackpad
+        debug = UserDefaults.standard.bool(forKey: "scrollDebug")
         guard reverseMouse || reverseTrackpad else {
             stop()
             return true
@@ -75,14 +82,18 @@ final class ScrollDirection {
 
     /// 系統覺得回呼太慢或使用者操作時會暫停攔截，再打開
     fileprivate func reenable() {
+        if debug { Self.log.notice("事件攔截被系統暫停，重新打開") }
         if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
     }
 
     fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> CGEvent {
         let now = CACurrentMediaTime()
         if type.rawValue == 29 {
-            if let touches = NSEvent(cgEvent: event)?.touches(matching: .touching, in: nil), touches.count >= 2 {
-                lastTrackpadTouches = now
+            let count = NSEvent(cgEvent: event)?.touches(matching: .touching, in: nil).count ?? 0
+            if count >= 2 { lastTrackpadTouches = now }
+            if debug, count != lastLoggedTouches {
+                lastLoggedTouches = count
+                Self.log.notice("手指事件：\(count) 指")
             }
             return event
         }
@@ -92,6 +103,7 @@ final class ScrollDirection {
             let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
             currentIsTrackpad = continuous && now - lastTrackpadTouches < 0.3
         }
+        if debug { logScroll(event, label: "收到") }
         guard currentIsTrackpad ? reverseTrackpad : reverseMouse else { return event }
         let axes: [(CGEventField, CGEventField, CGEventField)] = [
             (.scrollWheelEventDeltaAxis1, .scrollWheelEventPointDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis1),
@@ -104,7 +116,21 @@ final class ScrollDirection {
             event.setIntegerValueField(points, value: -original.1)
             event.setDoubleValueField(fixed, value: -original.2)
         }
+        if debug { logScroll(event, label: "改成") }
         return event
+    }
+
+    private func logScroll(_ event: CGEvent, label: String) {
+        let lines = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
+        let points = event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
+        let fixed = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+        let ns = NSEvent(cgEvent: event)
+        Self.log.notice("""
+            \(label, privacy: .public) \(self.currentIsTrackpad ? "觸控板" : "滑鼠", privacy: .public) \
+            連續=\(event.getIntegerValueField(.scrollWheelEventIsContinuous)) \
+            階段=\(event.getIntegerValueField(.scrollWheelEventScrollPhase)) 慣性=\(event.getIntegerValueField(.scrollWheelEventMomentumPhase)) \
+            行=\(lines) 點=\(points) 精細=\(fixed) NSEvent=\(ns.map { "\($0.scrollingDeltaY)" } ?? "-", privacy: .public)
+            """)
     }
 }
 

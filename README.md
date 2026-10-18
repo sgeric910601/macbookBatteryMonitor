@@ -493,6 +493,7 @@ $APP --screenshots <資料夾> # 用示範數據畫出 README 的介紹圖（doc
 - Info.plist 帶 `MBMPrerelease`（例如 `beta.1`）時，發布的 tag 是 `v<版本>-beta.1`，自動標成預先發行版本，不會變成「最新版本」
 - `build.sh` 會把管理員服務程式（`CPUPowerHelper`）放進 App 的 `Contents/Library/Helpers/`，充電夥伴的動畫、靜態圖與貓咪大頭照（`Resources/Companion/`）放進 `Contents/Resources/`；服務只有使用者開啟管理員 CPU 取樣或精準喚醒時才會安裝到系統
 - 只裝 Command Line Tools 時沒有 SwiftUI 的 macro 外掛，所以程式裡不用 `@State`，介面狀態（包括設定視窗選的分類）集中在 `PanelState`
+- 捲動方向的記錄（開發用，預設關閉）：`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，每個捲動事件被認成觸控板或滑鼠、改寫前後的值都會寫進系統記錄，用 `/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'` 查看（zsh 裡 `log` 是內建指令，要寫完整路徑）；查完用 `defaults delete com.kuan.batterymonitor scrollDebug` 關掉
 
 DMG 的背景圖：
 

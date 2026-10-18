@@ -496,6 +496,7 @@ $APP --screenshots <folder> # render the README images with demo data (docs/scre
 - When Info.plist has `MBMPrerelease` (such as `beta.1`), the release tag is `v<version>-beta.1` and the release is marked as a pre-release, never as the latest release
 - `build.sh` puts the admin service (`CPUPowerHelper`) into `Contents/Library/Helpers/` and the charging companion's animations, still images and the cat headshot (`Resources/Companion/`) into `Contents/Resources/`; the service is only installed into the system when the user turns on admin CPU sampling or precise wake
 - Command Line Tools don't include SwiftUI's macro plugins, so the code doesn't use `@State`; UI state (including the selected Settings section) lives in `PanelState`
+- Scroll direction logging (for development, off by default): after `defaults write com.kuan.batterymonitor scrollDebug -bool true` and relaunching the app, every scroll event's trackpad/mouse classification and its values before and after rewriting go to the system log; watch them with `/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'` (in zsh `log` is a builtin, so use the full path). Turn it off with `defaults delete com.kuan.batterymonitor scrollDebug`
 
 The DMG and its background:
 

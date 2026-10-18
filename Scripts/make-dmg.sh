@@ -69,6 +69,31 @@ ditto "$app" "$stage/macbookBatteryMonitor.app"
 ln -s /Applications "$stage/應用程式"
 cp "$root/Resources/DMG/background.tiff" "$stage/.background/background.tiff"
 
+# 掛載後的磁碟圖示用 App 圖示（根目錄隱藏的 .VolumeIcon.icns）。只在安裝時看得到，所以只留桌面（預設 64 點，
+# Retina 128 像素）與側邊欄、標題列（16 點）用得到的 16～128 像素，約 32 KB（完整的圖示要 1.2 MB）
+icon="$app/Contents/Resources/AppIcon.icns"
+if [[ -f "$icon" ]]; then
+    iconutil -c iconset "$icon" -o "$work/full.iconset"
+    mkdir -p "$work/volume.iconset"
+    for size in 16x16 16x16@2x 32x32 32x32@2x 128x128; do
+        cp "$work/full.iconset/icon_$size.png" "$work/volume.iconset/"
+    done
+    iconutil -c icns "$work/volume.iconset" -o "$work/VolumeIcon.icns"
+fi
+
+# Finder 排好視窗之後才放進圖示（排版時 Finder 會把 .VolumeIcon.icns 刪掉、清掉標記），並在磁碟根目錄的
+# Finder 資訊標記「有自訂圖示」，Finder 才會用它。有 SetFile（Xcode 或 Command Line Tools）時只改這個標記；
+# 沒有時直接寫入 Finder 資訊（排版後根目錄的 Finder 資訊是空的）
+set_volume_icon() {
+    [[ -f "$work/VolumeIcon.icns" ]] || return 0
+    cp "$work/VolumeIcon.icns" "$mounted/.VolumeIcon.icns"
+    if command -v SetFile >/dev/null 2>&1; then
+        SetFile -a C "$mounted"
+    else
+        xattr -wx com.apple.FinderInfo 0000000000000000040000000000000000000000000000000000000000000000 "$mounted"
+    fi
+}
+
 # 先做可寫入的映像檔，掛載後讓 Finder 排好圖示，再壓縮成唯讀的 DMG
 size_mb=$(( $(du -sm "$stage" | cut -f1) + 20 ))
 hdiutil create -quiet -volname "$volume" -srcfolder "$stage" -fs HFS+ -format UDRW -size "${size_mb}m" "$work/rw.dmg"
@@ -107,6 +132,7 @@ then
 else
     echo "⚠️ Finder 無法排列圖示，改用預設排列" >&2
 fi
+set_volume_icon
 
 rm -rf "$mounted/.fseventsd"
 chmod -Rf go-w "$mounted" 2>/dev/null || true

@@ -250,7 +250,7 @@ v1.7.1 起支援 Intel Mac（通用版需要 macOS 14 以上，大約是 2018 �
 - **點一下**：出現對話框說一句話，每點一次換一句：心情（快沒電、充電中、吃飽了、等待智慧充電時在睡覺）、今天用掉與補回的電量、電池健康度與循環次數、整台 Mac 現在的耗電；4 秒後收起來
 - **連點兩下**打開面板；**拖曳**可以移動，位置會記住；**右鍵**可以打開面板、換外觀、換照片、換大小、切換位置、打開充電夥伴的設定或隱藏
 - **自由移動**（v1.7.3 起）：可以放在螢幕上任何地方，選單列旁邊、Dock 上方都可以，也可以一部分超出螢幕（至少留一角在螢幕上，找得回來）。拖曳由 App 自己處理，拖到螢幕頂端時 macOS 不會把它當成視窗並排、放大到中間
-- **大小**（v1.7.3 起）：50%～200%，在設定 → 充電夥伴的滑桿、右鍵的「大小」（小、標準、大、特大），或把滑鼠移到寵物上用觸控板兩指捏合調整；改大小時腳底的位置不動
+- **大小**（v1.7.3 起）：50%～200%，在設定 → 充電夥伴的滑桿或右鍵的「大小」（小、標準、大、特大）調整；改大小時腳底的位置不動。v1.7.3 說明裡的觸控板捏合縮放實際上收不到手勢（寵物視窗刻意不搶焦點，macOS 不把捏合送給它），v1.7.4 起拿掉
 - **會動的眼睛**（v1.7.3 起，貓咪大頭照）：貓咪的眼睛會跟著滑鼠游標轉，偶爾眨眼；等智慧充電時閉眼睡覺，滑鼠移過去就醒來。眼睛用的是照片裡貓咪自己的虹膜，只有眼睛那一小塊用 Core Animation 移動，不會讓整個畫面重畫；每秒最多更新 20 次，眼珠幾乎沒動時不更新，滑鼠不動時完全不用 CPU（M1 實測滑鼠一直移動時約多 0.4% CPU）。外觀選貓咪大頭照時，設定 → 充電夥伴有「眼睛跟著游標」（關掉就完全不監聽滑鼠移動）與「會眨眼、睡覺」兩個開關。「我的照片」的眼睛不會動
 - **摸摸**（v1.7.3 起）：滑鼠在寵物身上左右來回移動幾下就是在摸牠：頭上冒出愛心，說「呼嚕呼嚕～」「好舒服喔」等，眼睛照樣張開看著你
 - **位置**：「浮在視窗上方」或「放在桌布上」（和桌面圖示同一層，會被視窗蓋住）；每個桌面都看得到，全螢幕的 App 裡不出現
@@ -262,7 +262,8 @@ macOS 的「自然捲動」是滑鼠和觸控板共用一個設定：觸控板�
 
 - **滑鼠滾輪反向**：一般滑鼠滾輪與 Magic Mouse 反過來，例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向
 - **觸控板反向**：只反轉觸控板
-- **怎麼分辨**：兩指以上在觸控板上捲動算觸控板（放開手指後的慣性也算），其他（一般滾輪、Magic Mouse 的單指捲動）算滑鼠。垂直與水平捲動一起反向
+- **怎麼分辨**：兩指以上在觸控板上捲動算觸控板（放開手指後的慣性也算），其他（一般滾輪、Magic Mouse 的單指捲動）算滑鼠。垂直與水平捲動一起反向。觸控板的慣性還在滑時轉一下滑鼠滾輪，滾輪照滑鼠的設定、之後的慣性仍照觸控板的設定（v1.7.4 起；以前滾輪會把正在滑的慣性改判成滑鼠）
+- **網頁不會往回彈**（v1.7.4 起）：觸控板的事件除了公開的捲動量，還帶著網頁拿來算慣性的原始捲動量，其中有些是系統從觸控資料算出來的、改不了，只改公開的欄位時網頁會一直往回彈。所以反向的觸控板與 Magic Mouse 捲動改用新造的事件取代，裡面所有捲動量都是反向的值；一般滑鼠滾輪照舊直接改
 - **權限**：攔截並改寫捲動事件需要「輔助使用」權限。打開開關時 macOS 會請你到「系統設定 → 隱私權與安全性 → 輔助使用」打開「電池與系統監控」，允許後幾秒內就生效，不用重開 App。App 沒有 Apple 開發者簽章，macOS 會把每個新版本當成新的 App：**每次更新後要在「輔助使用」裡先移除舊的項目、再加一次**（見下面的步驟），設定頁沒有權限時會提醒並提供按鈕
 - **耗電**：兩個開關都關掉時完全不攔截；打開時只在捲動的瞬間處理事件
 - **穩定**：攔截在自己的高優先執行緒上跑，App 忙著畫面板或取樣時捲動也不用等，系統就不會因為回應太慢暫停攔截；另外每 5 秒檢查一次，被系統暫停就重新打開、失效就重建，剛重新允許「輔助使用」時也會在 5 秒內自動開始。設定頁的狀態是實際情況：「運作中」表示正在攔截，「啟動中…」表示有權限、馬上會開始
@@ -288,7 +289,7 @@ macOS 的「自然捲動」是滑鼠和觸控板共用一個設定：觸控板�
 
 設定 → 更新可以檢查 GitHub 上的新版本，有新版時按「一鍵更新」：
 
-1. 下載 DMG（v1.7.2 起；舊系統版本下載 `macbookBatteryMonitor-macOS12.dmg`，系統已是 macOS 14 以上時改下載通用版），唯讀掛載在暫存資料夾取出 App，不會出現在 Finder 或桌面：用系統內建的 `diskutil image attach` 掛載、`diskutil eject` 卸載，沒有這個指令的舊系統改用 `hdiutil`（macOS 27 起 hdiutil 的這種掛載方式標為不建議使用）；沒有 DMG 的舊 Release 改用 zip。只從 `github.com` 與 `githubusercontent.com` 下載
+1. 下載 DMG（v1.7.2 起；舊系統版本下載 `macbookBatteryMonitor-macOS12.dmg`，系統已是 macOS 14 以上時改下載通用版），唯讀掛載在暫存資料夾取出 App，不會出現在 Finder 或桌面：用系統內建的 `diskutil image attach` 掛載、`diskutil eject` 卸載；舊系統改用 `hdiutil`（macOS 13 的寫法不同、更舊的系統可能沒有這個指令，都會回報錯誤；macOS 27 起 hdiutil 的這種掛載方式標為不建議使用）；沒有 DMG 的舊 Release 改用 zip。只從 `github.com` 與 `githubusercontent.com` 下載
 2. 驗證：比對 Release 附的 `SHA256SUMS.txt`，並確認 App 的識別碼、版本號、Beta 序號與簽章
 3. App 結束後換上新版並重新開啟；換不過去會放回原本的版本。設定、電量歷史、智慧充電排程與自訂的 App 圖示顏色都會保留；下載或驗證失敗、或更新中途被中斷時，暫存檔會清掉
 
@@ -490,11 +491,11 @@ $APP --screenshots <資料夾> # 用示範數據畫出 README 的介紹圖（doc
 
 - 舊系統版本（macOS 12 起）在 `legacy-macos12` 分支：把 macOS 13／14 才有的寫法（Observation、Swift Charts、Grid、SMAppService 等）換成相容寫法，其他程式與主分支相同。在較新的系統上加 `--macos12-paths` 啟動，可以強制走 macOS 12 的寫法測試。發布時，`legacy-macos12` 分支的版本號（含 Beta 序號）和這次發布相同，GitHub Actions 才會一起打包 `macbookBatteryMonitor-macOS12.dmg`
 - `build.sh` 會一次編出 Apple 晶片與 Intel 兩種架構（通用版），並拿掉執行檔的本地符號（`strip -x`，執行檔從 11 MB 降到約 4.8 MB；全域符號保留，當機報告仍看得到函式名稱）；只裝 Command Line Tools、無法一次編兩種架構時，自動改編這台電腦的架構
-- 發布時 GitHub Actions 會打包兩個 DMG：通用版 `macbookBatteryMonitor.dmg` 與舊系統版本 `macbookBatteryMonitor-macOS12.dmg`，再附 `SHA256SUMS.txt`。DMG 由 `Scripts/make-dmg.sh` 產生，只用系統內建的工具：`hdiutil` 建立與壓縮映像檔，Finder 排好拖曳安裝的視窗（Finder 不能用時照樣產生，只是用預設排列）；掛載與卸載用 `diskutil image attach`／`diskutil eject`，沒有這個指令的舊系統改用 `hdiutil`（macOS 27 起 hdiutil 的這些用法標為不建議使用）。背景圖由 `Scripts/make-dmg-background.swift` 產生。掛載後的磁碟圖示是 App 圖示（只留 16～128 像素，約 32 KB；要等 Finder 排好視窗後才放進去，排版時 Finder 會把它刪掉）。每一版另附舊檔名的 `battery`／`status` zip（給 v1.5.0～v1.6.2 與 v1.7.1 的通用版；內容相同，只有 `MBMEdition` 不同，用來保留原本的系統監控設定）；過渡版 v1.7.2 另附通用版與 macOS 12 版的 zip（給 v1.7.1）
+- 發布時 GitHub Actions 會打包兩個 DMG：通用版 `macbookBatteryMonitor.dmg` 與舊系統版本 `macbookBatteryMonitor-macOS12.dmg`，再附 `SHA256SUMS.txt`。DMG 由 `Scripts/make-dmg.sh` 產生，只用系統內建的工具：`hdiutil` 建立與壓縮映像檔，Finder 排好拖曳安裝的視窗（Finder 不能用時照樣產生，只是用預設排列）；掛載與卸載用 `diskutil image attach`／`diskutil eject`，舊系統（沒有這個指令或寫法不同，會回報錯誤）改用 `hdiutil`（macOS 27 起 hdiutil 的這些用法標為不建議使用）。背景圖由 `Scripts/make-dmg-background.swift` 產生。掛載後的磁碟圖示是 App 圖示（只留 16～128 像素，約 32 KB；要等 Finder 排好視窗後才放進去，排版時 Finder 會把它刪掉）。每一版另附舊檔名的 `battery`／`status` zip（給 v1.5.0～v1.6.2 與 v1.7.1 的通用版；內容相同，只有 `MBMEdition` 不同，用來保留原本的系統監控設定）；過渡版 v1.7.2 另附通用版與 macOS 12 版的 zip（給 v1.7.1）
 - Info.plist 帶 `MBMPrerelease`（例如 `beta.1`）時，發布的 tag 是 `v<版本>-beta.1`，自動標成預先發行版本，不會變成「最新版本」
 - `build.sh` 會把管理員服務程式（`CPUPowerHelper`）放進 App 的 `Contents/Library/Helpers/`，充電夥伴的動畫、靜態圖與貓咪大頭照（`Resources/Companion/`）放進 `Contents/Resources/`；服務只有使用者開啟管理員 CPU 取樣或精準喚醒時才會安裝到系統
 - 只裝 Command Line Tools 時沒有 SwiftUI 的 macro 外掛，所以程式裡不用 `@State`，介面狀態（包括設定視窗選的分類）集中在 `PanelState`
-- 捲動方向的記錄：攔截開始、停止、被系統暫停或重建，以及「輔助使用」權限的變化一律留在系統記錄（很少發生，不影響效能）；`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，還會記下每個捲動事件被認成觸控板或滑鼠、手指數與改寫前後的值（開發用，預設關閉）。兩種記錄都用 `/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'` 查看（zsh 裡 `log` 是內建指令，要寫完整路徑）；詳細記錄查完用 `defaults delete com.kuan.batterymonitor scrollDebug` 關掉
+- 捲動方向的記錄：攔截開始、停止、被系統暫停或重建，以及「輔助使用」權限的變化一律留在系統記錄（很少發生，不影響效能）；`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，還會記下每個捲動事件被認成觸控板或滑鼠、手指數與改寫前後的值（開發用，預設關閉）；`scrollRebuild` 設成 false 可以改回直接改原本的事件，用來比較。沒有公開文件的 175～178 欄位是觸控板事件的原始捲動量（176／178 垂直、175／177 水平，小數欄位）。兩種記錄都用 `/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'` 查看（zsh 裡 `log` 是內建指令，要寫完整路徑）；詳細記錄查完用 `defaults delete com.kuan.batterymonitor scrollDebug` 關掉
 
 DMG 的背景圖：
 

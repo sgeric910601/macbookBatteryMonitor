@@ -11,6 +11,22 @@ struct HistorySample: Codable {
     var charging: Bool
 }
 
+/// 這次開機的時間（kern.boottime）；開機後不會變
+enum BootTime {
+    static let date: Date? = {
+        var value = timeval()
+        var size = MemoryLayout<timeval>.size
+        guard sysctlbyname("kern.boottime", &value, &size, nil, 0) == 0, value.tv_sec > 0 else { return nil }
+        return Date(timeIntervalSince1970: Double(value.tv_sec) + Double(value.tv_usec) / 1_000_000)
+    }()
+
+    /// 拔電時間早於這次開機時（中間關過機），改從開機算起：關機的那段不算用電池，睡眠照算
+    static func clamp(_ unplugged: Date, bootTime: Date? = date) -> Date {
+        guard let bootTime, bootTime > unplugged else { return unplugged }
+        return bootTime
+    }
+}
+
 struct ChartPoint: Identifiable {
     let id: Int
     let t: Date
@@ -95,11 +111,15 @@ final class HistoryStore: ObservableObject {
         unsaved = 0
     }
 
-    /// 最近一次從接電變成用電池的時間。紀錄太舊（App 中間沒在跑）就不採信。
+    /// 最近一次從接電變成用電池的時間。紀錄太舊（App 中間沒在跑）就不採信；中間關過機的話從這次開機算起
     func lastUnplugged() -> Date? {
-        guard let last = samples.last, !last.plugged, Date().timeIntervalSince(last.t) < 600 else { return nil }
+        Self.lastUnplugged(in: samples, now: Date(), bootTime: BootTime.date)
+    }
+
+    nonisolated static func lastUnplugged(in samples: [HistorySample], now: Date, bootTime: Date?) -> Date? {
+        guard let last = samples.last, !last.plugged, now.timeIntervalSince(last.t) < 600 else { return nil }
         guard let pluggedIndex = samples.lastIndex(where: { $0.plugged }) else { return nil }
-        return samples[samples.index(after: pluggedIndex)].t
+        return BootTime.clamp(samples[samples.index(after: pluggedIndex)].t, bootTime: bootTime)
     }
 
     /// 取指定時間範圍的資料並降採樣到 maxPoints 以內

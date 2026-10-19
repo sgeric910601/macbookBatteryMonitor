@@ -22,7 +22,8 @@ cleanup() {
 trap cleanup EXIT
 
 # 掛載、卸載先用 diskutil image attach／diskutil eject（macOS 27 起 hdiutil 的這些用法標為不建議使用，以後可能拿掉）；
-# 舊系統（可能包括 GitHub Actions 的 macos-15）沒有這個指令，diskutil 回報不認得、結束碼非 0，改用原本的 hdiutil
+# 更舊的系統可能沒有這個指令，macOS 13 只認單槓的 -readOnly 寫法（GitHub Actions 的 macos-15 也可能不同）：
+# diskutil 回報錯誤、結束碼非 0 時改用原本的 hdiutil
 
 # 從 diskutil 的 plist 輸出取出第一個 <key>$1</key> 的字串
 plist_string() { sed -n "/<key>$1<\/key>/{n;s:.*<string>\(.*\)</string>.*:\1:p;q;}"; }

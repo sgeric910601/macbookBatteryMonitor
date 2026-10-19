@@ -213,7 +213,8 @@ final class Updater: ObservableObject {
 
     /// 把 DMG 唯讀掛載在 mount（不出現在 Finder 與桌面），回傳卸載用的指令；兩種方式都掛不上時回傳 nil。
     /// 先用 `diskutil image attach`（macOS 27 起 hdiutil 的這種掛載方式標為不建議使用，以後可能拿掉）；
-    /// 舊系統沒有這個指令（diskutil 回報不認得、結束碼非 0），改用原本的 hdiutil
+    /// 更舊的系統可能沒有這個指令；macOS 13 有，但只認單槓的 -readOnly 寫法（實測 13.7.6 對雙槓回報用法錯誤、什麼都不掛）。
+    /// 這些情況結束碼都不是 0，改用原本的 hdiutil（v1.7.2 起一直用它，在舊系統上實測過）
     nonisolated private static func attach(_ dmg: URL, at mount: URL) -> (tool: String, arguments: [String])? {
         if run("/usr/sbin/diskutil", ["image", "attach", "--readOnly", "--nobrowse", "--mountPoint", mount.path, dmg.path]) == 0 {
             return ("/usr/sbin/diskutil", ["eject", "force", mount.path])

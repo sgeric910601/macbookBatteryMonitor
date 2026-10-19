@@ -41,7 +41,7 @@ enum DumpCommand {
             snapshot: s,
             estimates: e,
             systemHealth: SystemProfiler.readSync(),
-            lastUnplugged: e.state == .discharging ? PowerLog.lastUnpluggedDateSync() : nil,
+            lastUnplugged: e.state == .discharging ? PowerLog.lastUnpluggedDateSync().map { BootTime.clamp($0) } : nil,
             topProcesses: ProcessEnergy.sampleSync(),
             loginItem: "\(LoginItem.status)",
             edition: AppEdition.current.rawValue

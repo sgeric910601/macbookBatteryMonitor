@@ -30,7 +30,8 @@ final class ScrollDirection {
         // 開發用：`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，
         // 每個捲動事件的判斷與改寫前後的值會寫進系統記錄
         tap.configure(.init(reverseMouse: reverseMouse, reverseTrackpad: reverseTrackpad,
-                            debug: UserDefaults.standard.bool(forKey: "scrollDebug")))
+                            debug: UserDefaults.standard.bool(forKey: "scrollDebug"),
+                            rebuild: UserDefaults.standard.object(forKey: "scrollRebuild") as? Bool ?? true))
         wanted = reverseMouse || reverseTrackpad
         guard wanted else {
             watchdog?.invalidate()
@@ -102,6 +103,8 @@ final class ScrollTap: @unchecked Sendable {
         var reverseMouse = false
         var reverseTrackpad = false
         var debug = false
+        /// 連續捲動（觸控板、Magic Mouse）改用新造的事件取代原本的；開發時可以用 scrollRebuild 關掉，比較兩種做法
+        var rebuild = true
     }
 
     enum Health { case ok, disabled, invalid, stopped }
@@ -114,7 +117,9 @@ final class ScrollTap: @unchecked Sendable {
     private var runLoop: CFRunLoop?
     /// 最近一次觸控板上有兩指以上的時間（主執行緒寫入）；捲動在這之後 0.3 秒內就算觸控板
     private var lastTrackpadTouches: TimeInterval = 0
-    /// 一段捲動（含放開手指後的慣性）從頭到尾算同一種裝置
+    /// 連續捲動的這段手勢（含放開手指後的慣性）是不是觸控板；一般滾輪的事件不會改到它
+    private var gestureIsTrackpad = false
+    /// 這個事件判斷成哪一種（記錄用）
     private var currentIsTrackpad = false
     /// 只在主執行緒使用
     private var lastLoggedTouches = -1
@@ -214,39 +219,90 @@ final class ScrollTap: @unchecked Sendable {
             return event
         }
         guard type == .scrollWheel else { return event }
-        // 新的一段捲動才重新判斷裝置；放開手指後的慣性沿用
-        if event.getIntegerValueField(.scrollWheelEventMomentumPhase) == 0 {
-            let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
-            let touches = locked { lastTrackpadTouches }
-            currentIsTrackpad = continuous && now - touches < 0.3
-        }
+        currentIsTrackpad = classify(event, now: now)
         if config.debug { logScroll(event, label: "收到") }
         guard currentIsTrackpad ? config.reverseTrackpad : config.reverseMouse else { return event }
-        let axes: [(CGEventField, CGEventField, CGEventField)] = [
-            (.scrollWheelEventDeltaAxis1, .scrollWheelEventPointDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis1),
-            (.scrollWheelEventDeltaAxis2, .scrollWheelEventPointDeltaAxis2, .scrollWheelEventFixedPtDeltaAxis2),
-        ]
-        for (lines, points, fixed) in axes {
-            // 先讀出原本的值再寫：改行數時系統會順便重算像素與精細值
-            let original = (event.getIntegerValueField(lines), event.getIntegerValueField(points), event.getDoubleValueField(fixed))
-            event.setIntegerValueField(lines, value: -original.0)
-            event.setIntegerValueField(points, value: -original.1)
-            event.setDoubleValueField(fixed, value: -original.2)
+        if config.rebuild, event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0, let replaced = Self.rebuilt(from: event) {
+            if config.debug { logScroll(replaced, label: "改成") }
+            return replaced
         }
+        Self.reverse(event)
         if config.debug { logScroll(event, label: "改成") }
         return event
+    }
+
+    /// 判斷這個捲動事件來自觸控板還是滑鼠。
+    /// - 一般滾輪（不連續）一定是滑鼠，而且不會改到觸控板那邊的判斷：觸控板的慣性還在跑時轉一下滾輪，
+    ///   之後的慣性事件仍算觸控板（以前會被改判成滑鼠，跟著滑鼠的設定反向，畫面突然往反方向滑）
+    /// - 放開手指後的慣性沿用同一段手勢的判斷
+    /// - 手勢開始時（或沒有階段的連續捲動）看最近 0.3 秒內觸控板上有沒有兩指；同一段手勢中途只會從滑鼠改成觸控板、
+    ///   不會反過來，主執行緒慢一點、一時沒數到手指也不會中途改判
+    private func classify(_ event: CGEvent, now: TimeInterval) -> Bool {
+        guard event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 else { return false }
+        if event.getIntegerValueField(.scrollWheelEventMomentumPhase) != 0 { return gestureIsTrackpad }
+        let recentTouches = now - locked { lastTrackpadTouches } < 0.3
+        switch event.getIntegerValueField(.scrollWheelEventScrollPhase) {
+        case 2, 4, 8:   // 手指移動中、放開、取消：同一段手勢
+            gestureIsTrackpad = gestureIsTrackpad || recentTouches
+        default:        // 剛放上手指（1、128）或沒有階段：新的一段
+            gestureIsTrackpad = recentTouches
+        }
+        return gestureIsTrackpad
+    }
+
+    /// 捲動量的欄位：公開的行數、像素、精細值，加上沒有公開文件、但也帶著同一份捲動量的 175～178
+    /// （實測 macOS 13 與 27 的觸控板事件都有：176／178 是垂直、175／177 是水平，小數欄位）。網頁等 App 用它們算放開手指後的慣性，
+    /// 只改公開的欄位時，拖動的方向反了、慣性卻照原方向，網頁就會一直往回彈
+    private static let integerDeltaFields: [CGEventField] = [
+        .scrollWheelEventDeltaAxis1, .scrollWheelEventDeltaAxis2,
+        .scrollWheelEventPointDeltaAxis1, .scrollWheelEventPointDeltaAxis2,
+    ]
+    private static let fixedDeltaFields: [CGEventField] = [.scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis2]
+    private static let rawDeltaFields: [CGEventField] = [175, 176, 177, 178].map { CGEventField(rawValue: $0)! }
+    /// 新造的事件要從原本的事件抄過來的其他欄位：連續與否、手指階段、慣性階段、捲動次數，以及慣性相關的 137、173（沒有公開文件）
+    private static let copiedFields: [CGEventField] = [
+        .scrollWheelEventIsContinuous, .scrollWheelEventScrollPhase, .scrollWheelEventMomentumPhase,
+        .scrollWheelEventScrollCount, .scrollWheelEventInstantMouser,
+        CGEventField(rawValue: 137)!, CGEventField(rawValue: 173)!,
+    ]
+
+    /// 在原本的事件上反向（一般滾輪用）。177、178 是系統從原始觸控資料算出來的，改不了，寫入時還會把 175、176 重設回原值，
+    /// 所以這裡只改其他欄位
+    static func reverse(_ event: CGEvent) {
+        let fields = fixedDeltaFields + rawDeltaFields.prefix(2)
+        let integers = integerDeltaFields.map { event.getIntegerValueField($0) }
+        let doubles = fields.map { event.getDoubleValueField($0) }
+        for (field, value) in zip(integerDeltaFields, integers) { event.setIntegerValueField(field, value: -value) }
+        for (field, value) in zip(fields, doubles) { event.setDoubleValueField(field, value: -value) }
+    }
+
+    /// 連續捲動改用新造的事件取代：原本的事件附帶系統的原始觸控資料，177、178 由它算出來、改不掉，網頁拿來算慣性就會往回彈。
+    /// 新事件沒有那份資料，所有捲動量（包括 175～178）都是這裡設定的反向值，其他欄位照抄
+    static func rebuilt(from event: CGEvent) -> CGEvent? {
+        guard let new = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0) else { return nil }
+        new.location = event.location
+        new.flags = event.flags
+        new.timestamp = event.timestamp
+        for field in copiedFields { new.setDoubleValueField(field, value: event.getDoubleValueField(field)) }
+        for field in copiedFields.prefix(5) { new.setIntegerValueField(field, value: event.getIntegerValueField(field)) }
+        let integers = integerDeltaFields.map { event.getIntegerValueField($0) }
+        let doubles = (fixedDeltaFields + rawDeltaFields).map { event.getDoubleValueField($0) }
+        for (field, value) in zip(integerDeltaFields, integers) { new.setIntegerValueField(field, value: -value) }
+        for (field, value) in zip(fixedDeltaFields + rawDeltaFields, doubles) { new.setDoubleValueField(field, value: -value) }
+        return new
     }
 
     private func logScroll(_ event: CGEvent, label: String) {
         let lines = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
         let points = event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
         let fixed = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+        let raw = event.getDoubleValueField(CGEventField(rawValue: 178)!)
         let ns = NSEvent(cgEvent: event)
         Self.log.notice("""
             \(label, privacy: .public) \(self.currentIsTrackpad ? "觸控板" : "滑鼠", privacy: .public) \
             連續=\(event.getIntegerValueField(.scrollWheelEventIsContinuous)) \
             階段=\(event.getIntegerValueField(.scrollWheelEventScrollPhase)) 慣性=\(event.getIntegerValueField(.scrollWheelEventMomentumPhase)) \
-            行=\(lines) 點=\(points) 精細=\(fixed) NSEvent=\(ns.map { "\($0.scrollingDeltaY)" } ?? "-", privacy: .public)
+            行=\(lines) 點=\(points) 精細=\(fixed) 原始=\(raw) NSEvent=\(ns.map { "\($0.scrollingDeltaY)" } ?? "-", privacy: .public)
             """)
     }
 }
@@ -260,9 +316,23 @@ extension ScrollDirection {
             guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 10, wheel2: 4, wheel3: 0) else { return "無法建立事件" }
             event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
             event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+            // 觸控板事件另外帶著的捲動量（沒有公開文件的 175～178，小數欄位）也要跟著反向。連續捲動換成新造的事件，四個都會反向；
+            // 一般滾輪在原本的事件上改，177、178 改不了，只看 175、176
+            let raw = [175, 176, 177, 178].map { CGEventField(rawValue: $0)! }
+            for (field, value) in zip(raw, [0.5, 2, 3, 20]) { event.setDoubleValueField(field, value: value) }
+            // 手指剛放上去（新的一段手勢）；慣性事件沒有手指階段
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: momentum == 0 && continuous ? 1 : 0)
             let out = tap.handle(.scrollWheel, event)
-            let v = out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1), h = out.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)
-            return v < 0 && h < 0 ? "反向" : v > 0 && h > 0 ? "不變" : "異常（\(v), \(h)）"
+            let checked = continuous ? raw : Array(raw.prefix(2))
+            let values = [Double(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)), Double(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis2))]
+                + checked.map { out.getDoubleValueField($0) }
+            // 換成新事件時，連續、手指階段、慣性階段要照抄
+            if out !== event, out.getIntegerValueField(.scrollWheelEventIsContinuous) != 1
+                || out.getIntegerValueField(.scrollWheelEventMomentumPhase) != momentum
+                || out.getIntegerValueField(.scrollWheelEventScrollPhase) != event.getIntegerValueField(.scrollWheelEventScrollPhase) {
+                return "異常（新事件的階段沒抄對）"
+            }
+            return values.allSatisfy { $0 < 0 } ? "反向" : values.allSatisfy { $0 > 0 } ? "不變" : "異常（\(values)）"
         }
         for (mouse, trackpad) in [(true, false), (false, true), (true, true)] {
             tap.configure(.init(reverseMouse: mouse, reverseTrackpad: trackpad))
@@ -272,6 +342,12 @@ extension ScrollDirection {
             print("  觸控板放開後的慣性：\(scroll(continuous: true, momentum: 1, touchesJustNow: false))")
             tap.resetTouchesForTest()
             print("  Magic Mouse（連續、沒有兩指）：\(scroll(continuous: true, touchesJustNow: false))")
+            // 觸控板的慣性還在跑時轉一下滾輪：滾輪照滑鼠的設定，之後的慣性仍照觸控板的設定
+            _ = scroll(continuous: true, touchesJustNow: true)
+            tap.resetTouchesForTest()
+            let wheel = scroll(continuous: false, touchesJustNow: false)
+            let momentum = scroll(continuous: true, momentum: 2, touchesJustNow: false)
+            print("  觸控板慣性中間轉一下滾輪：滾輪\(wheel)、之後的慣性\(momentum)")
         }
         // 攔截執行緒：開始、檢查、停止都正常（需要「輔助使用」權限，沒有時只印出狀態）
         if ScrollDirection.trusted {
@@ -294,5 +370,7 @@ private func scrollTapCallback(proxy: CGEventTapProxy, type: CGEventType, event:
         tap.reenable(reason: type == .tapDisabledByTimeout ? "回應逾時" : "使用者輸入")
         return Unmanaged.passUnretained(event)
     }
-    return Unmanaged.passUnretained(tap.handle(type, event))
+    let out = tap.handle(type, event)
+    // 換成新造的事件時，交給系統的是我們建立的物件，要多保留一次（系統用完會釋放）
+    return out === event ? Unmanaged.passUnretained(event) : Unmanaged.passRetained(out)
 }

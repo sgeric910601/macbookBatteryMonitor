@@ -242,7 +242,7 @@ struct SettingsView: View {
                                     .frame(width: 44, alignment: .trailing)
                             }
                         }
-                        Text("滑鼠移過去看狀態、點一下聊天、來回移動是摸牠；可以拖曳、用觸控板捏合縮放，右鍵可以換大小或隱藏。")
+                        Text("滑鼠移過去看狀態、點一下聊天、來回移動是摸牠；可以拖曳，右鍵可以換大小或隱藏。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

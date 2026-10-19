@@ -12,7 +12,8 @@ final class DesktopPetState: ObservableObject {
 }
 
 /// 桌面寵物：把充電夥伴放在桌面上。滑鼠移過去出現想像框（目前的狀態），點一下出現對話框（每點一次換一句），
-/// 拖曳可以移動（記住位置），觸控板捏合或設定裡的滑桿可以調整大小，連點兩下打開面板，右鍵可以換外觀、大小或隱藏。
+/// 拖曳可以移動（記住位置），設定裡的滑桿或右鍵選單可以調整大小，連點兩下打開面板，右鍵可以換外觀、大小或隱藏。
+/// 沒有觸控板捏合縮放：寵物視窗刻意不搶焦點，macOS 不會把捏合手勢送給它（在 M1 與 Air 2015 實測都收不到）
 /// 用滑鼠在牠身上來回移動是在摸牠：會冒愛心、說呼嚕呼嚕。
 /// 只有 MacBook 有（桌上型 Mac 沒有電池）。
 /// 對話框是另一個不接收滑鼠的視窗，跟著寵物移動，不會擋到下面的東西
@@ -100,11 +101,6 @@ final class DesktopPetController {
         container.onClick = { [weak self] in self?.speak() }
         container.onDoubleClick = { [weak self] in self?.openPanel?() }
         container.menuProvider = { [weak self] in self?.menu() }
-        // 觸控板兩指捏合：放大或縮小
-        container.onMagnify = { [weak self] magnification in
-            guard let self else { return }
-            settings.desktopPetScale = AppSettings.clampPetScale(settings.desktopPetScale * (1 + magnification))
-        }
         panel.contentView = container
         panel.setFrameOrigin(savedOrigin() ?? defaultOrigin())
         panel.orderFrontRegardless()
@@ -726,8 +722,6 @@ private final class PetContainerView: NSView {
     var onClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
     var menuProvider: (() -> NSMenu?)?
-    /// 觸控板捏合的放大比例（正數放大、負數縮小）
-    var onMagnify: ((CGFloat) -> Void)?
     /// 滑鼠在寵物上移動（視窗座標的 x），用來判斷是不是在摸牠
     var onStroke: ((CGFloat) -> Void)?
 
@@ -842,10 +836,6 @@ private final class PetContainerView: NSView {
         let click = DispatchWorkItem { [weak self] in self?.onClick?() }
         pendingClick = click
         DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: click)
-    }
-
-    override func magnify(with event: NSEvent) {
-        onMagnify?(event.magnification)
     }
 
     override func rightMouseDown(with event: NSEvent) {

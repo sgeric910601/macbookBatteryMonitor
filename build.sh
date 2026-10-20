@@ -30,13 +30,22 @@ if ! swift build -c release $ARCH_FLAGS; then
 fi
 BIN="$(swift build -c release $ARCH_FLAGS --show-bin-path)/$APP_NAME"
 
+# 簽章：鑰匙圈裡有被信任的「macbookBatteryMonitor Signing」憑證（Scripts/make-signing-cert.sh 建立，發布時從 GitHub Secrets 匯入）
+# 就用它簽，每個版本的簽章身分相同，macOS 的「輔助使用」與藍牙權限在重裝、更新後都會保留；沒有就用 ad-hoc 簽章
+SIGN_IDENTITY="${MBM_SIGN_IDENTITY:-macbookBatteryMonitor Signing}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "\"${SIGN_IDENTITY}\""; then
+    SIGN="$SIGN_IDENTITY"
+else
+    SIGN="-"
+fi
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Library/Helpers"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
 # 拿掉除錯用的本地符號，執行檔小一半以上；全域符號保留，當機報告仍看得到函式名稱
 strip -x "$APP/Contents/MacOS/$APP_NAME"
 cp "$(dirname "$BIN")/CPUPowerHelper" "$APP/Contents/Library/Helpers/CPUPowerHelper"
-codesign --force --sign - --timestamp=none "$APP/Contents/Library/Helpers/CPUPowerHelper"
+codesign --force --sign "$SIGN" --timestamp=none "$APP/Contents/Library/Helpers/CPUPowerHelper"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace MBMEdition -string "$EDITION" "$APP/Contents/Info.plist"
 # App 名稱（Finder、啟動台、Spotlight、通知、登入項目顯示的名稱）。
@@ -55,8 +64,8 @@ fi
 cp Resources/AppIcons/icon-*.png "$APP/Contents/Resources/" 2>/dev/null || true
 # 智慧充電的充電夥伴：透明背景的 HEVC 動畫、不播放時的靜態圖與照片外觀的貓咪照片
 cp Resources/Companion/*.mov Resources/Companion/*.png Resources/Companion/*.heic "$APP/Contents/Resources/"
-codesign --force --sign - --timestamp=none "$APP"
-echo "✅ 已產生 ${APP}（MBMEdition=${EDITION}，$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")）"
+codesign --force --sign "$SIGN" --timestamp=none "$APP"
+echo "✅ 已產生 ${APP}（MBMEdition=${EDITION}，$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")，簽章：$([[ $SIGN == - ]] && echo ad-hoc || echo "$SIGN")）"
 
 if [[ $INSTALL == 1 ]]; then
     pkill -x "$APP_NAME" || true

@@ -75,6 +75,8 @@ From v1.7.2 Settings is its own window with sections on the left: General, Displ
 
 Macs without a battery (Mac mini, iMac, Mac Studio, Mac Pro) show a computer icon with system power in the menu bar. The panel shows system power with a 3-minute average, a power breakdown (chip, CPU/GPU/ANE, other), power history, the most energy-hungry apps and peripherals. The Settings window has no Charging or Charging companion sections and no battery notifications.
 
+How a desktop is recognized: by the product name (for example "Mac mini (M1, 2020)"), whether a battery is installed, and whether the system's power source list has an internal battery. Apple silicon desktops also have an empty battery entry in the system, so v1.7.3 and earlier treated the M1 Mac mini as a laptop and showed 0% (fixed in v1.7.4).
+
 ![Desktop Mac: system power in the menu bar and the power breakdown panel](docs/screenshots/desktop.png)
 
 ### Intel Macs
@@ -89,7 +91,7 @@ From v1.7.1, Intel Macs are supported (the universal build needs macOS 14 or lat
 
 ### Peripherals
 
-The Peripherals tab lists connected Bluetooth keyboards, mice, trackpads and headphones. AirPods and similar show "左" (left), "右" (right) and "盒" (case) side by side on one row (v1.7.1+). Non-Apple Bluetooth Low Energy mice and keyboards from Logitech, Razer and others show up too (v1.6.2+, requires Bluetooth permission, asked on first launch; the app has no Apple developer signature, so macOS treats each new version as a new app and may ask again after an update). The bell next to each device sets its own low battery alert: off, or below 10%, 15%, 20%, 30% or 50% (20% by default); Settings → Peripherals sets them for all connected devices at once (v1.7.2+).
+The Peripherals tab lists connected Bluetooth keyboards, mice, trackpads and headphones. AirPods and similar show "左" (left), "右" (right) and "盒" (case) side by side on one row (v1.7.1+). Non-Apple Bluetooth Low Energy mice and keyboards from Logitech, Razer and others show up too (v1.6.2+, requires Bluetooth permission, asked on first launch; from v1.7.4 updates no longer ask again, see "Permissions are kept"). The bell next to each device sets its own low battery alert: off, or below 10%, 15%, 20%, 30% or 50% (20% by default); Settings → Peripherals sets them for all connected devices at once (v1.7.2+).
 
 ![Peripherals: AirPods, keyboard and mouse battery levels with alert settings](docs/screenshots/peripherals.png)
 
@@ -151,6 +153,8 @@ Older versions remain on Releases but have the bugs below, all fixed in the late
      ```bash
      xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app
      ```
+**Permissions are kept** (v1.7.4+): every release is signed with the same dedicated certificate, so macOS treats new versions as the same app and keeps the Accessibility and Bluetooth permissions after one-click updates and reinstalls. The certificate is self-made, not an Apple developer signature, so the first launch still has to be allowed as above. Updating from v1.7.3 or earlier switches signatures, so the permissions have to be allowed one last time (Accessibility: see "If reversed scrolling suddenly stops working" below).
+
 4. The first launch (v1.7.1+) asks whether you want battery only or battery plus system monitors (power only / power plus system monitors on desktops), whether to turn on admin CPU sampling (Apple silicon), and for notification and Bluetooth permissions (Bluetooth is only used to read the battery of Logitech, Razer and similar mice and keyboards). It also adds itself to login items (can be turned off in Settings; on macOS 13 the system drops the login item when a new version replaces the app, so the app adds it again)
 
 Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click update) installs the new version without downloading it yourself (the v1.7.1 macOS 12 build goes through v1.7.2 first). The bottom left of the Settings window shows the app name and version.
@@ -198,7 +202,7 @@ Already on v1.5.0 or later: Settings → Update → "一鍵更新" (one-click up
 
 ## Usage
 
-- **Left click** the menu bar icon: open the panel
+- **Left click** the menu bar icon: open the panel. This also works while another app is in full screen (green button): the panel appears over the full-screen app (v1.7.4+; before, clicking did nothing)
 - **Right click**: open the panel, Settings, Quit
 - **Power flow** (v1.2+): click "系統" (System) for component details, then the chip for CPU/GPU/ANE
 - **System monitor modules** (when on): left click opens the module's panel, right click opens Settings (Monitoring & power saving) or quits; hold ⌘ and drag to reorder icons
@@ -267,11 +271,11 @@ macOS's "natural scrolling" is one setting for both mouse and trackpad: if you l
 - **"觸控板反向"** (reverse trackpad): reverses only the trackpad
 - **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad (including the momentum after lifting your fingers); everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Vertical and horizontal scrolling are reversed together. Turning the mouse wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum (v1.7.4+; before, the wheel event re-labeled the gliding momentum as mouse)
 - **No bouncing back in web pages** (v1.7.4+): besides the documented scroll deltas, trackpad events carry raw deltas that web pages use for momentum, some of them computed by the system from the touch data and impossible to change; rewriting only the documented fields made pages keep bouncing back. Reversed trackpad and Magic Mouse scrolls are therefore replaced with newly created events whose deltas are all reversed; regular mouse wheels are still rewritten in place
-- **Permission**: intercepting and rewriting scroll events requires Accessibility permission. Turning a switch on asks you to enable the app in System Settings → Privacy & Security → Accessibility; it starts working within seconds, no relaunch needed. The app has no Apple developer signature, so macOS treats every new version as a new app: **after each update, remove the old entry under Accessibility and add it again** (see the steps below). The settings page warns you when the permission is missing and has a button to open it
+- **Permission**: intercepting and rewriting scroll events requires Accessibility permission. Turning a switch on asks you to enable the app in System Settings → Privacy & Security → Accessibility; it starts working within seconds, no relaunch needed. From v1.7.4 the permission is kept across updates and reinstalls (see "Permissions are kept"); when updating from v1.7.3 or earlier, allow it once more with the steps below. The settings page warns you when the permission is missing and has a button to open it
 - **Power**: nothing is intercepted while both switches are off; when on, events are only handled at the moment you scroll
 - **Reliability**: the interception runs on its own high-priority thread, so scrolling never waits for the app while it draws a panel or samples data and macOS doesn't pause it for responding too slowly; a check every 5 seconds also re-enables it if macOS paused it, rebuilds it if it became invalid, and starts it within 5 seconds after you allow Accessibility again. The settings status is the real state: "運作中" (working) means scroll events are being intercepted, "啟動中…" (starting) means permission is there and it starts shortly
 
-**If reversed scrolling suddenly stops working** (usually after an update or reinstall), allow Accessibility again:
+**If reversed scrolling suddenly stops working** (for example after updating from v1.7.3 or earlier), allow Accessibility again:
 
 1. Open the app's Settings → Mouse & trackpad; it shows an orange note starting with "需要允許「輔助使用」" (Accessibility needed). Click "打開輔助使用設定" (open Accessibility settings), or go to System Settings → Privacy & Security → Accessibility yourself
 2. Select "電池與系統監控" in the list and click "−" below it to remove it. Remove it even if its switch still looks on: that approval belongs to the old version and does nothing for the new one
@@ -494,6 +498,7 @@ $APP --screenshots <folder> # render the README images with demo data (docs/scre
 
 - The macOS 12 build lives on the `legacy-macos12` branch: macOS 13/14-only APIs (Observation, Swift Charts, Grid, SMAppService and so on) are replaced with compatible code, everything else matches the main branch. Launching with `--macos12-paths` forces the macOS 12 code paths on newer systems. GitHub Actions only packages `macbookBatteryMonitor-macOS12.dmg` when the `legacy-macos12` branch has the same version (including the beta number) as the release
 - `build.sh` builds Apple silicon and Intel in one go (universal) and strips local symbols from the binary (`strip -x`, from 11 MB down to about 4.8 MB; global symbols stay, so crash reports still show function names); with Command Line Tools that can't build both, it falls back to this Mac's architecture
+- Signing (v1.7.4+): `build.sh` signs with the trusted "macbookBatteryMonitor Signing" certificate when the keychain has it and falls back to ad-hoc signing otherwise (the last line says which). Create the certificate once with `Scripts/make-signing-cert.sh`, which imports it into the login keychain, trusts it for code signing and backs up `signing.p12` with its password in a folder outside the project; releases import it on GitHub Actions with `Scripts/import-signing-cert.sh` from the Secrets `MBM_SIGNING_P12` and `MBM_SIGNING_PASSWORD`. The fixed signing identity (`identifier "com.kuan.batterymonitor" and certificate leaf = H"…"`) is what lets macOS treat every version as the same app and keep its permissions; if the backup is lost, a new certificate means users allow the permissions once more
 - Releases package two DMGs, the universal `macbookBatteryMonitor.dmg` and the older-systems `macbookBatteryMonitor-macOS12.dmg`, plus `SHA256SUMS.txt`. `Scripts/make-dmg.sh` builds them with built-in tools only: `hdiutil` creates and compresses the image and Finder lays out the drag-to-install window (without Finder it still builds the DMG with the default layout); it mounts and unmounts with `diskutil image attach` and `diskutil eject`, falling back to `hdiutil` on older systems that lack the command or use a different syntax and report an error (macOS 27 deprecates these uses of hdiutil). `Scripts/make-dmg-background.swift` draws the background. The mounted disk shows the app icon (only the 16–128 pixel sizes, about 32 KB; it is added after Finder lays out the window, because the layout step deletes it). Every release also attaches the older `battery`/`status` zips (for v1.5.0–v1.6.2 and the v1.7.1 universal build; same content, only `MBMEdition` differs, which keeps the system monitor setting); the bridge release v1.7.2 also attached the universal and macOS 12 zips (for v1.7.1)
 - When Info.plist has `MBMPrerelease` (such as `beta.1`), the release tag is `v<version>-beta.1` and the release is marked as a pre-release, never as the latest release
 - `build.sh` puts the admin service (`CPUPowerHelper`) into `Contents/Library/Helpers/` and the charging companion's animations, still images and the cat headshot (`Resources/Companion/`) into `Contents/Resources/`; the service is only installed into the system when the user turns on admin CPU sampling or precise wake

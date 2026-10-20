@@ -160,7 +160,8 @@ enum BatteryReader {
     }
 
     static func read(includeTemperature: Bool = true, includeLivePower: Bool = true) -> BatterySnapshot? {
-        guard let reg = registryProperties() else { return nil }
+        // 桌上型 Mac 的電池元件是空的，不讀，改走桌上型的系統耗電
+        guard hasBattery, let reg = registryProperties() else { return nil }
         let data = reg["BatteryData"] as? [String: Any] ?? [:]
         let telemetry = reg["PowerTelemetryData"] as? [String: Any] ?? [:]
         let charger = reg["ChargerData"] as? [String: Any] ?? [:]
@@ -232,14 +233,34 @@ enum BatteryReader {
         return s
     }
 
-    /// 只讀 PowerTelemetryData 的 SystemLoad（W）。不碰任何共用快取，可以在背景執行緒呼叫
-    /// 這台 Mac 有沒有內建電池（桌上型 Mac 沒有）
+    /// 這台 Mac 有沒有內建電池（桌上型 Mac 沒有）。Apple 晶片的桌上型 Mac（例如 M1 Mac mini）也有 AppleSmartBattery，
+    /// 只是 BatteryInstalled 是 No、電量與電壓都是 0，所以先看機型名稱，再看電池有沒有裝著，以及系統的電源清單裡有沒有內建電池
     static let hasBattery: Bool = {
+        if isDesktopModel(productName: productName()) { return false }
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         guard service != IO_OBJECT_NULL else { return false }
-        IOObjectRelease(service)
-        return true
+        defer { IOObjectRelease(service) }
+        let installed = IORegistryEntryCreateCFProperty(service, "BatteryInstalled" as CFString, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? Bool
+        guard installed != false, let battery = internalBatteryDescription() else { return false }
+        return battery[kIOPSIsPresentKey] as? Bool != false
     }()
+
+    /// 產品名稱看得出是桌上型 Mac。Apple 晶片 2022 年起的機型代號都是 "MacXX,Y"（例如 M2 Mac mini 是 "Mac14,3"），
+    /// 看不出是不是筆電，所以看產品名稱，例如 "Mac mini (M1, 2020)"。Intel 的桌上型 Mac 沒有 AppleSmartBattery，不用看
+    static func isDesktopModel(productName: String) -> Bool {
+        ["Mac mini", "iMac", "Mac Studio", "Mac Pro"].contains { productName.hasPrefix($0) }
+    }
+
+    /// 裝置樹裡的產品名稱，例如 "MacBook Air (M1, 2020)"；只有 Apple 晶片的 Mac 有，其他回傳空字串
+    private static func productName() -> String {
+        let entry = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/product")
+        guard entry != IO_OBJECT_NULL else { return "" }
+        defer { IOObjectRelease(entry) }
+        guard let data = IORegistryEntryCreateCFProperty(entry, "product-name" as CFString, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? Data else { return "" }
+        return String(decoding: data.prefix { $0 != 0 }, as: UTF8.self)
+    }
 
     /// 桌上型 Mac 的整機耗電（SMC PSTR）
     static func desktopSystemWatts() -> Double? {
@@ -247,6 +268,7 @@ enum BatteryReader {
         return watts
     }
 
+    /// 只讀 PowerTelemetryData 的 SystemLoad（W）。不碰任何共用快取，可以在背景執行緒呼叫
     static func systemLoadWatts() -> Double? {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         guard service != IO_OBJECT_NULL else { return nil }

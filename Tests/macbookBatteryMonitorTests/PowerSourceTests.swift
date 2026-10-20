@@ -152,4 +152,13 @@ final class PowerSourceTests {
         snapshot.reconcilePowerSource(inputMilliwatts: nil)
         XCTAssertTrue(snapshot.externalConnected)
     }
+
+    func testDesktopModelNames() {
+        for name in ["Mac mini (M1, 2020)", "Mac mini (2023)", "iMac (24-inch, M1, 2021)", "Mac Studio (2022)", "Mac Pro (2023)"] {
+            XCTAssertTrue(BatteryReader.isDesktopModel(productName: name))
+        }
+        for name in ["MacBook Air (M1, 2020)", "MacBook Pro (14-inch, 2021)", "MacBook Air (15-inch, M2, 2023)", ""] {
+            XCTAssertTrue(!BatteryReader.isDesktopModel(productName: name))
+        }
+    }
 }

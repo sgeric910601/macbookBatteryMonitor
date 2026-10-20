@@ -26,10 +26,17 @@ jobs:
       - uses: actions/checkout@v5
       - name: 測試
         run: Scripts/test-power.sh
+      # 有設定 Secrets 的簽章憑證就匯入，build.sh 會用它簽（固定的簽章身分，使用者更新後不用重加權限）；沒有就用 ad-hoc
+      - name: 匯入簽章憑證
+        env:
+          MBM_SIGNING_P12: ${{ secrets.MBM_SIGNING_P12 }}
+          MBM_SIGNING_PASSWORD: ${{ secrets.MBM_SIGNING_PASSWORD }}
+        run: Scripts/import-signing-cert.sh
       - name: 編譯通用版並驗證簽章與架構
         run: |
           ./build.sh
           codesign --verify --deep --strict build/macbookBatteryMonitor.app
+          codesign -d -r- build/macbookBatteryMonitor.app
           lipo -archs build/macbookBatteryMonitor.app/Contents/MacOS/macbookBatteryMonitor | grep -q x86_64
           lipo -archs build/macbookBatteryMonitor.app/Contents/MacOS/macbookBatteryMonitor | grep -q arm64
       - name: 打包 DMG
@@ -71,6 +78,12 @@ jobs:
       - name: 測試
         if: ${{ env.TAG != '' }}
         run: Scripts/test-power.sh
+      - name: 匯入簽章憑證
+        if: ${{ env.TAG != '' }}
+        env:
+          MBM_SIGNING_P12: ${{ secrets.MBM_SIGNING_P12 }}
+          MBM_SIGNING_PASSWORD: ${{ secrets.MBM_SIGNING_PASSWORD }}
+        run: Scripts/import-signing-cert.sh
       - name: 編譯並打包
         if: ${{ env.TAG != '' }}
         # 給人下載、也給 v1.7.2 起的一鍵更新用的 DMG（macOS 14 以上的通用版），檔名固定不帶版本號。

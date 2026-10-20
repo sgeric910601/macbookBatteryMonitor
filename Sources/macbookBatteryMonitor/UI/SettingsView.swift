@@ -300,7 +300,7 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
-                            Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。App 沒有開發者簽章，每次更新後要先移除舊的項目再加一次。")
+                            Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。清單裡已經有它、開關也開著的話，那是 v1.7.3 以前版本的允許，先按「－」移除再加一次；之後更新都會保留。")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                                 .fixedSize(horizontal: false, vertical: true)

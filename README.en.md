@@ -414,7 +414,7 @@ CPU usage measured on an M1 MacBook Air:
 
 ## Older versions
 
-Older versions stay on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases), but all have known bugs that the latest version fixes; each release's notes list its known issues at the top. v1.5.0 and later can update straight to the latest version. If you want to save power, use the latest version with battery only plus power saving mode or a slower update interval instead of an older version.
+Older versions stay on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases), but all have known bugs that the latest version fixes. v1.5.0 and later can update straight to the latest version. If you want to save power, use the latest version with battery only plus power saving mode or a slower update interval instead of an older version.
 
 | Version | Main additions |
 |---|---|

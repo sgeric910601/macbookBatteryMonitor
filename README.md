@@ -412,7 +412,7 @@ M1 MacBook Air 實測 CPU 使用率：
 
 ## 舊版本
 
-舊版本保留在 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)，但都有已知問題，最新版已經全部修正；每一版的發行說明開頭列出它有哪些問題。v1.5.0 以後的版本可以直接一鍵更新到最新版。想省電的話，請用最新版的「只看電池」，再開省電模式或調慢更新頻率，不要改用舊版。
+舊版本保留在 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)，但都有已知問題，最新版已經全部修正。v1.5.0 以後的版本可以直接一鍵更新到最新版。想省電的話，請用最新版的「只看電池」，再開省電模式或調慢更新頻率，不要改用舊版。
 
 | 版本 | 主要新增 |
 |---|---|

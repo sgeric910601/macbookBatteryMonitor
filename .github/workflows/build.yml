@@ -1,6 +1,8 @@
 # 推送到 main 或開 PR 時測試並編譯通用版（Apple 晶片與 Intel）。
 # 發布 Release（標題與說明取自 .github/release-notes/<tag>.md，第一行為標題）：
-#   - 推送到 main 時，若 Info.plist 的版本 v<版本> 還沒有 Release、且有對應說明檔，就在該 commit 建立 tag 並發布
+#   - 推送到 main 時，若 Info.plist 的版本 v<版本> 還沒有 Release、且有對應說明檔，就在該 commit 建立草稿 Release
+#   - 草稿使用者與一鍵更新都看不到：發布者在自己的 Mac 上執行 Scripts/sign-release.sh <tag>，驗證附檔、
+#     用只在那台鑰匙圈裡的更新簽章私鑰簽 SHA256SUMS.txt、上傳 SHA256SUMS.sig 後才正式發布
 #   - Info.plist 帶 MBMPrerelease（例如 beta.1）時 tag 是 v<版本>-beta.1，標成預先發行版本：
 #     正式版的一鍵更新與通知不會用到，只有使用者手動檢查更新時才找得到
 #   - 推送 v* tag，或手動執行並填入 tag
@@ -70,7 +72,7 @@ jobs:
             fi
           fi
           if [[ -n "$tag" ]] && gh release view "$tag" >/dev/null 2>&1; then
-            echo "$tag 已經發布過"
+            echo "${tag} 已經有 Release（包括還沒簽署的草稿）"
             tag=""
           fi
           echo "TAG=$tag" >> "$GITHUB_ENV"
@@ -83,6 +85,8 @@ jobs:
         env:
           MBM_SIGNING_P12: ${{ secrets.MBM_SIGNING_P12 }}
           MBM_SIGNING_PASSWORD: ${{ secrets.MBM_SIGNING_PASSWORD }}
+          # 發布一定要用固定的憑證簽：沒有憑證就停下來，不發布 ad-hoc 簽章的版本
+          MBM_SIGNING_REQUIRED: 1
         run: Scripts/import-signing-cert.sh
       - name: 編譯並打包
         if: ${{ env.TAG != '' }}
@@ -93,14 +97,14 @@ jobs:
         #   - 通用版 zip：只有過渡版 v1.7.2 附。v1.7.1 會看最近的版本，找得到 status zip 或 v1.7.2 的通用版 zip
         run: |
           ./build.sh universal
-          codesign --verify --deep --strict build/macbookBatteryMonitor.app
+          Scripts/check-signature.sh build/macbookBatteryMonitor.app
           Scripts/make-dmg.sh build/macbookBatteryMonitor.app macbookBatteryMonitor.dmg
           if [[ "$TAG" == v1.7.2 ]]; then
             ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "macbookBatteryMonitor-${TAG}-macOS-universal.zip"
           fi
           for edition in battery status; do
             ./build.sh "$edition"
-            codesign --verify --deep --strict build/macbookBatteryMonitor.app
+            Scripts/check-signature.sh build/macbookBatteryMonitor.app
             ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "macbookBatteryMonitor-${TAG}-${edition}-macOS-arm64.zip"
           done
       - name: 編譯並打包舊系統版本（macOS 12 起）
@@ -122,7 +126,7 @@ jobs:
           cd ../legacy
           Scripts/test-power.sh
           ./build.sh legacy
-          codesign --verify --deep --strict build/macbookBatteryMonitor.app
+          "$GITHUB_WORKSPACE/Scripts/check-signature.sh" build/macbookBatteryMonitor.app
           "$GITHUB_WORKSPACE/Scripts/make-dmg.sh" build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-macOS12.dmg"
           if [[ "$TAG" == v1.7.2 ]]; then
             ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-${TAG}-macOS12.zip"
@@ -134,9 +138,9 @@ jobs:
           shopt -s nullglob
           files=(macbookBatteryMonitor*.dmg macbookBatteryMonitor-"$TAG"-*.zip)
           shasum -a 256 "${files[@]}" > SHA256SUMS.txt
-          # v1.8.0-beta.1 這種 tag 標成預先發行版本，不會變成「最新版本」
-          flags=()
-          [[ "$TAG" == *-* ]] && flags=(--prerelease --latest=false)
+          # 建立草稿，由 Scripts/sign-release.sh 簽署後發布；v1.8.0-beta.1 這種 tag 標成預先發行版本，不會變成「最新版本」
+          flags=(--draft)
+          [[ "$TAG" == *-* ]] && flags+=(--prerelease --latest=false)
           notes=".github/release-notes/$TAG.md"
           if [[ -f "$notes" ]]; then
             title="$(head -n 1 "$notes" | sed 's/^# *//')"

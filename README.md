@@ -23,7 +23,7 @@ macOS 選單列的電池與系統資訊 App。MacBook 的選單列直接顯示�
 - **系統監控**：CPU／GPU（含風扇與溫度）、記憶體、磁碟（含外接磁碟與硬碟健康度）、網路，選單列各一個圖示；不用時一個開關全部關掉
 - **滑鼠與觸控板分開的捲動方向**：例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向
 - **省電**：預設每秒更新，面板關閉時 CPU 約 0.2%；可以調慢更新頻率或開省電模式
-- **一鍵更新，權限會保留**：在設定按一下就下載、驗證並換上新版；「輔助使用」與藍牙權限不用重新允許
+- **一鍵更新，權限會保留**：在設定按一下就下載、驗證並換上新版；只安裝帶著發布者更新簽章、用同一張憑證簽的版本；「輔助使用」與藍牙權限不用重新允許
 - **不會偷偷控制充電**：只有你拖動充電上限滑桿或設定智慧充電時，才會調整 macOS 的充電上限；實際停在上限由 macOS 控制
 - **不需要 Xcode**：只要 Command Line Tools 就能編譯
 
@@ -244,12 +244,17 @@ macOS 的「自然捲動」是滑鼠和觸控板共用一個設定：觸控板�
 設定 → 更新可以檢查 GitHub 上的新版本，有新版時按「一鍵更新」：
 
 1. 下載 DMG（舊系統版本下載 `macbookBatteryMonitor-macOS12.dmg`，系統已是 macOS 14 以上時改下載通用版）。只從 `github.com` 與 `githubusercontent.com` 下載
-2. 驗證：比對 Release 附的 `SHA256SUMS.txt`，確認 App 的識別碼、版本號、Beta 序號與簽章。DMG 在暫存資料夾唯讀掛載，不會出現在 Finder 或桌面
+2. 驗證（任何一項不符就取消更新）：
+   - Release 附的校驗檔 `SHA256SUMS.txt` 要帶著發布者的更新簽章 `SHA256SUMS.sig`（Ed25519）。簽章的私鑰只在發布者的 Mac 上，不在 GitHub，所以就算有人能上傳檔案到 GitHub 也做不出能安裝的版本
+   - 用簽過的校驗檔核對 DMG
+   - 取出的 App 要是同一張憑證「macbookBatteryMonitor Signing」簽的，識別碼、版本號與 Beta 序號也要對
+   - DMG 在暫存資料夾唯讀掛載，不會出現在 Finder 或桌面
 3. App 結束後換上新版並重新開啟，換不過去會放回原本的版本。設定、電量歷史、智慧充電排程與 App 圖示顏色都會保留；下載或驗證失敗、更新中途被中斷時，暫存檔會清掉
 
 - **自動檢查更新**（預設開啟）：啟動後與之後每 6 小時看一次，距離上次檢查超過一天才連到 `api.github.com`；只提示，不會自動安裝。新版發布後大約 1 天內會發現
 - **有新版本時通知**（預設開啟）：自動檢查發現新的正式版時發一則通知，每個版本只通知一次；點通知或面板底部的「有新版本」打開設定的「更新」
 - **Beta 測試版**：GitHub 上標成「預先發行版本」的 Beta（例如 v1.8.0-beta.1）只有按「檢查更新」時才會列出，自動檢查不提示、也不發通知。按「安裝 Beta…」後會先說明測試版可能不穩定，再按一次「安裝 Beta」才會安裝。已有比 Beta 新的正式版時只列出正式版。想回到正式版，到 GitHub 下載正式版重新安裝即可
+- 沒有更新簽章的 Release 不會提示，也不會安裝（v1.7.5 起；v1.7.4 以前的版本只核對校驗檔與簽章是否完好）
 - App 不在可寫入的位置（例如由系統管理員安裝）時無法一鍵更新，會提示到 GitHub 手動下載
 
 **舊版本怎麼更新上來**：
@@ -383,7 +388,7 @@ M1 MacBook Air 實測 CPU 使用率：
 | 周邊設備電量（耳機左右耳、充電盒） | `system_profiler SPBluetoothDataType`；是否連著藍牙耳機由 CoreAudio 的裝置清單判斷 |
 | 捲動方向（選用） | `CGEvent` 事件攔截（捲動與觸控板手指事件），需要「輔助使用」權限；兩個開關都關掉時不攔截 |
 | 會動的眼睛 | `NSEvent` 的滑鼠移動事件（只讀游標位置，不需要權限）；只在桌面寵物是貓咪大頭照、而且「眼睛跟著游標」打開時監聽 |
-| 新版本資訊 | GitHub API `releases`（最近 20 個），自動檢查每天最多一次；下載檔以 Release 的 `SHA256SUMS.txt` 驗證 |
+| 新版本資訊 | GitHub API `releases`（最近 20 個），自動檢查每天最多一次；下載檔以 Release 的 `SHA256SUMS.txt` 驗證，校驗檔以 `SHA256SUMS.sig`（Ed25519，CryptoKit）驗證，App 以 `codesign` 確認是同一張憑證簽的 |
 
 ## 資料存放位置
 
@@ -479,6 +484,13 @@ $APP --selftest-dmg <DMG> # 用一鍵更新的流程從本機的 DMG 取出 App 
 ```
 
 捲動方向的記錄：`/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'`（zsh 裡 `log` 是內建指令，要寫完整路徑）。`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，會記下每個捲動事件的判斷與改寫前後的值。
+
+發布流程：
+1. 改 `Resources/Info.plist` 的版本號、寫 `.github/release-notes/v<版本>.md`；`legacy-macos12` 合併 main、版本號相同。先推 `legacy-macos12` 再推 main
+2. GitHub Actions 測試、打包，建立**草稿** Release（使用者與一鍵更新都看不到）；沒有簽章憑證就停下來
+3. 在發布者的 Mac 上執行 `Scripts/sign-release.sh v<版本>`：下載草稿的附檔、核對校驗碼、確認每個 App 的版本與簽章憑證，用鑰匙圈裡的更新簽章私鑰簽 `SHA256SUMS.txt`、上傳 `SHA256SUMS.sig`，再正式發布
+
+更新簽章的金鑰用 `Scripts/make-update-key.sh` 建立一次（私鑰存在登入鑰匙圈，另做一份加密備份），公鑰寫在 `Model/Update.swift` 的 `updatePublicKeys`。
 
 設計文件：
 - [電力流向與硬體功耗](docs/design/hardware-power-flow.md)：取樣、對齊、什麼時候不顯示「其他」

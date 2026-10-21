@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 final class UpdateTests {
@@ -202,5 +203,55 @@ final class UpdateTests {
         // 單一 Release（releases/latest）的解析同樣只接受正式版
         XCTAssertEqual(UpdateLogic.release(json: Data(entries[2].utf8), edition: "legacy", mainSupported: false)?.assetSize, 2)
         XCTAssertNil(UpdateLogic.release(json: Data(entries[1].utf8), edition: "legacy", mainSupported: false))
+    }
+
+    func testUpdateSignature() throws {
+        let key = Curve25519.Signing.PrivateKey()
+        let publicKey = key.publicKey.rawRepresentation.base64EncodedString()
+        let sums = Data("\(String(repeating: "c3", count: 32))  macbookBatteryMonitor.dmg\n".utf8)
+        let signature = try key.signature(for: sums).base64EncodedString()
+        // 正確的簽章通過，前後的空白與換行不影響
+        XCTAssertTrue(UpdateLogic.isSignatureValid(signature, for: sums, publicKeys: [publicKey]))
+        XCTAssertTrue(UpdateLogic.isSignatureValid(signature + "\n", for: sums, publicKeys: [publicKey]))
+        // 換金鑰期間：清單裡任一把公鑰簽的都可以
+        let other = Curve25519.Signing.PrivateKey()
+        XCTAssertTrue(UpdateLogic.isSignatureValid(signature, for: sums,
+                                                   publicKeys: [other.publicKey.rawRepresentation.base64EncodedString(), publicKey]))
+        // 校驗檔被改過
+        var tampered = sums
+        tampered[0] = UInt8(ascii: "d")
+        XCTAssertTrue(!UpdateLogic.isSignatureValid(signature, for: tampered, publicKeys: [publicKey]))
+        // 別把金鑰簽的
+        let forged = try other.signature(for: sums).base64EncodedString()
+        XCTAssertTrue(!UpdateLogic.isSignatureValid(forged, for: sums, publicKeys: [publicKey]))
+        // 缺簽章、不是 base64、長度不對
+        XCTAssertTrue(!UpdateLogic.isSignatureValid("", for: sums, publicKeys: [publicKey]))
+        XCTAssertTrue(!UpdateLogic.isSignatureValid("!!not base64!!", for: sums, publicKeys: [publicKey]))
+        XCTAssertTrue(!UpdateLogic.isSignatureValid(Data(repeating: 1, count: 63).base64EncodedString(), for: sums, publicKeys: [publicKey]))
+        // 公鑰格式不對、或沒有公鑰
+        XCTAssertTrue(!UpdateLogic.isSignatureValid(signature, for: sums, publicKeys: [Data(repeating: 2, count: 31).base64EncodedString()]))
+        XCTAssertTrue(!UpdateLogic.isSignatureValid(signature, for: sums, publicKeys: []))
+        // App 內建的公鑰格式正確
+        XCTAssertTrue(!UpdateLogic.updatePublicKeys.isEmpty)
+        for encoded in UpdateLogic.updatePublicKeys {
+            XCTAssertEqual(Data(base64Encoded: encoded)?.count, 32)
+        }
+
+        // Release 有校驗檔與簽章才算簽過
+        func release(_ names: [String]) -> ReleaseInfo? {
+            let assets = names.map { name in
+                "{\"name\":\"\(name)\",\"size\":1,\"browser_download_url\":\"https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.7.5/\(name)\"}"
+            }
+            let json = """
+                {"tag_name":"v1.7.5","html_url":"https://github.com/sgeric910601/macbookBatteryMonitor/releases/tag/v1.7.5",
+                 "draft":false,"prerelease":false,"assets":[\(assets.joined(separator: ","))]}
+                """
+            return UpdateLogic.release(json: Data(json.utf8), edition: "universal")
+        }
+        let signed = release(["macbookBatteryMonitor.dmg", "SHA256SUMS.txt", "SHA256SUMS.sig"])
+        XCTAssertTrue(signed?.isSigned == true)
+        XCTAssertEqual(signed?.signatureURL?.lastPathComponent, "SHA256SUMS.sig")
+        XCTAssertTrue(release(["macbookBatteryMonitor.dmg", "SHA256SUMS.txt"])?.isSigned == false)
+        XCTAssertTrue(release(["macbookBatteryMonitor.dmg", "SHA256SUMS.sig"])?.isSigned == false)
     }
 }

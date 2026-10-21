@@ -1,10 +1,15 @@
 #!/bin/bash
 # GitHub Actions 用：把 Secrets 裡的簽章憑證（Scripts/make-signing-cert.sh 建立的 signing.p12）匯入一個暫時的鑰匙圈並信任，
 # build.sh 就會用它簽。每個版本的簽章身分相同，使用者一鍵更新後「輔助使用」與藍牙權限都會保留。
-# 沒有設定 MBM_SIGNING_P12 時什麼都不做（例如別人的 fork 開的 PR），build.sh 改用 ad-hoc 簽章
+# 沒有設定 MBM_SIGNING_P12 時什麼都不做（例如別人的 fork 開的 PR），build.sh 改用 ad-hoc 簽章；發布時則停下來
 set -euo pipefail
 
 if [[ -z "${MBM_SIGNING_P12:-}" ]]; then
+    # 發布時（MBM_SIGNING_REQUIRED=1）一定要有憑證：ad-hoc 簽章的版本使用者更新後權限會失效，一鍵更新也不會安裝
+    if [[ "${MBM_SIGNING_REQUIRED:-}" == 1 ]]; then
+        echo "發布需要簽章憑證，但沒有設定 MBM_SIGNING_P12（見 Scripts/make-signing-cert.sh），停止發布" >&2
+        exit 1
+    fi
     echo "沒有設定簽章憑證（MBM_SIGNING_P12），用 ad-hoc 簽章"
     exit 0
 fi

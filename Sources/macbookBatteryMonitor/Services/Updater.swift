@@ -77,7 +77,9 @@ final class Updater: ObservableObject {
             // 舊系統版本：系統已升級到 macOS 14 以上時改裝主版本的通用版
             let mainSupported = ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 14, minorVersion: 0, patchVersion: 0))
                 && !Compat.forceMacOS12Paths
+            // 只看有校驗檔與更新簽章的 Release：沒簽過的（例如有人自己上傳的）不提示、也不安裝
             let releases = UpdateLogic.releases(json: data, edition: AppEdition.current.rawValue, mainSupported: mainSupported)
+                .filter(\.isSigned)
             guard !releases.isEmpty else {
                 state = userInitiated ? .failed("找不到新版的下載檔") : .idle
                 return
@@ -150,7 +152,20 @@ final class Updater: ObservableObject {
         }
     }
 
+    /// 先確認 SHA256SUMS.txt 是發布者的金鑰簽的，再用它核對下載檔；缺校驗檔或簽章、簽章不對都不安裝
     nonisolated private static func downloadAndVerify(_ release: ReleaseInfo, into work: URL) async throws -> URL {
+        guard let checksumURL = release.checksumURL, let signatureURL = release.signatureURL else {
+            throw UpdateError(message: "這個版本沒有更新簽章，不能一鍵更新")
+        }
+        let sums = try await fetchSmall(checksumURL)
+        let signature = try await fetchSmall(signatureURL)
+        guard UpdateLogic.isSignatureValid(String(decoding: signature, as: UTF8.self), for: sums) else {
+            throw UpdateError(message: "更新簽章驗證失敗，已取消更新")
+        }
+        guard let expected = UpdateLogic.checksum(in: String(decoding: sums, as: UTF8.self), for: release.assetName) else {
+            throw UpdateError(message: "校驗檔裡找不到這個下載檔")
+        }
+
         var request = URLRequest(url: release.assetURL, timeoutInterval: 120)
         request.setValue("macbookBatteryMonitor", forHTTPHeaderField: "User-Agent")
         let (temp, response) = try await URLSession.shared.download(for: request)
@@ -161,20 +176,22 @@ final class Updater: ObservableObject {
         try FileManager.default.moveItem(at: temp, to: file)
         let data = try Data(contentsOf: file)
         guard data.count > 0, data.count < 100_000_000 else { throw UpdateError(message: "下載的檔案大小異常") }
-
-        // 有校驗檔就一定要對得上
-        if let checksumURL = release.checksumURL {
-            let (sums, _) = try await URLSession.shared.data(from: checksumURL)
-            guard let expected = UpdateLogic.checksum(in: String(decoding: sums, as: UTF8.self), for: release.assetName) else {
-                throw UpdateError(message: "校驗檔裡找不到這個下載檔")
-            }
-            let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-            guard actual == expected else { throw UpdateError(message: "下載的檔案校驗不符，已取消更新") }
-        }
+        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard actual == expected else { throw UpdateError(message: "下載的檔案校驗不符，已取消更新") }
         return try unpack(file, release: release, into: work)
     }
 
-    /// 從下載的 DMG 或 zip 取出 App，確認識別碼、版本號與簽章；開發用的 `--selftest-dmg` 也走這裡
+    /// 下載校驗檔、簽章這種小檔案：一定要是 GitHub 的網址、回應 200、不超過 64 KB
+    nonisolated private static func fetchSmall(_ url: URL) async throws -> Data {
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.setValue("macbookBatteryMonitor", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200, let final = response.url, UpdateLogic.isTrusted(final),
+              data.count < 65_536 else { throw UpdateError(message: "下載校驗檔失敗：伺服器回應異常") }
+        return data
+    }
+
+    /// 從下載的 DMG 或 zip 取出 App，確認識別碼、版本號、簽章與簽章的憑證；開發用的 `--selftest-dmg` 也走這裡
     nonisolated static func unpack(_ file: URL, release: ReleaseInfo, into work: URL) throws -> URL {
         let unpacked = work.appendingPathComponent("unpacked")
         if release.assetName.hasSuffix(".dmg") {
@@ -193,6 +210,10 @@ final class Updater: ObservableObject {
         }
         guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path]) == 0 else {
             throw UpdateError(message: "新版 App 的簽章驗證失敗")
+        }
+        // 簽章完好之外，還要是這個 App 的憑證簽的
+        guard run("/usr/bin/codesign", ["--verify", "-R", "=" + UpdateLogic.codeRequirement, app.path]) == 0 else {
+            throw UpdateError(message: "新版 App 不是用這個 App 的憑證簽的，已取消更新")
         }
         return app
     }

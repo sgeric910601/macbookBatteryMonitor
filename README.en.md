@@ -25,7 +25,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **System monitors**: CPU/GPU (with fans and temperatures), memory, disks (including external drives and drive health) and network, one menu bar icon each; one switch turns them all off
 - **Separate mouse and trackpad scroll directions**: for example natural scrolling on the trackpad and the traditional direction on the mouse wheel
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
-- **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; Accessibility and Bluetooth permissions don't have to be granted again
+- **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
 - **No Xcode needed**: the Command Line Tools are enough to build it
 
@@ -246,12 +246,17 @@ The icon is a Ragdoll cat lying on its back on a wireless charging pad (a cut-ou
 Settings → Update checks GitHub for new versions; when there is one, click "一鍵更新" (one-click update):
 
 1. It downloads the DMG (the older macOS build downloads `macbookBatteryMonitor-macOS12.dmg`, or the universal build once the system is macOS 14 or later), only from `github.com` and `githubusercontent.com`
-2. It verifies the download against the release's `SHA256SUMS.txt` and checks the app's identifier, version, beta number and signature. The DMG is mounted read-only in a temporary folder and never appears in Finder or on the desktop
+2. It verifies (any mismatch cancels the update):
+   - the release's checksum file `SHA256SUMS.txt` must carry the publisher's update signature `SHA256SUMS.sig` (Ed25519). The signing key lives only on the publisher's Mac, not on GitHub, so even someone able to upload files to GitHub can't produce an installable version
+   - the DMG is checked against the signed checksum file
+   - the app inside must be signed with the same "macbookBatteryMonitor Signing" certificate, with the right identifier, version and beta number
+   - the DMG is mounted read-only in a temporary folder and never appears in Finder or on the desktop
 3. When the app quits, the new version replaces it and relaunches; if that fails, the original version is put back. Settings, charge history, smart charging schedules and the app icon color are kept; temporary files are removed if downloading or verification fails or the update is interrupted
 
 - **Check for updates automatically** (on by default): checks at launch and every 6 hours after, but only contacts `api.github.com` if the last check was more than a day ago; it only tells you and never installs by itself. A new release is found within about a day
 - **Notify about new versions** (on by default): when an automatic check finds a new stable release, you get one notification per version; the notification or "有新版本" (new version available) at the bottom of the panel opens Settings → Update
 - **Betas**: betas marked as pre-releases on GitHub (for example v1.8.0-beta.1) are only listed when you click "檢查更新" (check for updates); automatic checks don't mention them or notify. "安裝 Beta…" (install beta…) first explains that betas may be unstable, and only a second click on "安裝 Beta" installs it. If a stable release newer than the beta exists, only that is listed. To go back to stable, download a stable release from GitHub and reinstall
+- Releases without an update signature are neither offered nor installed (v1.7.5+; v1.7.4 and earlier only check the checksum file and that the signature is intact)
 - If the app isn't in a writable location (for example installed by an administrator), one-click update can't work and points you to GitHub instead
 
 **Updating from older versions**:
@@ -385,7 +390,7 @@ CPU usage measured on an M1 MacBook Air:
 | Peripheral batteries (headphone buds, case) | `system_profiler SPBluetoothDataType`; whether Bluetooth headphones are connected comes from CoreAudio's device list |
 | Scroll directions (optional) | A `CGEvent` tap (scroll and trackpad finger events), Accessibility permission required; no tap while both switches are off |
 | Moving eyes | `NSEvent` mouse-moved events (pointer position only, no permission needed); only while the desktop pet shows the cat photo with "眼睛跟著游標" (eyes follow the pointer) on |
-| New versions | GitHub API `releases` (the latest 20); automatic checks at most once a day; downloads verified against the release's `SHA256SUMS.txt` |
+| New versions | GitHub API `releases` (the latest 20); automatic checks at most once a day; downloads verified against the release's `SHA256SUMS.txt`, the checksum file against `SHA256SUMS.sig` (Ed25519, CryptoKit), and the app with `codesign` against the same certificate |
 
 ## Where data is stored
 
@@ -482,6 +487,13 @@ $APP --selftest-dmg <DMG> # take the app out of a local DMG and verify it the wa
 ```
 
 Scroll direction logs: `/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'` (in zsh `log` is a builtin, so use the full path). After `defaults write com.kuan.batterymonitor scrollDebug -bool true` and relaunching the app, every scroll event's classification and its values before and after rewriting are logged too.
+
+Releasing:
+1. Bump the version in `Resources/Info.plist` and write `.github/release-notes/v<version>.md`; merge main into `legacy-macos12` with the same version. Push `legacy-macos12` first, then main
+2. GitHub Actions tests, packages and creates a **draft** release (invisible to users and one-click update); it stops if the signing certificate is missing
+3. On the publisher's Mac, run `Scripts/sign-release.sh v<version>`: it downloads the draft's assets, checks the checksums and every app's version and signing certificate, signs `SHA256SUMS.txt` with the update signing key in the keychain, uploads `SHA256SUMS.sig` and publishes the release
+
+The update signing key is created once with `Scripts/make-update-key.sh` (the private key stays in the login keychain, plus an encrypted backup); the public key is `updatePublicKeys` in `Model/Update.swift`.
 
 Design documents (Chinese):
 - [Power flow and component power](docs/design/hardware-power-flow.md): sampling, alignment, when "other" isn't shown

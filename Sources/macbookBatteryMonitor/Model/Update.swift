@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// 版本號與 Beta 序號。GitHub 的 tag 是 v1.7.1、v1.8.0-beta.1；App 的 Info.plist 是 1.8.0，
@@ -57,16 +58,40 @@ struct ReleaseInfo: Equatable {
     var assetSize: Int
     /// Release 附的 SHA256SUMS.txt（加入一鍵更新之後的 Release 才有）
     var checksumURL: URL?
+    /// SHA256SUMS.txt 的更新簽章（v1.7.5 起的 Release 才有）
+    var signatureURL: URL? = nil
     /// Beta 序號；nil 是正式版
     var beta: Int? = nil
 
     var appVersion: AppVersion { AppVersion(numbers: version, beta: beta) }
     var isBeta: Bool { beta != nil }
+    /// 校驗檔與更新簽章都有才能一鍵更新
+    var isSigned: Bool { checksumURL != nil && signatureURL != nil }
     var versionText: String { appVersion.text }
 }
 
 enum UpdateLogic {
     static let checksumFile = "SHA256SUMS.txt"
+    /// SHA256SUMS.txt 的更新簽章：一行 base64，是 64 bytes 的 Ed25519 原始簽章，簽的是 SHA256SUMS.txt 的原始位元組。
+    /// 發布時在發布者的 Mac 上用 Scripts/sign-release.sh 簽（私鑰只在那台的鑰匙圈）
+    static let signatureFile = "SHA256SUMS.sig"
+
+    /// 一鍵更新信任的更新簽章公鑰（32 bytes 原始公鑰的 base64）。用陣列存：換金鑰時先發一版同時信任新舊兩把的 App
+    static let updatePublicKeys = ["IgVQOfoM0nYqd6D4kCw0UmjhdWgzPXJiyPmrwZysQ3k="]
+
+    /// 新版 App 一定要是這張憑證簽的（Scripts/make-signing-cert.sh 建立的「macbookBatteryMonitor Signing」，
+    /// 和 Scripts/check-signature.sh 相同）；用別的憑證或 ad-hoc 簽的都不安裝
+    static let codeRequirement = #"identifier "com.kuan.batterymonitor" and certificate leaf = H"8a0f04d547969a353a94b2697263f1326370aec0""#
+
+    /// 簽章要是其中一把公鑰簽的；格式不對（不是 base64、長度不對）一律不通過
+    static func isSignatureValid(_ signature: String, for sums: Data, publicKeys: [String] = updatePublicKeys) -> Bool {
+        guard let raw = Data(base64Encoded: signature.trimmingCharacters(in: .whitespacesAndNewlines)), raw.count == 64 else { return false }
+        return publicKeys.contains { encoded in
+            guard let data = Data(base64Encoded: encoded), data.count == 32,
+                  let key = try? Curve25519.Signing.PublicKey(rawRepresentation: data) else { return false }
+            return key.isValidSignature(raw, for: sums)
+        }
+    }
 
     /// "v1.4.1"、"1.4.1" → [1, 4, 1]；有不是數字的部分就回傳 nil
     static func version(_ text: String) -> [Int]? {
@@ -170,7 +195,8 @@ enum UpdateLogic {
         }
         guard let name = candidates.first(where: { asset($0) != nil }), let file = asset(name) else { return nil }
         return ReleaseInfo(tag: tag, version: version, pageURL: page, assetName: name, assetURL: file.url,
-                           assetSize: file.size, checksumURL: asset(checksumFile)?.url, beta: parsed.beta)
+                           assetSize: file.size, checksumURL: asset(checksumFile)?.url, signatureURL: asset(signatureFile)?.url,
+                           beta: parsed.beta)
     }
 
     /// SHA256SUMS.txt 每行「<64 位十六進位>  <檔名>」

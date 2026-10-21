@@ -16,7 +16,9 @@
 ## GitHub Actions（`.github/workflows/build.yml`）
 
 - **每次推送與 PR**：跑 `Scripts/test-power.sh`，匯入簽章憑證，編譯通用版，檢查簽章（`codesign --verify --deep --strict`）、簽章身分與兩種架構，打包 DMG
-- **發布**：推送到 `main` 時，如果 `Info.plist` 的版本 `v<版本>` 還沒有 Release，而且有 `.github/release-notes/v<版本>.md`，就在這個 commit 建立 tag 並發布。說明檔第一行是標題，第三行起是內容。所以版本號和說明檔要等確定發布時才一起 commit
+- **發布**：推送到 `main` 時，如果 `Info.plist` 的版本 `v<版本>` 還沒有 Release（包括草稿），而且有 `.github/release-notes/v<版本>.md`，就測試、打包，在這個 commit 建立**草稿** Release。說明檔第一行是標題，第三行起是內容。所以版本號和說明檔要等確定發布時才一起 commit
+- **發布一定要用固定的憑證**：匯入憑證的步驟帶 `MBM_SIGNING_REQUIRED=1`，沒有設定 Secrets 就停下來；每個打包好的 App 都用 `Scripts/check-signature.sh` 確認是「macbookBatteryMonitor Signing」簽的
+- **簽署並正式發布**：草稿使用者與一鍵更新都看不到。發布者在自己的 Mac 上執行 `Scripts/sign-release.sh v<版本>` 才正式發布（見下面的「更新簽章」）
 - `Info.plist` 帶 `MBMPrerelease`（例如 `beta.1`）時，tag 是 `v<版本>-beta.1`，標成預先發行版本，不會變成「最新版本」
 - `legacy-macos12` 的版本號（含 Beta 序號）和這次發布相同時，才一起打包舊系統版本。所以要先推 `legacy-macos12`，再推 `main`
 - 每一版附上：兩個 DMG、`…-<tag>-battery-macOS-arm64.zip`、`…-<tag>-status-macOS-arm64.zip`（給 v1.5.0～v1.6.2 與 v1.7.1 通用版的一鍵更新；內容和通用版相同，只有 `MBMEdition` 不同）、`SHA256SUMS.txt`。過渡版 v1.7.2 另附通用版與 macOS 12 版的 zip（給 v1.7.1）
@@ -32,14 +34,49 @@
 
 ## 一鍵更新（`Services/Updater.swift`）
 
-1. **檢查**：讀 GitHub API 最近 20 個 Release。自動檢查在啟動後與之後每 6 小時看一次，距離上次檢查超過一天才連線；Beta 只在手動檢查時列出
+1. **檢查**：讀 GitHub API 最近 20 個 Release。自動檢查在啟動後與之後每 6 小時看一次，距離上次檢查超過一天才連線；Beta 只在手動檢查時列出；沒有校驗檔或更新簽章的 Release 直接略過，不提示也不安裝
 2. **挑檔案**：通用版依序找 DMG、通用版 zip、舊檔名的 zip。舊系統版本找 `macbookBatteryMonitor-macOS12.dmg`、再找它的 zip；系統已經是 macOS 14 以上時改裝通用版
-3. **下載**：只從 `github.com` 與 `githubusercontent.com` 下載，比對 Release 的 `SHA256SUMS.txt`
-4. **取出**：DMG 唯讀、不顯示地掛載在暫存資料夾（掛載方式和 `make-dmg.sh` 相同），用 `ditto` 拷出 App；zip 用 `ditto -x -k` 解開
-5. **驗證**：識別碼是 `com.kuan.batterymonitor`，版本號與 Beta 序號和 Release 的 tag 一致，`codesign --verify --deep --strict` 通過
-6. **換上**：App 結束後換上新版並重新開啟；換不過去就放回原本的版本。下載或驗證失敗、更新中途被中斷時，暫存檔會清掉
+3. **驗證校驗檔**：下載 `SHA256SUMS.txt` 與 `SHA256SUMS.sig`（一定要是 GitHub 的網址、回應 200、不超過 64 KB），用 App 內建的公鑰驗證簽章；缺任何一個或簽章不對就不安裝
+4. **下載**：只從 `github.com` 與 `githubusercontent.com` 下載，用簽過的 `SHA256SUMS.txt` 核對
+5. **取出**：DMG 唯讀、不顯示地掛載在暫存資料夾（掛載方式和 `make-dmg.sh` 相同），用 `ditto` 拷出 App；zip 用 `ditto -x -k` 解開
+6. **驗證 App**：識別碼是 `com.kuan.batterymonitor`，版本號與 Beta 序號和 Release 的 tag 一致，`codesign --verify --deep --strict` 通過，而且 `codesign --verify -R` 符合 `Model/Update.swift` 的 `codeRequirement`（「macbookBatteryMonitor Signing」憑證簽的）
+7. **換上**：App 結束後換上新版並重新開啟；換不過去就放回原本的版本。下載或驗證失敗、更新中途被中斷時，暫存檔會清掉
 
 `--selftest-dmg <DMG>` 用同一段流程從本機的 DMG 取出 App 並驗證，不安裝；`--selftest-update` 用版本號改低的副本測試真正的下載與更新。
+
+## 更新簽章（v1.7.5 起）
+
+### 為什麼
+
+憑證的私鑰在 GitHub Secrets 裡，Release 也是 GitHub Actions 打包的。只靠校驗檔與憑證的話，GitHub 帳號被盜的人可以上傳自己的 DMG 與校驗檔，甚至用 Actions 做出憑證簽的版本。所以另外加一把只在發布者 Mac 上的 Ed25519 金鑰：一鍵更新只接受這把金鑰簽過的 `SHA256SUMS.txt`。
+
+### 格式
+
+- `SHA256SUMS.sig`：一行 base64，是 64 bytes 的 Ed25519 原始簽章，簽的是 `SHA256SUMS.txt` 的原始位元組
+- 公鑰：32 bytes 原始公鑰的 base64，寫在 `Model/Update.swift` 的 `updatePublicKeys`（陣列）。App 用 CryptoKit 的 `Curve25519.Signing.PublicKey` 驗證，macOS 12 起都有
+- 用 openssl 驗證：`base64 -d SHA256SUMS.sig > sig.bin`，`openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in SHA256SUMS.txt -sigfile sig.bin`
+
+### 金鑰
+
+- `Scripts/make-update-key.sh` 建立一次：私鑰存在登入鑰匙圈（generic password，服務名稱「macbookBatteryMonitor update signing」），不寫進專案、GitHub、CI 或記錄
+- 同一個腳本建立加密的備份映像檔（AES-256，密碼只有發布者知道），私鑰直接寫進加密的磁碟裡；備份放 iCloud Drive 與私人的備份 repo
+- `Scripts/update-signing.swift` 是金鑰工具（產生、印出公鑰、簽署、驗證、匯出、匯入），編譯後用「macbookBatteryMonitor Signing」憑證簽，鑰匙圈才認得同一個工具，重新編譯不會一直詢問
+
+### 發布時
+
+`Scripts/sign-release.sh v<版本>`：
+1. 確認鑰匙圈的金鑰是 App 信任的公鑰
+2. 下載草稿的所有附檔，核對 `SHA256SUMS.txt`，每個附檔都要列在裡面
+3. 打開每個 DMG 與 zip，用 `Scripts/check-signature.sh` 確認 App 是「macbookBatteryMonitor Signing」簽的，版本號與 Beta 序號和 tag 一致
+4. 簽 `SHA256SUMS.txt`，用公鑰驗證一次，上傳 `SHA256SUMS.sig`
+5. 草稿改成正式發布，正式版標成最新版本
+
+### 過渡與限制
+
+- v1.7.4 以前的一鍵更新不認得 `SHA256SUMS.sig`，照舊只核對校驗檔與簽章是否完好。v1.7.5 是第一個會驗證的版本，之後的每次更新都要有簽章
+- **換金鑰**：先發一版 `updatePublicKeys` 同時有新舊兩把公鑰、用舊金鑰簽的版本，之後才改用新金鑰
+- **金鑰與備份都遺失**：已經裝了 v1.7.5 以後版本的使用者無法再一鍵更新，只能手動下載一次帶新公鑰的版本
+- 鎖定的憑證（`codeRequirement`）要換時也一樣：先發一版同時接受新舊兩個條件的 App
 
 ## 簽章
 

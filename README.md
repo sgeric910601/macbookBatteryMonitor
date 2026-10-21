@@ -42,7 +42,7 @@ macOS 選單列的電池與系統資訊 App。MacBook 的選單列直接顯示�
 ## 安裝
 
 1. 下載上面對應的 DMG 並打開
-2. 把「電池與系統監控」拖到「應用程式」資料夾（檔名是 `macbookBatteryMonitor.app`）
+2. 把「電池與系統監控」拖到「應用程式」資料夾（檔名是 `macbookBatteryMonitor.app`），退出 DMG 後從「應用程式」打開。直接在 DMG 裡打開的話，App 會詢問要不要改從「應用程式」打開；還沒拖過去、或「應用程式」裡是比較舊的版本時，按一下就會幫你拷貝過去
 3. 第一次打開時 macOS 會擋下來（App 沒有 Apple 開發者簽章）。任選一種方式放行：
    - 到「系統設定 → 隱私權與安全性」，在下方找到這個 App，按「強制打開」
    - 或在終端機執行：
@@ -255,6 +255,7 @@ macOS 的「自然捲動」是滑鼠和觸控板共用一個設定：觸控板�
 - **有新版本時通知**（預設開啟）：自動檢查發現新的正式版時發一則通知，每個版本只通知一次；點通知或面板底部的「有新版本」打開設定的「更新」
 - **Beta 測試版**：GitHub 上標成「預先發行版本」的 Beta（例如 v1.8.0-beta.1）只有按「檢查更新」時才會列出，自動檢查不提示、也不發通知。按「安裝 Beta…」後會先說明測試版可能不穩定，再按一次「安裝 Beta」才會安裝。已有比 Beta 新的正式版時只列出正式版。想回到正式版，到 GitHub 下載正式版重新安裝即可
 - 沒有更新簽章的 Release 不會提示，也不會安裝（v1.7.5 起；v1.7.4 以前的版本只核對校驗檔與簽章是否完好）
+- **從 DMG 打開，或被 macOS 搬到暫存位置執行時**，一鍵更新會更新「應用程式」裡的那一份，裝好後從那裡打開（v1.7.6 起）。被搬到暫存位置，是指 App 帶著從網路下載的隔離標記、又沒有用 Finder 搬過（例如用指令複製），macOS 每次都把它放在隨機的唯讀位置執行，重新開機也一樣。這時啟動時會詢問要不要改從「應用程式」打開：按下去會確認那一份是同一張憑證簽的、清掉它的隔離標記再重新打開，只需要做一次。以前的版本遇到這種情況只能手動下載，或執行 `xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app`
 - App 不在可寫入的位置（例如由系統管理員安裝）時無法一鍵更新，會提示到 GitHub 手動下載
 
 **舊版本怎麼更新上來**：
@@ -481,6 +482,7 @@ $APP --selftest-pet      # 桌面寵物：改大小、模擬摸牠、切換游�
 $APP --selftest-scroll   # 造出滾輪、觸控板、慣性與 Magic Mouse 的捲動事件，確認哪些會反向（不需要權限）
 $APP --selftest-update   # 檢查 GitHub 上的新版本，有就直接一鍵更新（測試時把副本的版本號改低）
 $APP --selftest-dmg <DMG> # 用一鍵更新的流程從本機的 DMG 取出 App 並驗證（版本號要相同），不安裝
+$APP --selftest-location [relaunch | <App 路徑>] # 印出 App 是不是從 DMG 或暫存位置執行、該改從哪裡打開；relaunch 照按下按鈕的流程做；給路徑則檢查那個 App
 ```
 
 捲動方向的記錄：`/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'`（zsh 裡 `log` 是內建指令，要寫完整路徑）。`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，會記下每個捲動事件的判斷與改寫前後的值。

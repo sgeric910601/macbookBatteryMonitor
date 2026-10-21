@@ -40,7 +40,14 @@
 4. **下載**：只從 `github.com` 與 `githubusercontent.com` 下載，用簽過的 `SHA256SUMS.txt` 核對
 5. **取出**：DMG 唯讀、不顯示地掛載在暫存資料夾（掛載方式和 `make-dmg.sh` 相同），用 `ditto` 拷出 App；zip 用 `ditto -x -k` 解開
 6. **驗證 App**：識別碼是 `com.kuan.batterymonitor`，版本號與 Beta 序號和 Release 的 tag 一致，`codesign --verify --deep --strict` 通過，而且 `codesign --verify -R` 符合 `Model/Update.swift` 的 `codeRequirement`（「macbookBatteryMonitor Signing」憑證簽的）
-7. **換上**：App 結束後換上新版並重新開啟；換不過去就放回原本的版本。下載或驗證失敗、更新中途被中斷時，暫存檔會清掉
+7. **換上**：App 結束後換上新版並重新開啟；換不過去就放回原本的版本。從 DMG 打開或被 macOS 搬到暫存位置執行時（v1.7.6 起），換的是「應用程式」（或被搬走之前的位置）裡的那一份，那裡還沒有就直接放進去。下載或驗證失敗、更新中途被中斷時，暫存檔會清掉
+
+### App 的位置（`Services/AppLocation.swift`，v1.7.6 起）
+
+- **從 DMG 打開**：App 在 `/Volumes/` 底下的唯讀磁碟上。一鍵更新換不掉它，也不會登錄開機自啟動，退出 DMG 後 App 就結束
+- **被搬到暫存位置**（App Translocation）：App 帶著隔離標記、沒用 Finder 搬過時，macOS 每次都從 `…/AppTranslocation/…` 這個隨機的唯讀位置執行。原本的位置用 Security 的 `SecTranslocateCreateOriginalPathForURL` 查（沒有公開標頭，執行時才找；找不到就當作在「應用程式」）
+- 啟動時詢問（帶開發用參數時不問）。按下去會：從 DMG 打開、而「應用程式」沒有或是比較舊的版本時，先把這一份拷貝過去（舊的移到垃圾桶）；確認目標是 `codeRequirement` 的憑證簽的；清掉它的隔離標記；這個 App 結束後從那裡打開（只允許同時執行一份，所以要等這份結束）
+- `--selftest-location` 不跳出詢問，印出判斷結果；加 `relaunch` 照按下按鈕的流程做；給一個 App 路徑則只檢查那個位置
 
 `--selftest-dmg <DMG>` 用同一段流程從本機的 DMG 取出 App 並驗證，不安裝；`--selftest-update` 用版本號改低的副本測試真正的下載與更新。
 

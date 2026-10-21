@@ -108,9 +108,12 @@ final class Updater: ObservableObject {
     /// 下載、驗證、安裝；成功時 App 會結束並由安裝程序重新開啟新版
     func install() async {
         guard let release = available, canInstall else { return }
-        let target = Bundle.main.bundleURL
+        // 從 DMG 打開、或被 macOS 搬到暫存位置執行時，更新「應用程式」（或被搬走之前的位置）裡的那一份，裝好後從那裡打開
+        let target = AppLocation.problem().map(AppLocation.preferredURL) ?? Bundle.main.bundleURL
         let folder = target.deletingLastPathComponent()
-        guard FileManager.default.isWritableFile(atPath: folder.path), FileManager.default.isWritableFile(atPath: target.path) else {
+        let exists = FileManager.default.fileExists(atPath: target.path)
+        guard FileManager.default.isWritableFile(atPath: folder.path),
+              !exists || (AppLocation.isOurApp(target) && FileManager.default.isWritableFile(atPath: target.path)) else {
             state = .failed("App 所在位置沒有寫入權限，請到 GitHub 手動下載")
             return
         }
@@ -248,7 +251,8 @@ final class Updater: ObservableObject {
         return nil
     }
 
-    /// 寫一個小腳本：等這個 App 結束後換上新版（換不過去就放回原本的版本）並重新開啟
+    /// 寫一個小腳本：等這個 App 結束後換上新版（換不過去就放回原本的版本）並重新開啟。
+    /// 目標還不存在時（從 DMG 打開、「應用程式」裡還沒有）直接放進去
     nonisolated private static func launchInstaller(staged: URL, target: URL) throws {
         let script = staged.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("install.sh")
         try """
@@ -258,7 +262,7 @@ final class Updater: ObservableObject {
         while kill -0 "$pid" 2>/dev/null && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
         backup="${target%.app}.previous.app"
         rm -rf "$backup"
-        if mv "$target" "$backup" && mv "$staged" "$target"; then
+        if { [ ! -e "$target" ] || mv "$target" "$backup"; } && mv "$staged" "$target"; then
           rm -rf "$backup"
         elif [ ! -d "$target" ] && [ -d "$backup" ]; then
           mv "$backup" "$target"

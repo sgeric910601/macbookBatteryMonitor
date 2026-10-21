@@ -52,6 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             NSApp.terminate(nil)
             return
         }
+        // 從 DMG 打開、或被 macOS 搬到暫存位置執行時，詢問要不要改從「應用程式」裡的那一份執行
+        if AppLocation.promptIfNeeded() {
+            NSApp.terminate(nil)
+            return
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.target = self

@@ -119,6 +119,39 @@ if let index = CommandLine.arguments.firstIndex(of: "--selftest-dmg"), index + 1
     exit(passed ? 0 : 1)
 }
 
+// 開發用：`--selftest-location` 印出 App 從哪裡執行、該改從哪裡執行；加 `relaunch` 就照啟動時按下按鈕的流程做
+// （拷貝或確認簽章、清掉隔離標記，這個行程結束後從那裡打開），不跳出詢問。
+// 加一個 App 的路徑則只檢查那個位置（例如另一個正在暫存位置執行的 App 的路徑），印出原本的位置
+if let index = CommandLine.arguments.firstIndex(of: "--selftest-location") {
+    if let path = CommandLine.arguments.dropFirst(index + 1).first, path != "relaunch" {
+        let url = URL(fileURLWithPath: path)
+        let problem = AppLocation.problem(for: url)
+        print("selftest: \(path)：\(problem == .translocated ? "暫存位置" : problem == .diskImage ? "DMG" : "一般位置")，"
+              + "原本的位置 \(AppLocation.originalURL(of: url)?.path ?? "—")")
+        exit(0)
+    }
+    MainActor.assumeIsolated {
+        guard let problem = AppLocation.problem() else {
+            print("selftest: 從一般位置執行 \(Bundle.main.bundlePath)")
+            exit(0)
+        }
+        let target = AppLocation.preferredURL(for: problem)
+        let installed = AppLocation.installedVersion(at: target)?.text
+        let install = AppLocation.needsInstall(problem, at: target)
+        print("selftest: \(problem == .diskImage ? "從 DMG 執行" : "從暫存位置執行") \(Bundle.main.bundlePath)")
+        print("selftest: 原本的位置 \(AppLocation.originalURL()?.path ?? "—")、改從 \(target.path)（那裡的版本 \(installed ?? "沒有")）、\(install ? "要先拷貝這一版過去" : "直接打開")")
+        guard CommandLine.arguments.dropFirst(index + 1).first == "relaunch" else { exit(0) }
+        do {
+            try AppLocation.relaunch(at: target, installing: install)
+            print("selftest: 已安排重新打開")
+            exit(0)
+        } catch {
+            print("selftest: 失敗 \((error as? AppLocation.LocationError)?.message ?? error.localizedDescription)")
+            exit(1)
+        }
+    }
+}
+
 if let index = CommandLine.arguments.firstIndex(of: "--screenshots"), index + 1 < CommandLine.arguments.count {
     MainActor.assumeIsolatedCompat {
         _ = NSApplication.shared

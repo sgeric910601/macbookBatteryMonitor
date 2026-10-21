@@ -44,7 +44,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 ## Install
 
 1. Download the matching DMG above and open it
-2. Drag "電池與系統監控" (Battery & System Monitor) into Applications (the file is `macbookBatteryMonitor.app`)
+2. Drag "電池與系統監控" (Battery & System Monitor) into Applications (the file is `macbookBatteryMonitor.app`), eject the DMG and open it from Applications. If you open it right inside the DMG, the app offers to open the copy in Applications instead; if it isn't there yet or is an older version, one click copies it over
 3. macOS blocks the first launch (the app isn't signed with an Apple developer certificate). Allow it either way:
    - In System Settings → Privacy & Security, find the app near the bottom and click "Open Anyway"
    - Or run in Terminal:
@@ -257,6 +257,7 @@ Settings → Update checks GitHub for new versions; when there is one, click "�
 - **Notify about new versions** (on by default): when an automatic check finds a new stable release, you get one notification per version; the notification or "有新版本" (new version available) at the bottom of the panel opens Settings → Update
 - **Betas**: betas marked as pre-releases on GitHub (for example v1.8.0-beta.1) are only listed when you click "檢查更新" (check for updates); automatic checks don't mention them or notify. "安裝 Beta…" (install beta…) first explains that betas may be unstable, and only a second click on "安裝 Beta" installs it. If a stable release newer than the beta exists, only that is listed. To go back to stable, download a stable release from GitHub and reinstall
 - Releases without an update signature are neither offered nor installed (v1.7.5+; v1.7.4 and earlier only check the checksum file and that the signature is intact)
+- **When the app runs from the DMG or from macOS's temporary location**, one-click update updates the copy in Applications and opens it from there (v1.7.6+). The temporary location happens when an app carries the downloaded-file quarantine flag but was never moved with Finder (for example copied with a command): macOS then runs it from a random read-only location every time, even after a restart. At launch the app offers to open the copy in Applications instead; that checks the copy is signed with the same certificate, clears its quarantine flag and reopens it, once. Earlier versions could only be updated by downloading manually or running `xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app`
 - If the app isn't in a writable location (for example installed by an administrator), one-click update can't work and points you to GitHub instead
 
 **Updating from older versions**:
@@ -484,6 +485,7 @@ $APP --selftest-pet      # desktop pet: resize, simulate stroking, toggle pointe
 $APP --selftest-scroll   # create wheel, trackpad, momentum and Magic Mouse scroll events and check which get reversed (no permission needed)
 $APP --selftest-update   # check GitHub for a new version and one-click update right away (lower a copy's version to test)
 $APP --selftest-dmg <DMG> # take the app out of a local DMG and verify it the way one-click update does (versions must match), without installing
+$APP --selftest-location [relaunch | <app path>] # print whether the app runs from a DMG or the temporary location and where it should open from; relaunch does what the button does; a path checks that app instead
 ```
 
 Scroll direction logs: `/usr/bin/log stream --predicate 'subsystem == "com.kuan.batterymonitor" AND category == "scroll"'` (in zsh `log` is a builtin, so use the full path). After `defaults write com.kuan.batterymonitor scrollDebug -bool true` and relaunching the app, every scroll event's classification and its values before and after rewriting are logged too.

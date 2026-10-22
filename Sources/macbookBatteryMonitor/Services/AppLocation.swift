@@ -65,7 +65,8 @@ enum AppLocation {
         case .translocated:
             alert.messageText = "「\(AppEdition.appName)」正在從 macOS 的暫存位置執行"
             alert.informativeText = "這份 App 帶著從網路下載的隔離標記，又沒有用 Finder 搬過，macOS 就把它放在暫存位置執行，"
-                + "一鍵更新與開機自啟動都無法使用。按「改從\(place)打開」會清掉它的隔離標記並重新打開，只需要做一次。"
+                + "一鍵更新與開機自啟動都無法使用。按「改從\(place)打開」會清掉它的隔離標記並重新打開，只需要做一次；"
+                + "macOS 可能會再請你到「系統設定 → 隱私權與安全性」按一次「強制打開」。"
             alert.addButton(withTitle: "改從\(place)打開")
         case .diskImage:
             alert.messageText = "你打開的是 DMG 裡的「\(AppEdition.appName)」"

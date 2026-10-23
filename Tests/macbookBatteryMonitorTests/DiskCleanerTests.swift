@@ -79,16 +79,17 @@ final class DiskCleanerTests {
         assert(count == 2, "檔案數應為 2，實際為 \(count)")
 
         // 執行清理測試
-        let target = DiskCleanerService.CacheTarget(
-            id: "test.target",
+        let item = DiskCleanerService.CleanableItem(
+            id: "test.item",
             name: "測試快取",
             path: tempDir.path,
+            category: .developer,
             associatedProcess: "NonExistentDummyApp99999",
             sizeBytes: bytes,
             itemCount: count
         )
 
-        let result = service.clean(target: target)
+        let result = service.clean(item: item)
         assert(result.success, "清理應成功：\(result.message)")
         assert(result.freedBytes == 2048, "釋放大小應為 2048")
 

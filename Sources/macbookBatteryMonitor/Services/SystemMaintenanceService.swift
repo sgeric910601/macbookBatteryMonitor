@@ -57,11 +57,23 @@ public enum SystemMaintenanceService {
         )
     }
 
+    /// 強制釋放系統不活躍快取記憶體（macOS 原生 purge 指令）
+    public static func purgeMemory() -> MaintenanceOutcome {
+        let (status, output) = runCommand("/usr/bin/purge", arguments: [])
+        let success = (status == 0)
+        return MaintenanceOutcome(
+            operation: "釋放不活躍記憶體",
+            success: success,
+            details: success ? "已強制回收未使用的磁碟讀寫記憶體快取" : "記憶體釋放未成功：\(output)"
+        )
+    }
+
     /// 一鍵執行全套無痛系統維護
     public static func performFullMaintenance() -> [MaintenanceOutcome] {
         return [
             flushDNS(),
-            rebuildQuickLookCache()
+            rebuildQuickLookCache(),
+            purgeMemory()
         ]
     }
 }

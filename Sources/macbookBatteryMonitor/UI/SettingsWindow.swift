@@ -16,6 +16,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case peripherals
     /// 滑鼠與觸控板分開的捲動方向
     case input
+    /// 系統深度清理與最佳化
+    case maintenance
     case update
 
     var id: String { rawValue }
@@ -29,6 +31,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .companion: return "充電夥伴"
         case .peripherals: return "周邊設備"
         case .input: return "滑鼠與觸控板"
+        case .maintenance: return "清理與系統維護"
         case .update: return "更新"
         }
     }
@@ -43,6 +46,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .companion: return "pawprint"
         case .peripherals: return "keyboard"
         case .input: return "computermouse"
+        case .maintenance: return "sparkles"
         case .update: return "arrow.down.circle"
         }
     }
@@ -97,6 +101,7 @@ struct SettingsWindowView: View {
                     case .display: DisplayItemsView(settings: settings, limitSlider: store.chargeLimit.supported)
                     case .charging: ChargingPlanView(store: store, settings: settings, ui: ui, embedded: true)
                     case .peripherals: PeripheralAlertsCard(store: store.peripherals, settings: settings)
+                    case .maintenance: MaintenanceSettingsView()
                     default: EmptyView()
                     }
                 }
@@ -165,6 +170,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         ui.loginStatus = LoginItem.status
         ui.scrollTrusted = ScrollDirection.trusted
         ui.scrollRunning = ScrollDirection.shared.isRunning
+        ui.dockWindowsRunning = DockWindowSwitcher.shared.isRunning
+        ui.inputTapRunning = InputController.shared.isRunning
     }
 
     func windowWillClose(_ notification: Notification) {

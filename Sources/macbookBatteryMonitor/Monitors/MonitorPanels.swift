@@ -509,53 +509,190 @@ private struct DiskPanel: View {
 }
 
 private struct DiskCleanSection: View {
-    @State private var targets: [DiskCleanerService.CacheTarget] = []
+    @State private var scanResult: DiskCleanerService.ScanResult?
     @State private var isScanning = false
     @State private var isCleaning = false
     @State private var statusMessage: String?
+    @State private var expandedCategory: DiskCleanerService.CategoryType?
+    @State private var showLargeFiles = true
     private let service = DiskCleanerService()
 
     private var totalBytes: UInt64 {
-        targets.reduce(0) { $0 + $1.sizeBytes }
+        scanResult?.totalCleanableBytes ?? 0
     }
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    CardTitle("快取與維護", systemImage: "sparkles")
-                    Spacer()
-                    if isScanning || isCleaning {
-                        ProgressView().controlSize(.small)
-                    } else if totalBytes > 0 {
-                        Text(ByteFormat.size(totalBytes))
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+        VStack(spacing: 8) {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    // 頂部標題與總量
+                    HStack {
+                        CardTitle("儲存深度清理", systemImage: "sparkles")
+                        Spacer()
+                        if isScanning || isCleaning {
+                            ProgressView().controlSize(.small)
+                        } else if totalBytes > 0 {
+                            Text("可釋放 \(ByteFormat.size(totalBytes))")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+
+                    if let msg = statusMessage {
+                        Text(msg)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.green)
+                    }
+
+                    // 主要操作按鈕
+                    HStack(spacing: 8) {
+                        Button(action: scanAndCleanAll) {
+                            Label(totalBytes > 0 ? "一鍵釋放全部 (\(ByteFormat.size(totalBytes)))" : "深度掃描可清理項目", systemImage: "trash.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(isScanning || isCleaning)
+
+                        Button(action: scan) {
+                            Label("重新掃描", systemImage: "arrow.clockwise")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isScanning || isCleaning)
+                    }
+
+                    Divider()
+
+                    // 分類清單
+                    if let result = scanResult {
+                        VStack(spacing: 6) {
+                            ForEach(DiskCleanerService.CategoryType.allCases) { cat in
+                                let items = result.itemsByCategory[cat] ?? []
+                                let catBytes = items.reduce(0) { $0 + $1.sizeBytes }
+                                if catBytes > 0 {
+                                    VStack(spacing: 4) {
+                                        HStack {
+                                            Label(cat.rawValue, systemImage: cat.icon)
+                                                .font(.system(size: 11, weight: .medium))
+                                            Spacer()
+                                            Text(ByteFormat.size(catBytes))
+                                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                                .foregroundStyle(.secondary)
+                                            Button(action: { cleanCategory(items) }) {
+                                                Text("清理")
+                                                    .font(.system(size: 10))
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.mini)
+                                            .disabled(isCleaning)
+                                        }
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                expandedCategory = (expandedCategory == cat ? nil : cat)
+                                            }
+                                        }
+
+                                        // 展開細項
+                                        if expandedCategory == cat {
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                ForEach(items) { item in
+                                                    HStack {
+                                                        Text("• \(item.name)")
+                                                            .font(.system(size: 10))
+                                                            .foregroundStyle(.secondary)
+                                                            .lineLimit(1)
+                                                        Spacer()
+                                                        Text(ByteFormat.size(item.sizeBytes))
+                                                            .font(.system(size: 10, design: .rounded))
+                                                            .foregroundStyle(.secondary)
+                                                    }
+                                                    .padding(.leading, 12)
+                                                }
+                                            }
+                                            .padding(.vertical, 2)
+                                        }
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                            }
+                        }
+
+                        // Top 大型檔案區塊
+                        if !result.largeFiles.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Label("Top 大型佔用檔案", systemImage: "externaldrive.badge.exclamationmark")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Spacer()
+                                    Button(action: { showLargeFiles.toggle() }) {
+                                        Image(systemName: showLargeFiles ? "chevron.up" : "chevron.down")
+                                            .font(.system(size: 9))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                if showLargeFiles {
+                                    ForEach(result.largeFiles) { file in
+                                        HStack {
+                                            Text(file.name)
+                                                .font(.system(size: 10))
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Text(file.formattedSize)
+                                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                                .foregroundStyle(.secondary)
+                                            Button(action: {
+                                                NSWorkspace.shared.selectFile(file.path, inFileViewerRootedAtPath: "")
+                                            }) {
+                                                Image(systemName: "folder")
+                                                    .font(.system(size: 10))
+                                            }
+                                            .buttonStyle(.plain)
+                                            .help("在 Finder 顯示")
+                                        }
+                                        .padding(.vertical, 1)
+                                    }
+                                }
+                            }
+                        }
+                    } else if !isScanning {
+                        Text("點擊「深度掃描」分析開發者快取、過期安裝檔與孤立殘留")
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
 
-                if let msg = statusMessage {
-                    Text(msg)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.green)
-                }
+            // 系統維護卡片
+            Card {
+                VStack(alignment: .leading, spacing: 6) {
+                    CardTitle("系統無痛最佳化", systemImage: "wrench.and.screwdriver")
+                    HStack(spacing: 6) {
+                        Button(action: { runMaintenance("DNS 快取", action: SystemMaintenanceService.flushDNS) }) {
+                            Label("刷新 DNS", systemImage: "network")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
 
-                HStack(spacing: 8) {
-                    Button(action: scanAndClean) {
-                        Label(totalBytes > 0 ? "一鍵釋放快取" : "掃描快取", systemImage: "trash")
-                            .font(.system(size: 11))
+                        Button(action: { runMaintenance("縮圖快取", action: SystemMaintenanceService.rebuildQuickLookCache) }) {
+                            Label("修復縮圖", systemImage: "eye")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+
+                        Button(action: { runMaintenance("記憶體", action: SystemMaintenanceService.purgeMemory) }) {
+                            Label("釋放記憶體", systemImage: "memorychip")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(isScanning || isCleaning)
-
-                    Button(action: performMaintenance) {
-                        Label("修復 DNS 與縮圖", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isCleaning)
                 }
             }
         }
@@ -567,38 +704,54 @@ private struct DiskCleanSection: View {
     private func scan() {
         isScanning = true
         DispatchQueue.global(qos: .utility).async {
-            let res = service.scanTargets()
+            let res = service.performDeepScan()
             DispatchQueue.main.async {
-                self.targets = res
+                self.scanResult = res
                 self.isScanning = false
             }
         }
     }
 
-    private func scanAndClean() {
-        if totalBytes == 0 {
+    private func scanAndCleanAll() {
+        guard let res = scanResult, res.totalCleanableBytes > 0 else {
             scan()
             return
         }
         isCleaning = true
         DispatchQueue.global(qos: .userInitiated).async {
-            let results = service.cleanAll(targets: targets)
-            let freed = results.reduce(0) { $0 + $1.freedBytes }
-            let updated = service.scanTargets()
+            var freed: UInt64 = 0
+            for items in res.itemsByCategory.values {
+                let results = service.cleanCategory(items)
+                freed += results.reduce(0) { $0 + $1.freedBytes }
+            }
+            let updated = service.performDeepScan()
             DispatchQueue.main.async {
-                self.targets = updated
+                self.scanResult = updated
                 self.isCleaning = false
-                self.statusMessage = "已安全釋放 \(ByteFormat.size(freed))"
+                self.statusMessage = "🎉 已安全釋放 \(ByteFormat.size(freed)) 空間！"
             }
         }
     }
 
-    private func performMaintenance() {
+    private func cleanCategory(_ items: [DiskCleanerService.CleanableItem]) {
+        isCleaning = true
         DispatchQueue.global(qos: .userInitiated).async {
-            let outcomes = SystemMaintenanceService.performFullMaintenance()
-            let allSuccess = outcomes.allSatisfy { $0.success }
+            let results = service.cleanCategory(items)
+            let freed = results.reduce(0) { $0 + $1.freedBytes }
+            let updated = service.performDeepScan()
             DispatchQueue.main.async {
-                self.statusMessage = allSuccess ? "DNS 快取與 QuickLook 預覽已重新整理" : "部分系統維護項目已完成"
+                self.scanResult = updated
+                self.isCleaning = false
+                self.statusMessage = "已釋放 \(ByteFormat.size(freed))"
+            }
+        }
+    }
+
+    private func runMaintenance(_ name: String, action: @escaping () -> SystemMaintenanceService.MaintenanceOutcome) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let outcome = action()
+            DispatchQueue.main.async {
+                self.statusMessage = outcome.success ? "\(name)已完成最佳化" : "\(name)修復未完成"
             }
         }
     }

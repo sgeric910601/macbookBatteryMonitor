@@ -131,3 +131,13 @@ let pet = DesktopPetTests()
 pet.testThoughtShowsStateAndPlan()
 pet.testSayingsFollowMoodAndData()
 print("2 desktop pet tests passed")
+
+let cleaner = DiskCleanerTests()
+cleaner.testAPFSCloneResolverOnStandardFile()
+cleaner.testProcessGuardSensitivePaths()
+cleaner.testProcessGuardSystemPaths()
+cleaner.testProcessGuardSafeToCleanCheck()
+cleaner.testDiskCleanerCalculationAndClean()
+cleaner.testSystemMaintenanceStructure()
+print("6 disk cleaner, APFS clone and process guard tests passed")
+

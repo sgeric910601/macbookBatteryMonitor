@@ -6,5 +6,6 @@ models=(Sources/macbookBatteryMonitor/Model/ChargeLimitLogic.swift Sources/macbo
 if [[ -f Sources/macbookBatteryMonitor/Model/PowerBreakdown.swift ]]; then
     models+=(Sources/macbookBatteryMonitor/Model/PowerBreakdown.swift)
 fi
-swiftc Sources/macbookBatteryMonitor/Data/BatteryReader.swift Sources/macbookBatteryMonitor/Data/SMC.swift Sources/macbookBatteryMonitor/Data/ChargeLimit.swift Sources/macbookBatteryMonitor/Model/Estimator.swift "${models[@]}" Sources/macbookBatteryMonitor/UI/PowerFlowLayers.swift Sources/macbookBatteryMonitor/Monitors/MonitorModels.swift Tests/macbookBatteryMonitorTests/*.swift Tests/main.swift -o build/tests/power-tests
+services=(Sources/macbookBatteryMonitor/Services/APFSCloneResolver.swift Sources/macbookBatteryMonitor/Services/ProcessGuard.swift Sources/macbookBatteryMonitor/Services/DiskCleanerService.swift Sources/macbookBatteryMonitor/Services/SystemMaintenanceService.swift)
+swiftc Sources/macbookBatteryMonitor/Data/BatteryReader.swift Sources/macbookBatteryMonitor/Data/SMC.swift Sources/macbookBatteryMonitor/Data/ChargeLimit.swift Sources/macbookBatteryMonitor/Model/Estimator.swift "${models[@]}" "${services[@]}" Sources/macbookBatteryMonitor/UI/PowerFlowLayers.swift Sources/macbookBatteryMonitor/Monitors/MonitorModels.swift Tests/macbookBatteryMonitorTests/*.swift Tests/main.swift -o build/tests/power-tests
 build/tests/power-tests

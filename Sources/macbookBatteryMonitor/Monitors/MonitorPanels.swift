@@ -503,6 +503,103 @@ private struct DiskPanel: View {
                             lifetime: usage.lifetime, readRate: usage.readRate, writeRate: usage.writeRate, history: usage.history,
                             totalRead: usage.totalRead, totalWritten: usage.totalWritten, totalsTitle: "接上以來")
             }
+            DiskCleanSection()
+        }
+    }
+}
+
+private struct DiskCleanSection: View {
+    @State private var targets: [DiskCleanerService.CacheTarget] = []
+    @State private var isScanning = false
+    @State private var isCleaning = false
+    @State private var statusMessage: String?
+    private let service = DiskCleanerService()
+
+    private var totalBytes: UInt64 {
+        targets.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    CardTitle("快取與維護", systemImage: "sparkles")
+                    Spacer()
+                    if isScanning || isCleaning {
+                        ProgressView().controlSize(.small)
+                    } else if totalBytes > 0 {
+                        Text(ByteFormat.size(totalBytes))
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let msg = statusMessage {
+                    Text(msg)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.green)
+                }
+
+                HStack(spacing: 8) {
+                    Button(action: scanAndClean) {
+                        Label(totalBytes > 0 ? "一鍵釋放快取" : "掃描快取", systemImage: "trash")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isScanning || isCleaning)
+
+                    Button(action: performMaintenance) {
+                        Label("修復 DNS 與縮圖", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isCleaning)
+                }
+            }
+        }
+        .onAppear {
+            scan()
+        }
+    }
+
+    private func scan() {
+        isScanning = true
+        DispatchQueue.global(qos: .utility).async {
+            let res = service.scanTargets()
+            DispatchQueue.main.async {
+                self.targets = res
+                self.isScanning = false
+            }
+        }
+    }
+
+    private func scanAndClean() {
+        if totalBytes == 0 {
+            scan()
+            return
+        }
+        isCleaning = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let results = service.cleanAll(targets: targets)
+            let freed = results.reduce(0) { $0 + $1.freedBytes }
+            let updated = service.scanTargets()
+            DispatchQueue.main.async {
+                self.targets = updated
+                self.isCleaning = false
+                self.statusMessage = "已安全釋放 \(ByteFormat.size(freed))"
+            }
+        }
+    }
+
+    private func performMaintenance() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let outcomes = SystemMaintenanceService.performFullMaintenance()
+            let allSuccess = outcomes.allSatisfy { $0.success }
+            DispatchQueue.main.async {
+                self.statusMessage = allSuccess ? "DNS 快取與 QuickLook 預覽已重新整理" : "部分系統維護項目已完成"
+            }
         }
     }
 }

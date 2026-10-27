@@ -104,7 +104,7 @@ final class NetworkSpeedTest: ObservableObject {
         last = nil
         sampleLive()
         let timer = Timer(timeInterval: Self.liveInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.sampleLive() }
+            MainActor.assumeIsolatedCompat { self?.sampleLive() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer

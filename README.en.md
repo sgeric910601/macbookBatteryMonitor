@@ -388,7 +388,7 @@ CPU usage measured on an M1 MacBook Air:
 | CPU panel temperatures | IOHIDEventSystem temperature sensors (private interface, hidden if missing); SMC core temperature keys on M2 chips; Intel: see "Intel Macs" |
 | Network speed and totals | 64-bit interface counters from `sysctl` (`NET_RT_IFLIST2`), active interface only |
 | Network interface and IP | `SCDynamicStore` (default route interface), `getifaddrs` |
-| Network speed test | macOS's built-in `/usr/bin/networkQuality -c` (Apple's test servers; limited to 30 seconds when the system's `networkQuality` has `-M`, and force-stopped if not done after 60 either way; idle latency shows "—" when it isn't reported), only when 「開始測速」 is pressed; the live rates during the test come from the interface counters above |
+| Network speed test | macOS's built-in `/usr/bin/networkQuality -c` (Apple's test servers; limited to 30 seconds when the system's `networkQuality` has `-M`, and force-stopped if not done after 60 either way; idle latency shows "—" when it isn't reported; a download or upload reported as 0 wasn't measured, for example because the upload connections timed out, so it also shows "—" with a hint to test again), only when 「開始測速」 is pressed; the live rates during the test come from the interface counters above |
 | Top CPU / memory apps | `top -o cpu`, `top -o mem` |
 | Peripheral batteries (keyboards, mice, trackpads) | IORegistry services with `BatteryPercent` |
 | Peripheral batteries (Bluetooth LE mice, keyboards) | CoreBluetooth: the Battery Level (`0x2A19`) of the standard Battery Service (`0x180F`) on connected devices, Bluetooth permission required; the IORegistry HID usage tells mice and keyboards apart when the name doesn't |

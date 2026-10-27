@@ -553,7 +553,17 @@ struct SpeedTestResult: Equatable {
     var idleLatency: Double?
     var date: Date
 
-    /// 欄位缺少或不合理時留空；下載、上傳都沒有就當作失敗
+    /// 下載或上傳沒測到時是哪一個（「下載」「上傳」）；都有就是 nil
+    var missingPart: String? {
+        switch (download, upload) {
+        case (nil, .some): return "下載"
+        case (.some, nil): return "上傳"
+        default: return nil
+        }
+    }
+
+    /// 欄位缺少或不合理時留空；下載、上傳都沒有就當作失敗。
+    /// 速度是 0 也留空：那是沒測到（例如上傳的連線全部逾時，networkQuality 仍回報 0），不是真的 0
     static func parse(_ data: Data, at date: Date) -> SpeedTestResult? {
         guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
         func value(_ key: String) -> Double? {
@@ -561,7 +571,8 @@ struct SpeedTestResult: Equatable {
             let value = number.doubleValue
             return value.isFinite && value >= 0 ? value : nil
         }
-        let result = SpeedTestResult(download: value("dl_throughput"), upload: value("ul_throughput"),
+        func throughput(_ key: String) -> Double? { value(key).flatMap { $0 > 0 ? $0 : nil } }
+        let result = SpeedTestResult(download: throughput("dl_throughput"), upload: throughput("ul_throughput"),
                                      responsiveness: value("responsiveness"), idleLatency: value("base_rtt"), date: date)
         return result.download == nil && result.upload == nil ? nil : result
     }

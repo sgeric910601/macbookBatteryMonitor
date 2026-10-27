@@ -663,6 +663,9 @@ private struct SpeedTestCard: View {
                     InfoRow("回應能力", result.responsiveness.map { String(format: "%.0f RPM", $0) } ?? "—")
                         .help("網路忙碌時每分鐘能完成的往返次數，越高越不容易卡頓")
                     InfoRow("閒置延遲", result.idleLatency.map { String(format: "%.0f ms", $0) } ?? "—")
+                    if let missing = result.missingPart {
+                        note("這次沒有測到\(missing)速度（通常是測速伺服器的連線逾時），可以再測一次", color: .orange)
+                    }
                     note("\(result.date.formatted(date: .omitted, time: .shortened)) 測試・Apple 測速伺服器")
                 }
                 if case .failed(let message) = test.phase {

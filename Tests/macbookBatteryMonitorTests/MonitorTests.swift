@@ -117,6 +117,13 @@ extension MonitorTests {
         XCTAssertEqual(partial, SpeedTestResult(download: 1_000_000, upload: nil, responsiveness: nil, idleLatency: nil, date: date))
         // 失敗時的輸出、非 JSON、空資料
         XCTAssertNil(SpeedTestResult.parse(Data(#"{"error_code": -1009, "error_domain": "NSURLErrorDomain"}"#.utf8), at: date))
+        // 上傳的連線全部逾時時 networkQuality 仍回報 0：當作沒測到，不是 0 Mbps
+        let timedOut = SpeedTestResult.parse(Data(#"{"dl_throughput": 81088184, "ul_throughput": 0, "error_code": -1001}"#.utf8), at: date)
+        XCTAssertEqual(timedOut?.download, 81_088_184)
+        XCTAssertNil(timedOut?.upload)
+        XCTAssertEqual(timedOut?.missingPart, "上傳")
+        XCTAssertNil(SpeedTestResult.parse(Data(#"{"dl_throughput": 0, "ul_throughput": 0}"#.utf8), at: date))
+        XCTAssertNil(result?.missingPart)
         XCTAssertNil(SpeedTestResult.parse(Data("Downlink: 50 Mbps".utf8), at: date))
         XCTAssertNil(SpeedTestResult.parse(Data(), at: date))
         XCTAssertNil(SpeedTestResult.parse(Data("[1, 2]".utf8), at: date))

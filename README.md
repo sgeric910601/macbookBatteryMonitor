@@ -386,7 +386,7 @@ M1 MacBook Air 實測 CPU 使用率：
 | CPU 面板的溫度 | IOHIDEventSystem 溫度感測器（私有介面，不存在時不顯示）；M2 系列改讀 SMC 核心溫度鍵；Intel 見「Intel Mac」 |
 | 網路速度與累計流量 | `sysctl` 的 64 位元介面計數器（`NET_RT_IFLIST2`），只查目前使用中的介面 |
 | 網路介面與 IP | `SCDynamicStore`（預設路由介面）、`getifaddrs` |
-| 網路測速 | macOS 內建的 `/usr/bin/networkQuality -c`（Apple 的測速伺服器；系統的 `networkQuality` 有 `-M` 時限制最多 30 秒，不論有沒有，60 秒沒結束就強制停止；沒有回報閒置延遲時顯示「—」），只在按下「開始測速」時執行；測速中的即時速率用上一列的介面計數器 |
+| 網路測速 | macOS 內建的 `/usr/bin/networkQuality -c`（Apple 的測速伺服器；系統的 `networkQuality` 有 `-M` 時限制最多 30 秒，不論有沒有，60 秒沒結束就強制停止；沒有回報閒置延遲時顯示「—」；下載或上傳回報 0 是沒測到（例如上傳的連線逾時），也顯示「—」並提示再測一次），只在按下「開始測速」時執行；測速中的即時速率用上一列的介面計數器 |
 | CPU／記憶體 App 排行 | `top -o cpu`、`top -o mem` |
 | 周邊設備電量（鍵盤、滑鼠、觸控板） | IORegistry 中帶 `BatteryPercent` 的服務 |
 | 周邊設備電量（藍牙低功耗滑鼠、鍵盤） | CoreBluetooth：已連線設備的標準電池服務（`0x180F`）的電池電量（`0x2A19`），需要藍牙權限；名稱看不出是滑鼠或鍵盤時用 IORegistry 的 HID 用途判斷 |

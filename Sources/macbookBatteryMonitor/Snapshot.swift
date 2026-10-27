@@ -285,7 +285,21 @@ enum SnapshotCommand {
                     .environment(\.colorScheme, appearance == .aqua ? .light : .dark)
                 render(view, appearance: appearance, settle: 0.3, to: dir.appendingPathComponent("monitor-\(kind.rawValue)-\(suffix).png"))
             }
-            let views = MonitorDebug.menuBarImages(cpu: cpu, memory: memory, disk: disk, network: network).map { image -> NSView in
+            // 設定裡的選項：記憶體與磁碟合併的面板、網路面板的測速卡片
+            for (kind, name, merged, speedTest) in [(MonitorKind.memory, "memory-disk", true, false), (.network, "network-speedtest", false, true)] {
+                let view = MonitorPanel(kind: kind, cpu: cpu, memory: memory, disk: disk, network: network,
+                                        memoryDiskMerged: merged, showsSpeedTest: speedTest, onSettings: {})
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .environment(\.colorScheme, appearance == .aqua ? .light : .dark)
+                render(view, appearance: appearance, settle: 0.3, to: dir.appendingPathComponent("monitor-\(name)-\(suffix).png"))
+            }
+            // 最後三個是記憶體與磁碟合併的圖示，記憶體壓力依序為正常、警告、嚴重
+            let memoryText = memory.usage.map { ByteFormat.percent($0.usedFraction) } ?? "—"
+            let diskText = disk.volume.map { ByteFormat.percent($0.total > 0 ? Double($0.used) / Double($0.total) : 0) } ?? "—"
+            let merged = [MemoryPressure.normal, .warning, .critical].map {
+                MonitorMenuBarRenderer.memoryDisk(memory: memoryText, disk: diskText, pressure: $0)
+            }
+            let views = (MonitorDebug.menuBarImages(cpu: cpu, memory: memory, disk: disk, network: network) + merged).map { image -> NSView in
                 let button = NSButton(image: image, target: nil, action: nil)
                 button.isBordered = false
                 return button

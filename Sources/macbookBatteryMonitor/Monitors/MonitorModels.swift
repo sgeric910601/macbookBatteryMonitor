@@ -28,6 +28,16 @@ enum MonitorKind: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+extension MonitorKind {
+    /// 記憶體與磁碟合併成一個圖示：開關打開，且兩個模組都開著
+    static func mergesMemoryDisk(merge: Bool, memory: Bool, disk: Bool) -> Bool { merge && memory && disk }
+
+    /// 合併時磁碟併入記憶體的圖示，不再單獨出現
+    static func shown(_ enabled: [MonitorKind], memoryDiskMerged: Bool) -> [MonitorKind] {
+        memoryDiskMerged ? enabled.filter { $0 != .disk } : enabled
+    }
+}
+
 // MARK: - CPU
 
 /// 單一核心（或全部核心加總）的累計 tick
@@ -530,4 +540,44 @@ enum ThermalKeyTable {
         storage: ["TH0a", "TH0b"],
         battery: ["TB0T", "TB1T", "TB2T"],
         coresSleep: false)
+}
+
+/// macOS 內建 networkQuality（`-c` 輸出的 JSON）的測速結果
+struct SpeedTestResult: Equatable {
+    /// 位元／秒
+    var download: Double?
+    var upload: Double?
+    /// 網路忙碌時每分鐘能完成的往返次數（RPM），越高越不卡
+    var responsiveness: Double?
+    /// 閒置時的往返延遲（毫秒）
+    var idleLatency: Double?
+    var date: Date
+
+    /// 欄位缺少或不合理時留空；下載、上傳都沒有就當作失敗
+    static func parse(_ data: Data, at date: Date) -> SpeedTestResult? {
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        func value(_ key: String) -> Double? {
+            guard let number = json[key] as? NSNumber else { return nil }
+            let value = number.doubleValue
+            return value.isFinite && value >= 0 ? value : nil
+        }
+        let result = SpeedTestResult(download: value("dl_throughput"), upload: value("ul_throughput"),
+                                     responsiveness: value("responsiveness"), idleLatency: value("base_rtt"), date: date)
+        return result.download == nil && result.upload == nil ? nil : result
+    }
+
+    /// networkQuality 的參數。macOS 12 沒有 -M（測試時間上限），加了會直接失敗，
+    /// 所以只在說明裡列出 -M 時才加；沒有上限時靠 App 自己 60 秒後強制結束
+    static func arguments(help: String, maxRuntime: Int) -> [String] {
+        help.contains("-M:") ? ["-c", "-M", String(maxRuntime)] : ["-c"]
+    }
+
+    /// 測速常用的位元速率："17.2 Mbps"、"850 Kbps"、"1.2 Gbps"
+    static func bitRate(_ bitsPerSecond: Double) -> String {
+        let value = max(0, bitsPerSecond)
+        if value >= 999.5e6 { return String(format: "%.1f Gbps", value / 1e9) }
+        if value < 999.5e3, value > 0 { return String(format: "%.0f Kbps", value / 1e3) }
+        let mbps = value / 1e6
+        return String(format: mbps < 99.95 && mbps > 0 ? "%.1f Mbps" : "%.0f Mbps", mbps)
+    }
 }

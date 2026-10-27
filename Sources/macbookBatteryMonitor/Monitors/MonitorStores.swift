@@ -263,6 +263,8 @@ final class NetworkMonitor: ObservableObject {
     /// a：下載、b：上傳（位元組／秒）
     @Published private(set) var history = MonitorHistory()
     @Published private(set) var updated: Date?
+    /// 面板關閉後繼續測，下次打開仍看得到結果
+    let speedTest = NetworkSpeedTest()
 
     private var last: (interface: String, received: UInt64, sent: UInt64, date: Date)?
 

@@ -1,6 +1,19 @@
 import Foundation
 
 final class MonitorTests {
+    func testMemoryDiskMergeNeedsBothModules() {
+        XCTAssertTrue(MonitorKind.mergesMemoryDisk(merge: true, memory: true, disk: true))
+        XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: true, memory: true, disk: false))
+        XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: true, memory: false, disk: true))
+        XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: false, memory: true, disk: true))
+    }
+
+    func testMergedMemoryDiskDropsDiskIcon() {
+        let all = MonitorKind.allCases
+        XCTAssertEqual(MonitorKind.shown(all, memoryDiskMerged: false), all)
+        XCTAssertEqual(MonitorKind.shown(all, memoryDiskMerged: true), [.cpu, .memory, .network])
+    }
+
     func testCPUUsageFromTickDeltas() {
         let old = CPUTicks(user: 100, system: 50, idle: 850, nice: 0)
         let new = CPUTicks(user: 160, system: 70, idle: 1070, nice: 0)
@@ -86,5 +99,65 @@ final class MonitorTests {
         var everySecond = MonitorHistory()
         for i in 0..<200 { everySecond.append(Double(i), at: start.addingTimeInterval(Double(i))) }
         XCTAssertEqual(everySecond.points.count, MonitorHistory.capacity)
+    }
+}
+
+extension MonitorTests {
+    func testSpeedTestParsing() {
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        let json = """
+        {"dl_throughput": 52000000, "ul_throughput": 8400000, "responsiveness": 612.5, "base_rtt": 18.25,
+         "interface_name": "en9", "il_h2_req_resp": [20, 21], "other": {}}
+        """
+        let result = SpeedTestResult.parse(Data(json.utf8), at: date)
+        XCTAssertEqual(result, SpeedTestResult(download: 52_000_000, upload: 8_400_000, responsiveness: 612.5,
+                                               idleLatency: 18.25, date: date))
+        // 只測下載、欄位型別錯誤或負值：該欄留空，不當掉
+        let partial = SpeedTestResult.parse(Data(#"{"dl_throughput": 1000000, "ul_throughput": "x", "base_rtt": -1}"#.utf8), at: date)
+        XCTAssertEqual(partial, SpeedTestResult(download: 1_000_000, upload: nil, responsiveness: nil, idleLatency: nil, date: date))
+        // 失敗時的輸出、非 JSON、空資料
+        XCTAssertNil(SpeedTestResult.parse(Data(#"{"error_code": -1009, "error_domain": "NSURLErrorDomain"}"#.utf8), at: date))
+        XCTAssertNil(SpeedTestResult.parse(Data("Downlink: 50 Mbps".utf8), at: date))
+        XCTAssertNil(SpeedTestResult.parse(Data(), at: date))
+        XCTAssertNil(SpeedTestResult.parse(Data("[1, 2]".utf8), at: date))
+    }
+
+    /// macOS 12 的 networkQuality 沒有 -M，輸出也沒有閒置延遲（base_rtt）
+    func testSpeedTestOnOlderSystems() {
+        let monterey = """
+        USAGE: networkQuality [-C <configuration_url>] [-c] [-h] [-I <interfaceName>] [-s] [-v]
+            -C: override Configuration URL
+            -c: Produce computer-readable output
+            -h: Show help (this message)
+            -I: Bind test to interface (e.g., en0, pdp_ip0,...)
+            -s: Run tests sequentially instead of parallel upload/download
+            -v: Verbose output
+        """
+        let current = """
+            -k: Disable certificate validation
+            -M: Provide maximum runtime in seconds
+            -p: Use iCloud Private Relay
+        """
+        XCTAssertEqual(SpeedTestResult.arguments(help: monterey, maxRuntime: 30), ["-c"])
+        XCTAssertEqual(SpeedTestResult.arguments(help: current, maxRuntime: 30), ["-c", "-M", "30"])
+        XCTAssertEqual(SpeedTestResult.arguments(help: "", maxRuntime: 30), ["-c"])
+
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        let json = """
+        {"dl_flows": 12, "dl_throughput": 507593504, "lud_foreign_h2_req_resp": [74, 67], "lud_self_dl_h2": [58.5, 26.1],
+         "responsiveness": 1075, "ul_flows": 20, "ul_throughput": 68901384}
+        """
+        XCTAssertEqual(SpeedTestResult.parse(Data(json.utf8), at: date),
+                       SpeedTestResult(download: 507_593_504, upload: 68_901_384, responsiveness: 1075, idleLatency: nil, date: date))
+    }
+
+    func testBitRateFormat() {
+        XCTAssertEqual(SpeedTestResult.bitRate(0), "0 Mbps")
+        XCTAssertEqual(SpeedTestResult.bitRate(-5), "0 Mbps")
+        XCTAssertEqual(SpeedTestResult.bitRate(850_000), "850 Kbps")
+        XCTAssertEqual(SpeedTestResult.bitRate(999_700), "1.0 Mbps")
+        XCTAssertEqual(SpeedTestResult.bitRate(17_221_336), "17.2 Mbps")
+        XCTAssertEqual(SpeedTestResult.bitRate(345_600_000), "346 Mbps")
+        XCTAssertEqual(SpeedTestResult.bitRate(1_234_000_000), "1.2 Gbps")
     }
 }

@@ -94,7 +94,7 @@ if CommandLine.arguments.contains("--dump") {
 }
 
 if CommandLine.arguments.contains("--selftest-scroll") {
-    MainActor.assumeIsolated { ScrollDirection.shared.selfTest() }
+    MainActor.assumeIsolatedCompat { ScrollDirection.shared.selfTest() }
     exit(0)
 }
 
@@ -130,7 +130,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--selftest-location") {
               + "原本的位置 \(AppLocation.originalURL(of: url)?.path ?? "—")")
         exit(0)
     }
-    MainActor.assumeIsolated {
+    MainActor.assumeIsolatedCompat {
         guard let problem = AppLocation.problem() else {
             print("selftest: 從一般位置執行 \(Bundle.main.bundlePath)")
             exit(0)

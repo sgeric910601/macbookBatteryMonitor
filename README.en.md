@@ -22,7 +22,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Power flow**: watts between the power adapter, the system and the battery, expandable to the display backlight and CPU/GPU/ANE
 - **Charging companion and desktop pet**: a breathing cat, a battery with a face, a charge bar or a photo that follows the charging state, also available as a pet on the desktop
 - **Peripheral batteries**: Bluetooth keyboards, mice and trackpads (including Logitech, Razer and other Bluetooth LE devices) and the left bud, right bud and case of AirPods, each with its own low-battery notification
-- **System monitors**: CPU/GPU (with fans and temperatures), memory, disks (including external drives and drive health) and network, one menu bar icon each; one switch turns them all off
+- **System monitors**: CPU/GPU (with fans and temperatures), memory, disks (including external drives and drive health) and network (with a speed test), one menu bar icon each, or one shared icon for memory and disk; one switch turns them all off
 - **Separate mouse and trackpad scroll directions**: for example natural scrolling on the trackpad and the traditional direction on the mouse wheel
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
@@ -72,6 +72,7 @@ The app is named "電池與系統監控" (Battery & System Monitor on English sy
 - **Display styles** (Settings → Display items): icon and percentage, icon only, percentage only, icon and time remaining, or percentage inside the icon plus time remaining (the charge inside the battery icon, time remaining or time to full on the right). The last one shows "—" without time data and "已充飽" (full), "接電" (plugged in) or "已達上限" (limit reached) when full, plugged in without charging, or at the charge limit
 - A bolt while charging, a plug while plugged in without charging, red at low battery
 - **System monitors**: one menu bar icon each. Left click opens that monitor's panel, right click opens Settings or quits; hold ⌘ and drag to reorder the icons
+- **Memory and disk in one icon** (「記憶體與磁碟放在同一個圖示」 in Settings → Monitoring & power saving, off by default): two lines like CPU/GPU, memory on top and disk below; the memory value still turns orange or red under memory pressure. Its panel shows memory, then disk. Available only while both the memory and disk monitors are on
 - **Combine into one icon** (Settings → Monitoring & power saving): when the menu bar is full, macOS hides the icons that don't fit (MacBooks with a notch are hit hardest). You can then keep just the battery icon (power on desktops). Clicking it opens a second status bar right below the menu bar with the battery and monitor icons, updated live. Click an icon there to open its panel (click again to collapse it); click anywhere else or press Esc to close the bar. The monitors only sample while the second bar is open. No screen recording or Accessibility permission is needed
 - If you only see the battery icon and no CPU or other icons, check that the system monitor master switch is on in Settings → Monitoring & power saving
 
@@ -104,6 +105,7 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
   - NVMe drives keep their own record of how much of their rated life is used and how much has been read and written since they were made. Every Apple silicon Mac's internal drive is NVMe, as are most Intel Macs from 2016 on and Thunderbolt enclosures. Health is 100% minus the life used (3% used means 97%), the totals are the drive's lifetime totals, and power-on time is listed too, with an extra line if there are media errors. When the drive reports a critical warning or its spare blocks fall below the threshold, health shows a red "異常，建議立即備份" (failing, back up now)
   - Drives without that record (internal drives that aren't NVMe, such as a 2015 MacBook Air's, and most USB enclosures) show the SMART "正常／異常" (OK / failing) status, and totals since boot (since connected for external disks)
 - **Network**: the menu bar shows upload and download speed; the panel shows the current interface (Wi-Fi, Ethernet) and IP, a speed chart and totals since boot
+  - **Speed test**: off by default so it isn't started by accident; after turning on 「在網路面板顯示測速」 (show speed test in the network panel) in Settings → Monitoring & power saving, press 「開始測速」 (start test) at the bottom of the panel to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
 - Child processes (such as browser tabs) are merged into their app
 
 ![Battery plus system monitors: CPU/GPU, memory, disk and network icons in the menu bar and each monitor's panel, with fans, temperatures and external disks](docs/screenshots/edition-status.png)
@@ -134,7 +136,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 |---|---|
 | 一般 (General) | App icon color, notification thresholds, launch at login |
 | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, system monitor master switch and each monitor, combine into one icon, admin CPU sampling |
+| 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, system monitor master switch and each monitor, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
 | 充電 (Charging) | Charge limit slider, smart charging |
 | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
 | 周邊設備 (Peripherals) | Each device's low-battery notification |
@@ -343,6 +345,7 @@ CPU usage measured on an M1 MacBook Air:
 - Smart charging does nothing without a schedule and only calls the system when the limit has to change
 - Flow and charge bar animations are composited by Core Animation, not redrawn frame by frame; the charging companion is a small transparent HEVC video decoded once on first display and then played frame by frame (the desktop pet animating nonstop adds about 0.2% CPU and about 16 MB of memory on an M1)
 - Only enabled monitors sample; with the master switch off, no monitor icons or timers are created at all
+- The network speed test has to be turned on in Settings first, and only runs when you press the button. While it runs, the interface counters are read every 0.5 seconds for the live rates, and everything stops when it ends; without a press there is no test and no extra power use
 - Disk space is read with `statfs()` every second, and the purgeable space is recalibrated every 5 minutes; the external disk list doesn't hang on offline network volumes. Drive health is only read while the disk panel is open (about 0.2 ms each time); drives without it fall back to the SMART status, which launches `diskutil` and may wake a sleeping external drive, so it runs at most every 10 minutes per drive
 - Fans and temperatures are read in the background every 2 seconds, only while the CPU panel is open
 - Peripherals are checked every 60 seconds; headphones need `system_profiler`, so background updates only query it while a Bluetooth audio device is connected; Bluetooth LE devices are only asked for their battery when already connected, without new connections
@@ -385,6 +388,7 @@ CPU usage measured on an M1 MacBook Air:
 | CPU panel temperatures | IOHIDEventSystem temperature sensors (private interface, hidden if missing); SMC core temperature keys on M2 chips; Intel: see "Intel Macs" |
 | Network speed and totals | 64-bit interface counters from `sysctl` (`NET_RT_IFLIST2`), active interface only |
 | Network interface and IP | `SCDynamicStore` (default route interface), `getifaddrs` |
+| Network speed test | macOS's built-in `/usr/bin/networkQuality -c` (Apple's test servers; limited to 30 seconds when the system's `networkQuality` has `-M`, and force-stopped if not done after 60 either way; idle latency shows "—" when it isn't reported), only when 「開始測速」 is pressed; the live rates during the test come from the interface counters above |
 | Top CPU / memory apps | `top -o cpu`, `top -o mem` |
 | Peripheral batteries (keyboards, mice, trackpads) | IORegistry services with `BatteryPercent` |
 | Peripheral batteries (Bluetooth LE mice, keyboards) | CoreBluetooth: the Battery Level (`0x2A19`) of the standard Battery Service (`0x180F`) on connected devices, Bluetooth permission required; the IORegistry HID usage tells mice and keyboards apart when the name doesn't |
@@ -477,7 +481,7 @@ $APP --dump-peripherals  # read peripheral batteries once (all Bluetooth devices
 $APP --notification-status # print the app's notification permission (check this first when notifications don't arrive)
 $APP --selftest-panel    # open the panel for 20 seconds and close it, for power measurements
 $APP --selftest-hardware # expand the chip, switch to the smart charging page, check that sampling stops and resumes, print CPU readings
-$APP --selftest-monitors # open the CPU and memory panels for 10 seconds each, for power measurements
+$APP --selftest-monitors # open the CPU and memory panels for 10 seconds each, for power measurements; then switch the memory and disk icon merge once and back, printing the menu bar icon widths
 $APP --selftest-strip    # open the second status bar, then the CPU and battery panels, and print window frames and levels
 $APP --selftest-precise-wake <minutes> # create a precise-wake schedule to 100%, cancel and restore 2 minutes after the limit is raised
 $APP --selftest-settings # open Settings from the panel, visit every section, check it shows in the Dock while open and returns to menu-bar-only after
@@ -522,4 +526,4 @@ The cat in the app icon is `Resources/icon-cat.png` (a cut-out photo); the charg
 ## Thanks
 
 - [@melvin0kuo](https://github.com/melvin0kuo): animated power flow, layered component power, power sensor fallbacks, percentage inside the menu bar icon, stable full-charge display and admin CPU sampling (#1, #2, #4–#7), and the ideas for smart charging, charging schedules and the daily recap (#13)
-- [@liaw-boy](https://github.com/liaw-boy): external disks, fans and temperatures, menu bar icon alignment on 1x screens, the layout idea of merging the charge limit slider into the info card, closing the panel by clicking outside, and power saving only on battery (#8–#10, #12)
+- [@liaw-boy](https://github.com/liaw-boy): external disks, fans and temperatures, menu bar icon alignment on 1x screens, the layout idea of merging the charge limit slider into the info card, closing the panel by clicking outside, and power saving only on battery (#8–#10, #12); the network speed test and the shared memory and disk icon (#15, #16)

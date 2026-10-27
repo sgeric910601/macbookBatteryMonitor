@@ -114,13 +114,32 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!settings.systemMonitors)
+                    SwitchRow("記憶體與磁碟放在同一個圖示", isOn: binding(\.mergeMemoryDisk))
+                        .disabled(!settings.systemMonitors || !settings.monitorMemory || !settings.monitorDisk)
+                    if settings.systemMonitors {
+                        Text(settings.monitorMemory && settings.monitorDisk
+                             ? "像 CPU／GPU 一樣上下兩行，上面記憶體、下面磁碟；點開的面板也合在一起。"
+                             : "記憶體和磁碟都開著時才能使用。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    SwitchRow("在網路面板顯示測速", isOn: binding(\.networkSpeedTest))
+                        .disabled(!settings.systemMonitors || !settings.monitorNetwork)
+                    if settings.systemMonitors {
+                        Text(settings.monitorNetwork
+                             ? "打開後網路面板最下面才有「開始測速」。測一次約 20～30 秒、會用掉數百 MB 流量，預設關閉以免誤按。"
+                             : "網路模組開著時才能使用。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Divider()
                     SwitchRow("合併成一個圖示", isOn: binding(\.menuBarCombined))
                         .disabled(!settings.systemMonitors)
                     Text(!settings.systemMonitors
                          ? "關閉時選單列只有\(hasBattery ? "電池" : "耗電")圖示，四個模組都不會取樣，最省電。"
                          : settings.menuBarCombined
                          ? "選單列只留一個圖示，點一下在下方展開所有圖示；選單列太擠時用。"
-                         : "開啟的模組在選單列各有一個圖示，\(settings.updateText)。")
+                         : "開啟的模組在選單列各有一個圖示\(settings.memoryDiskMerged ? "（記憶體與磁碟共用一個）" : "")，\(settings.updateText)。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -38,6 +38,8 @@ final class AppSettings {
     /// 桌面寵物開關改變時
     /// 捲動方向的設定改變時
     @ObservationIgnored var onScrollDirectionChange: (() -> Void)?
+    /// 視窗切換的開關改變時
+    @ObservationIgnored var onWindowSwitcherChange: (() -> Void)?
     @ObservationIgnored var onDesktopPetChange: (() -> Void)?
 
     /// 可選的更新頻率（秒）
@@ -173,6 +175,20 @@ final class AppSettings {
             if scrollReverseTrackpad != oldValue { onScrollDirectionChange?() }
         }
     }
+    /// 用視窗切換取代 Cmd+Tab（預設關閉）
+    var windowSwitcher: Bool {
+        didSet {
+            defaults.set(windowSwitcher, forKey: Keys.windowSwitcher)
+            if windowSwitcher != oldValue { onWindowSwitcherChange?() }
+        }
+    }
+    /// 視窗切換的所有選項（快捷鍵、大小、篩選、排序、例外清單）
+    var switcher: SwitcherSettings {
+        didSet {
+            defaults.set(switcher.stored, forKey: Keys.switcher)
+            if switcher != oldValue { onWindowSwitcherChange?() }
+        }
+    }
     /// 桌面寵物的大小：1 是和日曆小工具差不多大，範圍 0.5～2（設定的地方用 clampPetScale 限制）
     var desktopPetScale: Double {
         didSet {
@@ -304,6 +320,8 @@ final class AppSettings {
         static let desktopPetFollowCursor = "desktopPetFollowCursor"
         static let scrollReverseMouse = "scrollReverseMouse"
         static let scrollReverseTrackpad = "scrollReverseTrackpad"
+        static let windowSwitcher = "windowSwitcher"
+        static let switcher = "windowSwitcherSettings"
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
@@ -401,6 +419,8 @@ final class AppSettings {
         desktopPetFollowCursor = defaults.bool(forKey: Keys.desktopPetFollowCursor)
         scrollReverseMouse = defaults.bool(forKey: Keys.scrollReverseMouse)
         scrollReverseTrackpad = defaults.bool(forKey: Keys.scrollReverseTrackpad)
+        windowSwitcher = defaults.bool(forKey: Keys.windowSwitcher)
+        switcher = SwitcherSettings(stored: defaults.dictionary(forKey: Keys.switcher) ?? [:])
         let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
         let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target

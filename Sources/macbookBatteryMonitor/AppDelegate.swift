@@ -116,6 +116,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.ui.scrollRunning = ScrollDirection.shared.isRunning
         }
         applyScrollDirection(prompt: false)
+        settings.onWindowSwitcherChange = { [weak self] in self?.applyWindowSwitcher(prompt: true) }
+        InputController.shared.onChange = { [weak self] in
+            self?.ui.scrollTrusted = ScrollDirection.trusted
+            self?.ui.inputTapRunning = InputController.shared.isRunning
+        }
+        applyWindowSwitcher(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -245,6 +251,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             guard ScrollDirection.trusted else { return }
             delegate.applyScrollDirection(prompt: false)
         }
+    }
+
+    /// 視窗切換同樣需要「輔助使用」；剛打開開關、還沒有權限時跳出系統的詢問，允許之後每 5 秒的檢查會自己開始
+    private func applyWindowSwitcher(prompt: Bool) {
+        let options = settings.switcher
+        InputTap.shared.setSwitcher(shortcuts: options.profiles.map(\.shortcut), vimKeys: options.vimKeys, releaseCommits: !options.keepOpenAfterRelease)
+        WindowSwitcher.shared.configure(options)
+        InputController.shared.apply(keys: settings.windowSwitcher)
+        if prompt, settings.windowSwitcher, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
     }
 
     /// 開發用：`--selftest-update` 檢查 GitHub 上的新版本，有就直接一鍵更新（App 會結束並由安裝程序重新開啟）

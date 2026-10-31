@@ -24,6 +24,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Peripheral batteries**: Bluetooth keyboards, mice and trackpads (including Logitech, Razer and other Bluetooth LE devices) and the left bud, right bud and case of AirPods, each with its own low-battery notification
 - **System monitors**: CPU/GPU (with fans and temperatures), memory, disks (including external drives and drive health) and network (with a speed test), one menu bar icon each, or one shared icon for memory and disk; one switch turns them all off
 - **Separate mouse and trackpad scroll directions**: for example natural scrolling on the trackpad and the traditional direction on the mouse wheel
+- **Login items**: lists the apps, agents and daemons that start at login, shows what each one is and where it comes from, and lets you clear the config files an uninstalled app left behind
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
@@ -141,6 +142,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
 | 周邊設備 (Peripherals) | Each device's low-battery notification |
 | 滑鼠與觸控板 (Mouse & trackpad) | Separate scroll directions |
+| 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
 | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
 Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens Update, and the gear in a monitor panel opens Monitoring & power saving.
@@ -232,6 +234,18 @@ This usually happens after updating from v1.7.3 or earlier: the "電池與系統
 2. Select "電池與系統監控" in the list and click "−" below it to remove it (even if its switch still looks on)
 3. Click "+", choose `macbookBatteryMonitor` in Applications, click Open and make sure its switch is on
 4. Back in the app's settings the status turns to "運作中" (working) within seconds, no relaunch needed
+
+## Login items
+
+Settings → 登入項目 (Login items) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
+
+- **Sources**: the "open at login" items, `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`. Every row has an icon, and items whose program no longer exists say so
+- **What you can do**: add or remove "open at login" apps; disable or enable your own (user-level) agents. Disabling takes effect at the next login and also stops the copy that is running now. Every action asks first
+- **Items whose program is gone**: when an app was deleted but its config file stayed, you can move that file to the Trash here (and put it back later). System-level ones ask for an admin password. Apple's own items and items whose program still exists have no remove button
+- **Detail page** (the ⓘ on each row): program path, identifier, the signer on the certificate, related apps (declared by the helper itself, or inferred from leftover preference file names and marked as inferred) and the full paths of possibly related files, each of which you can reveal in Finder or copy. It re-reads when you come back to the settings window. "Search the web" only opens your browser's search engine when you press it and sends nothing but the identifier
+- **Information only**: leftover files are listed by path and never deleted for you; similarly named files may belong to other software, so check before you act
+- **Limits**: system-level items and "Allow in the Background" can only be switched in System Settings; macOS has no public way to toggle other apps' background items
+- **Permission**: reading, adding and removing "open at login" items needs you to allow this app to control System Events (System Settings → Privacy & Security → Automation); macOS asks the first time. If you decline, the other sources still list
 
 ## App icon
 

@@ -30,6 +30,8 @@
     <string>14.0</string>
     <key>MBMEdition</key>
     <string>status</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>「電池與系統監控」需要透過 System Events 讀取、新增與移除「登入時打開」的項目。App 不會控制其他程式的內容。</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>

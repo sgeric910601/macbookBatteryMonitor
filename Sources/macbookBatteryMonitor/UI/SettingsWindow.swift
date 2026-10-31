@@ -16,6 +16,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case peripherals
     /// 滑鼠與觸控板分開的捲動方向
     case input
+    /// 登入時自動啟動的項目
+    case startup
     case update
 
     var id: String { rawValue }
@@ -29,6 +31,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .companion: return "充電夥伴"
         case .peripherals: return "周邊設備"
         case .input: return "滑鼠與觸控板"
+        case .startup: return "登入項目"
         case .update: return "更新"
         }
     }
@@ -43,6 +46,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .companion: return "pawprint"
         case .peripherals: return "keyboard"
         case .input: return "computermouse"
+        case .startup: return "power"
         case .update: return "arrow.down.circle"
         }
     }
@@ -57,6 +61,7 @@ struct SettingsWindowView: View {
     let store: BatteryStore
     let settings: AppSettings
     let ui: PanelState
+    @State private var startupItems = StartupItemsManager()
 
     private var hasBattery: Bool { store.snapshot != nil }
 
@@ -90,13 +95,17 @@ struct SettingsWindowView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(current.title).font(.title2.weight(.semibold))
-                    SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater,
-                                 chargeLimit: store.chargeLimit, hasBattery: hasBattery,
-                                 section: current, planActive: store.chargingPlan.isActive)
+                    // 登入項目分頁沒有 SettingsView 的卡片，不放進去，否則隱藏的卡片之間的間距會把標題與內容撐開
+                    if current != .startup {
+                        SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater,
+                                     chargeLimit: store.chargeLimit, hasBattery: hasBattery,
+                                     section: current, planActive: store.chargingPlan.isActive)
+                    }
                     switch current {
                     case .display: DisplayItemsView(settings: settings, limitSlider: store.chargeLimit.supported)
                     case .charging: ChargingPlanView(store: store, settings: settings, ui: ui, embedded: true)
                     case .peripherals: PeripheralAlertsCard(store: store.peripherals, settings: settings)
+                    case .startup: StartupItemsView(manager: startupItems)
                     default: EmptyView()
                     }
                 }

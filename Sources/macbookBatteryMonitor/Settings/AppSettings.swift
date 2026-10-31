@@ -38,6 +38,8 @@ final class AppSettings {
     /// 桌面寵物開關改變時
     /// 捲動方向的設定改變時
     @ObservationIgnored var onScrollDirectionChange: (() -> Void)?
+    /// 中文輸入法的 Caps Lock 延遲或 Shift 半形開關改變時
+    @ObservationIgnored var onInputSourceFixChange: (() -> Void)?
     @ObservationIgnored var onDesktopPetChange: (() -> Void)?
 
     /// 可選的更新頻率（秒）
@@ -173,6 +175,20 @@ final class AppSettings {
             if scrollReverseTrackpad != oldValue { onScrollDirectionChange?() }
         }
     }
+    /// Caps Lock 切換中英不延遲
+    var capsLockNoDelay: Bool {
+        didSet {
+            defaults.set(capsLockNoDelay, forKey: Keys.capsLockNoDelay)
+            if capsLockNoDelay != oldValue { onInputSourceFixChange?() }
+        }
+    }
+    /// 中文輸入法按住 Shift 打半形英文
+    var shiftHalfWidth: Bool {
+        didSet {
+            defaults.set(shiftHalfWidth, forKey: Keys.shiftHalfWidth)
+            if shiftHalfWidth != oldValue { onInputSourceFixChange?() }
+        }
+    }
     /// 桌面寵物的大小：1 是和日曆小工具差不多大，範圍 0.5～2（設定的地方用 clampPetScale 限制）
     var desktopPetScale: Double {
         didSet {
@@ -304,6 +320,8 @@ final class AppSettings {
         static let desktopPetFollowCursor = "desktopPetFollowCursor"
         static let scrollReverseMouse = "scrollReverseMouse"
         static let scrollReverseTrackpad = "scrollReverseTrackpad"
+        static let capsLockNoDelay = "capsLockNoDelay"
+        static let shiftHalfWidth = "shiftHalfWidth"
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
@@ -401,6 +419,8 @@ final class AppSettings {
         desktopPetFollowCursor = defaults.bool(forKey: Keys.desktopPetFollowCursor)
         scrollReverseMouse = defaults.bool(forKey: Keys.scrollReverseMouse)
         scrollReverseTrackpad = defaults.bool(forKey: Keys.scrollReverseTrackpad)
+        capsLockNoDelay = defaults.bool(forKey: Keys.capsLockNoDelay)
+        shiftHalfWidth = defaults.bool(forKey: Keys.shiftHalfWidth)
         let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
         let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target

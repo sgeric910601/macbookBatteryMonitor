@@ -66,6 +66,8 @@ final class PanelState {
     var scrollTrusted = false
     /// 捲動方向的事件攔截正在運作
     var scrollRunning = false
+    /// Shift 半形的按鍵攔截在運作
+    var shiftRunning = false
     /// 智慧充電頁的輸入：指定完成時間、每週排程的星期與時間
     var chargingCustomDeadline = Date().addingTimeInterval(4 * 3600)
     var chargingWeekdays: Set<Int> = [2, 3, 4, 5, 6]

@@ -328,6 +328,32 @@ struct SettingsView: View {
             }
             .settingsSection(.input, shown: section)
 
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("中文輸入法", systemImage: "keyboard")
+                    SwitchRow("Caps Lock 切換中英不延遲", isOn: binding(\.capsLockNoDelay))
+                    SwitchRow("按住 Shift 打半形英文", isOn: binding(\.shiftHalfWidth))
+                    Text("macOS 為了防誤觸，Caps Lock 要按住一下才切換；打開後按一下就切。注音等中文輸入法按住 Shift 打字母會變全形「Ａ」；打開後按住 Shift 時暫時改用英文鍵盤，放開就切回原本的輸入法。關掉「不延遲」後要重新開機才恢復原本的延遲。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if settings.shiftHalfWidth {
+                        if ui.shiftRunning {
+                            Label("運作中", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        } else if !ui.scrollTrusted {
+                            Text("「按住 Shift 打半形英文」需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                        }
+                    }
+                }
+            }
+            .settingsSection(.input, shown: section)
+
             UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked, ui: ui)
                 .settingsSection(.update, shown: section)
         }

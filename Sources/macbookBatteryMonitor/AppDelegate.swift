@@ -125,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         applyWindowSwitcher(prompt: false)
         settings.onInputSourceFixChange = { [weak self] in self?.applyInputSourceFix(prompt: true) }
         applyInputSourceFix(prompt: false)
+        settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -243,9 +244,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
     /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
+    /// 加入或移除擴充功能後，依新的狀態啟動或停止它；開關原本就關著的功能，加入時不會跳出權限詢問
+    private func applyFeature(_ feature: AppFeature) {
+        switch feature {
+        case .scrollDirection: applyScrollDirection(prompt: true)
+        case .windowSwitcher: applyWindowSwitcher(prompt: true)
+        }
+    }
+
     private func applyScrollDirection(prompt: Bool) {
-        let wanted = settings.scrollReverseMouse || settings.scrollReverseTrackpad
-        let running = ScrollDirection.shared.apply(reverseMouse: settings.scrollReverseMouse, reverseTrackpad: settings.scrollReverseTrackpad)
+        let installed = settings.isInstalled(.scrollDirection)
+        let mouse = installed && settings.scrollReverseMouse
+        let trackpad = installed && settings.scrollReverseTrackpad
+        let wanted = mouse || trackpad
+        let running = ScrollDirection.shared.apply(reverseMouse: mouse, reverseTrackpad: trackpad)
         scrollTrustTimer?.invalidate()
         scrollTrustTimer = nil
         guard wanted, !running else { return }
@@ -261,8 +273,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let options = settings.switcher
         InputTap.shared.setSwitcher(shortcuts: options.profiles.map(\.shortcut), vimKeys: options.vimKeys, releaseCommits: !options.keepOpenAfterRelease)
         WindowSwitcher.shared.configure(options)
-        InputController.shared.apply(keys: settings.windowSwitcher)
-        if prompt, settings.windowSwitcher, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
+        let wanted = settings.windowSwitcher && settings.isInstalled(.windowSwitcher)
+        InputController.shared.apply(keys: wanted)
+        if prompt, wanted, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
     }
 
     /// 中文輸入法：Caps Lock 不延遲（hidutil，不需權限）、按住 Shift 打半形（需要「輔助使用」，允許後每 2 秒檢查一次就開始）

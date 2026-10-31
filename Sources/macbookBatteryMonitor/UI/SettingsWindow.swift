@@ -21,6 +21,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// 登入時自動啟動的項目
     case startup
     case update
+    /// 擴充功能組最後一項：加入或移除擴充功能
+    case features
 
     var id: String { rawValue }
 
@@ -36,6 +38,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .windowSwitcher: return "視窗切換"
         case .startup: return "登入項目"
         case .update: return "更新"
+        case .features: return "功能管理"
         }
     }
 
@@ -52,11 +55,30 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .windowSwitcher: return "macwindow.on.rectangle"
         case .startup: return "power"
         case .update: return "arrow.down.circle"
+        case .features: return "square.grid.2x2"
         }
     }
 
-    static func available(hasBattery: Bool) -> [SettingsSection] {
-        hasBattery ? allCases : allCases.filter { $0 != .charging && $0 != .companion }
+    /// 擴充功能的分類：沒加入就不出現在側邊欄
+    var feature: AppFeature? {
+        switch self {
+        case .input: return .scrollDirection
+        case .windowSwitcher: return .windowSwitcher
+        default: return nil
+        }
+    }
+
+    static func section(for feature: AppFeature) -> SettingsSection {
+        allCases.first { $0.feature == feature } ?? .general
+    }
+
+    /// 側邊欄的分組：基本、電池（沒有電池時只剩周邊設備）、擴充功能（已加入的功能，最後是功能管理）
+    static func sidebar(hasBattery: Bool, isInstalled: (AppFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
+        [
+            ("基本", [.general, .display, .monitors, .startup, .update]),
+            ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
+            ("擴充功能", AppFeature.allCases.filter(isInstalled).map(section(for:)) + [.features]),
+        ]
     }
 }
 
@@ -69,9 +91,12 @@ struct SettingsWindowView: View {
 
     private var hasBattery: Bool { store.snapshot != nil }
 
-    private var sections: [SettingsSection] { SettingsSection.available(hasBattery: hasBattery) }
+    private var groups: [(title: String, sections: [SettingsSection])] {
+        SettingsSection.sidebar(hasBattery: hasBattery, isInstalled: settings.isInstalled)
+    }
+    private var sections: [SettingsSection] { groups.flatMap(\.sections) }
 
-    /// 沒有電池時「充電」「充電夥伴」不在側邊欄，改顯示一般
+    /// 沒有電池時「充電」「充電夥伴」不在側邊欄，移除的擴充功能也不在，改顯示一般
     private var current: SettingsSection {
         sections.contains(ui.settingsSection) ? ui.settingsSection : .general
     }
@@ -80,8 +105,12 @@ struct SettingsWindowView: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 List(selection: Binding<SettingsSection?>(get: { current }, set: { if let section = $0 { ui.settingsSection = section } })) {
-                    ForEach(sections) { section in
-                        Label(section.title, systemImage: section.systemImage).tag(section)
+                    ForEach(groups, id: \.title) { group in
+                        Section(group.title) {
+                            ForEach(group.sections) { section in
+                                Label(section.title, systemImage: section.systemImage).tag(section)
+                            }
+                        }
                     }
                 }
                 .listStyle(.sidebar)
@@ -111,6 +140,7 @@ struct SettingsWindowView: View {
                     case .peripherals: PeripheralAlertsCard(store: store.peripherals, settings: settings)
                     case .windowSwitcher: WindowSwitcherSettingsView(settings: settings, ui: ui)
                     case .startup: StartupItemsView(manager: startupItems)
+                    case .features: FeatureManagerView(settings: settings)
                     default: EmptyView()
                     }
                 }

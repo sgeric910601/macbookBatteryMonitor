@@ -43,6 +43,21 @@ final class AppSettings {
     /// 中文輸入法的 Caps Lock 延遲或 Shift 半形開關改變時
     @ObservationIgnored var onInputSourceFixChange: (() -> Void)?
     @ObservationIgnored var onDesktopPetChange: (() -> Void)?
+    /// 加入或移除擴充功能時（參數是改變的功能）
+    @ObservationIgnored var onFeatureInstallChange: ((AppFeature) -> Void)?
+
+    /// 已加入的擴充功能；沒加入的不啟動，設定裡也看不到
+    private(set) var installedFeatures: Set<AppFeature> = []
+
+    func isInstalled(_ feature: AppFeature) -> Bool { installedFeatures.contains(feature) }
+
+    func setInstalled(_ feature: AppFeature, _ installed: Bool) {
+        guard isInstalled(feature) != installed else { return }
+        if installed { installedFeatures.insert(feature) } else { installedFeatures.remove(feature) }
+        // 只改加入狀態，功能自己的設定都不動，重新加入時照舊
+        defaults.set(installed, forKey: feature.installedKey)
+        onFeatureInstallChange?(feature)
+    }
 
     /// 可選的更新頻率（秒）
     static let updateIntervals = [1, 2, 5, 10]
@@ -385,6 +400,16 @@ final class AppSettings {
             Keys.chargingSleepStrategy: ChargingSleepStrategy.readinessFirst.rawValue,
             Keys.chargingWakeEnabled: false,
         ])
+        // 要在寫入任何設定之前判斷（下面寫入安裝狀態後就判斷不出來）；從舊版更新的不算全新安裝，原本的功能都保留
+        let usedBefore = Self.usedBefore(defaults)
+        if !usedBefore {
+            for (key, installed) in AppFeature.freshInstallChoices { defaults.set(installed, forKey: key) }
+        }
+        var installed = Set<AppFeature>()
+        for feature in AppFeature.allCases where AppFeature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool) {
+            installed.insert(feature)
+        }
+        installedFeatures = installed
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)
         display = MenuBarDisplay(rawValue: defaults.string(forKey: Keys.display) ?? "") ?? .iconAndPercent
         lowAlertEnabled = defaults.bool(forKey: Keys.lowAlertEnabled)
@@ -399,7 +424,7 @@ final class AppSettings {
         networkSpeedTest = defaults.bool(forKey: Keys.networkSpeedTest)
         if defaults.object(forKey: Keys.systemMonitors) != nil {
             systemMonitors = defaults.bool(forKey: Keys.systemMonitors)
-        } else if Self.usedBefore(defaults), AppEdition.current == .battery || AppEdition.current == .status {
+        } else if usedBefore, AppEdition.current == .battery || AppEdition.current == .status {
             // 用舊檔名的 zip 從 v1.6.2 以前一鍵更新：電池版維持只看電池，系統監控版維持開著，不再詢問。
             // 手動下載通用版升級的看不出原本是哪一版，和全新安裝一樣詢問
             let previous = AppEdition.current == .status

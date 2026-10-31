@@ -128,6 +128,16 @@ final class AppSettings {
     var menuBarCombined: Bool {
         didSet { defaults.set(menuBarCombined, forKey: Keys.menuBarCombined); onMonitorsChange?() }
     }
+    /// 監控警示（預設關閉）：只在該模組有取樣時（選單列有它的圖示）才會判斷
+    var alertCPU: Bool {
+        didSet { defaults.set(alertCPU, forKey: Keys.alertCPU) }
+    }
+    var alertMemory: Bool {
+        didSet { defaults.set(alertMemory, forKey: Keys.alertMemory) }
+    }
+    var alertDisk: Bool {
+        didSet { defaults.set(alertDisk, forKey: Keys.alertDisk) }
+    }
     /// 全新安裝、還沒選過要不要開系統監控（第一次啟動時詢問）
     private(set) var needsModeChoice = false
 
@@ -330,6 +340,9 @@ final class AppSettings {
         static let mergeMemoryDisk = "mergeMemoryDisk"
         static let networkSpeedTest = "networkSpeedTest"
         static let systemMonitors = "systemMonitors"
+        static let alertCPU = "alertCPU"
+        static let alertMemory = "alertMemory"
+        static let alertDisk = "alertDisk"
         static let menuBarCombined = "menuBarCombined"
         static let powerSaving = "powerSaving"
         static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
@@ -428,6 +441,9 @@ final class AppSettings {
         monitorNetwork = defaults.bool(forKey: Keys.monitorNetwork)
         mergeMemoryDisk = defaults.bool(forKey: Keys.mergeMemoryDisk)
         networkSpeedTest = defaults.bool(forKey: Keys.networkSpeedTest)
+        alertCPU = defaults.bool(forKey: Keys.alertCPU)
+        alertMemory = defaults.bool(forKey: Keys.alertMemory)
+        alertDisk = defaults.bool(forKey: Keys.alertDisk)
         if defaults.object(forKey: Keys.systemMonitors) != nil {
             systemMonitors = defaults.bool(forKey: Keys.systemMonitors)
         } else if usedBefore, AppEdition.current == .battery || AppEdition.current == .status {

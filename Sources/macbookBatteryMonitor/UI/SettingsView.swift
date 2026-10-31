@@ -144,6 +144,25 @@ struct SettingsView: View {
             }
             .settingsSection(.monitors, shown: section)
 
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("監控警示", systemImage: "exclamationmark.triangle")
+                    SwitchRow("CPU 持續滿載（90% 以上 5 分鐘）", isOn: binding(\.alertCPU))
+                        .disabled(!settings.isMonitorEnabled(.cpu))
+                    SwitchRow("記憶體壓力嚴重", isOn: binding(\.alertMemory))
+                        .disabled(!settings.isMonitorEnabled(.memory))
+                    SwitchRow("開機磁碟剩不到 10 GB", isOn: binding(\.alertDisk))
+                        .disabled(!settings.isMonitorEnabled(.disk))
+                    Text(settings.menuBarCombined
+                         ? "每種只通知一次，回到正常後才會再通知。合併成一個圖示時，只在展開狀態列時判斷。"
+                         : "每種只通知一次，回到正常後才會再通知。該模組在選單列有圖示時才會判斷，不另外取樣。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .settingsSection(.monitors, shown: section)
+
             // Intel 直接由 SMC 讀 CPU 功耗，不需要管理員取樣
             if !ChipInfo.isIntel {
                 Card {

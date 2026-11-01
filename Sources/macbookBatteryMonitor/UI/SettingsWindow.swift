@@ -59,6 +59,40 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 側邊欄與頁首圖示方塊的顏色
+    var tint: Color {
+        switch self {
+        case .general: return .gray
+        case .display: return .blue
+        case .monitors: return .orange
+        case .startup: return .indigo
+        case .charging: return .green
+        case .companion: return .pink
+        case .peripherals: return .purple
+        case .input: return .cyan
+        case .windowSwitcher: return .blue
+        case .features: return .indigo
+        case .update: return .green
+        }
+    }
+
+    /// 頁首標題下的一行說明
+    var subtitle: String {
+        switch self {
+        case .general: return "App 圖示、通知與開機啟動"
+        case .display: return "選單列的顯示方式與面板裡的項目"
+        case .monitors: return "更新頻率、省電與系統監控"
+        case .startup: return "登入時自動啟動的項目與它們的來歷"
+        case .charging: return "充電上限與智慧充電"
+        case .companion: return "充電夥伴的外觀與桌面寵物"
+        case .peripherals: return "藍牙設備的低電量通知"
+        case .input: return "捲動方向與中文輸入法"
+        case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
+        case .features: return "加入或移除擴充功能"
+        case .update: return "版本、自動檢查與一鍵更新"
+        }
+    }
+
     /// 擴充功能所在的分類。「滑鼠、觸控板與鍵盤」放捲動方向與中文輸入法，加入其中一個就出現
     static func section(for feature: ExtensionFeature) -> SettingsSection {
         switch feature {
@@ -68,11 +102,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     /// 側邊欄的分組：基本、電池（沒有電池時只剩周邊設備）、擴充功能（已加入的功能，最後是功能管理）
+    /// 最後一組「關於」只有「更新」，單獨放在最下面
     static func sidebar(hasBattery: Bool, isInstalled: (ExtensionFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
         [
-            ("基本", [.general, .display, .monitors, .startup, .update]),
+            ("基本", [.general, .display, .monitors, .startup]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
             ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).map(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
+            ("關於", [.update]),
         ]
     }
 }
@@ -99,16 +135,23 @@ struct SettingsWindowView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                List(selection: Binding<SettingsSection?>(get: { current }, set: { if let section = $0 { ui.settingsSection = section } })) {
-                    ForEach(groups, id: \.title) { group in
-                        Section(group.title) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(groups, id: \.title) { group in
+                            Text(group.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.top, group.title == groups.first?.title ? 4 : 14)
+                                .padding(.bottom, 2)
+                                .accessibilityAddTraits(.isHeader)
                             ForEach(group.sections) { section in
-                                Label(section.title, systemImage: section.systemImage).tag(section)
+                                SidebarRow(section: section, selected: section == current) { ui.settingsSection = section }
                             }
                         }
                     }
+                    .padding(10)
                 }
-                .listStyle(.sidebar)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(AppEdition.appName) \(store.updater.currentVersion)")
                         .font(.caption)
@@ -118,11 +161,18 @@ struct SettingsWindowView: View {
                 }
                 .padding(12)
             }
-            .frame(width: 190)
+            .frame(width: 214)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(current.title).font(.title2.weight(.semibold))
+                    HStack(spacing: 12) {
+                        IconTile(symbol: current.systemImage, tint: current.tint, size: 38)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(current.title).font(.title2.weight(.semibold))
+                            Text(current.subtitle).font(.callout).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.bottom, 4)
                     // 登入項目分頁沒有 SettingsView 的卡片，不放進去，否則隱藏的卡片之間的間距會把標題與內容撐開
                     if current != .startup {
                         SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater,
@@ -242,5 +292,49 @@ extension View {
     /// 設定視窗：卡片只出現在它所屬的分類
     @ViewBuilder func settingsSection(_ owner: SettingsSection, shown: SettingsSection) -> some View {
         if owner == shown { self }
+    }
+}
+
+/// 圓角方塊裡的白色圖示（側邊欄與頁首）
+struct IconTile: View {
+    let symbol: String
+    let tint: Color
+    var size: CGFloat = 22
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.52, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(tint.gradient))
+            .accessibilityHidden(true)
+    }
+}
+
+/// 側邊欄的一列：選到時是柔和的色塊，不用系統的實心藍色
+private struct SidebarRow: View {
+    let section: SettingsSection
+    let selected: Bool
+    let select: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: select) {
+            HStack(spacing: 9) {
+                IconTile(symbol: section.systemImage, tint: section.tint)
+                Text(section.title)
+                    .fontWeight(selected ? .semibold : .regular)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(selected ? section.tint.opacity(0.2) : hovering ? Color.primary.opacity(0.06) : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

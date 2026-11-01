@@ -34,7 +34,7 @@ struct FeatureManagerView: View {
                 }
             }
         }
-        Text("擴充功能需要「輔助使用」權限；加入後，打開功能自己的開關時才會詢問。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
+        Text("擴充功能需要「輔助使用」權限，用到時才會詢問（加入時功能自己的開關原本就開著，會在加入時詢問）。移除「中文輸入法」後，已經套用的 Caps Lock 不延遲要重新開機才恢復。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

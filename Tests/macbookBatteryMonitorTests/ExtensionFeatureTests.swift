@@ -8,7 +8,7 @@ struct ExtensionFeatureTests {
     }
 
     /// 從舊版更新：沒存過加入狀態時，舊版就有的功能保留，新功能不會自己出現；存過的照存的
-    func testUpgradeKeepsEveryFeature() {
+    func testUpgradeKeepsReleasedFeatures() {
         XCTAssertTrue(ExtensionFeature.scrollDirection.isInstalled(stored: nil))
         XCTAssertTrue(!ExtensionFeature.windowSwitcher.isInstalled(stored: nil))
         XCTAssertTrue(!ExtensionFeature.inputMethod.isInstalled(stored: nil))

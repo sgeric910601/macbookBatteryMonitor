@@ -242,8 +242,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
-    /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
     /// 加入或移除擴充功能後，依新的狀態啟動或停止它；開關原本就關著的功能，加入時不會跳出權限詢問
     private func applyFeature(_ feature: ExtensionFeature) {
         switch feature {
@@ -253,6 +251,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+    /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
+    /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
     private func applyScrollDirection(prompt: Bool) {
         let installed = settings.isInstalled(.scrollDirection)
         let mouse = installed && settings.scrollReverseMouse

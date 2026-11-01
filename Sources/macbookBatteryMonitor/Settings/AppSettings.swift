@@ -406,7 +406,7 @@ final class AppSettings {
             for (key, installed) in ExtensionFeature.freshInstallChoices { defaults.set(installed, forKey: key) }
         }
         var installed = Set<ExtensionFeature>()
-        for feature in ExtensionFeature.allCases where ExtensionFeature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool) {
+        for feature in ExtensionFeature.allCases where feature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool) {
             installed.insert(feature)
         }
         installedFeatures = installed

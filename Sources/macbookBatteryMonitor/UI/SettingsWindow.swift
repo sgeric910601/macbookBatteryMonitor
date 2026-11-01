@@ -59,17 +59,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 擴充功能的分類：沒加入就不出現在側邊欄
-    var feature: ExtensionFeature? {
-        switch self {
-        case .input: return .scrollDirection
-        case .windowSwitcher: return .windowSwitcher
-        default: return nil
-        }
-    }
-
+    /// 擴充功能所在的分類。「滑鼠、觸控板與鍵盤」放捲動方向與中文輸入法，加入其中一個就出現
     static func section(for feature: ExtensionFeature) -> SettingsSection {
-        allCases.first { $0.feature == feature } ?? .general
+        switch feature {
+        case .scrollDirection, .inputMethod: return .input
+        case .windowSwitcher: return .windowSwitcher
+        }
     }
 
     /// 側邊欄的分組：基本、電池（沒有電池時只剩周邊設備）、擴充功能（已加入的功能，最後是功能管理）
@@ -77,7 +72,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         [
             ("基本", [.general, .display, .monitors, .startup, .update]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
-            ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).map(section(for:)) + [.features]),
+            ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).map(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
         ]
     }
 }

@@ -249,6 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         switch feature {
         case .scrollDirection: applyScrollDirection(prompt: true)
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
+        case .inputMethod: applyInputSourceFix(prompt: true)
         }
     }
 
@@ -280,17 +281,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// 中文輸入法：Caps Lock 不延遲（hidutil，不需權限）、按住 Shift 打半形（需要「輔助使用」，允許後每 2 秒檢查一次就開始）
     private func applyInputSourceFix(prompt: Bool) {
-        if settings.capsLockNoDelay { InputSourceFix.removeCapsLockDelay() }
+        if settings.capsLockNoDelay, settings.isInstalled(.inputMethod) { InputSourceFix.removeCapsLockDelay() }
         applyShiftHalfWidth(prompt: prompt)
     }
 
     private func applyShiftHalfWidth(prompt: Bool) {
-        let running = InputSourceFix.shared.applyShift(settings.shiftHalfWidth)
-        ui.shiftRunning = settings.shiftHalfWidth && InputSourceFix.shared.isRunning
+        let wanted = settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
+        let running = InputSourceFix.shared.applyShift(wanted)
+        ui.shiftRunning = wanted && InputSourceFix.shared.isRunning
         ui.scrollTrusted = ScrollDirection.trusted
         shiftTrustTimer?.invalidate()
         shiftTrustTimer = nil
-        guard settings.shiftHalfWidth, !running else { return }
+        guard wanted, !running else { return }
         if prompt { ScrollDirection.requestTrust() }
         shiftTrustTimer = repeating(every: 2) { delegate in
             guard ScrollDirection.trusted else { return }
@@ -531,7 +533,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         monitors.setSleeping(false)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設
-        if settings.capsLockNoDelay { InputSourceFix.removeCapsLockDelay() }
+        if settings.capsLockNoDelay, settings.isInstalled(.inputMethod) { InputSourceFix.removeCapsLockDelay() }
         refresh()
         store.peripherals.refresh()
         store.recordHistory()

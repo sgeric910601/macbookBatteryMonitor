@@ -109,6 +109,7 @@ struct PanelView: View {
                 .buttonStyle(.borderless)
                 .help("到設定一鍵更新")
             }
+            KeepAwakeButton(controller: KeepAwakeController.shared)
             Button {
                 ui.openSettings(nil)
             } label: {
@@ -124,6 +125,37 @@ struct PanelView: View {
             .buttonStyle(.borderless)
             .help("結束\(AppEdition.appName)")
         }
+    }
+}
+
+/// 面板下方的防止休眠：沒啟用時選時間開始；啟用中顯示剩餘時間，可以停止
+private struct KeepAwakeButton: View {
+    @Bindable var controller: KeepAwakeController
+
+    var body: some View {
+        Menu {
+            if controller.state.isActive {
+                Button("停止防止休眠") { controller.stop() }
+                Divider()
+            }
+            ForEach(KeepAwake.Duration.allCases, id: \.self) { duration in
+                Button(duration.title) { controller.start(duration) }
+            }
+            Divider()
+            Toggle("螢幕也保持亮著", isOn: $controller.keepDisplayOn)
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: controller.state.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
+                if let remaining = controller.state.remainingText(now: controller.now) {
+                    Text(remaining).font(.caption)
+                }
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(controller.state.isActive ? "防止休眠中" : "防止休眠")
+        .accessibilityLabel(controller.state.isActive ? "防止休眠中" : "防止休眠")
     }
 }
 

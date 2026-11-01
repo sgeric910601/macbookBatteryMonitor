@@ -251,6 +251,15 @@ Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) 
 
 The system integration uses private macOS functions, all loaded at run time and disabled if missing; their sources are listed in [docs/design/window-server-provenance.md](docs/design/window-server-provenance.md) (Chinese).
 
+## Quit an app when its last window closes
+
+Add "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
+
+- **When it quits**: 0.6 s after a window closes, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open. Finder and hidden apps are never quit
+- **Exceptions**: add apps that should keep running without windows, such as a music app playing in the background
+- **Power**: it only listens for window changes of the frontmost app, with no polling
+- **Permission**: needs Accessibility; nothing is observed while the feature is removed
+
 ## Hold ⌘Q / ⌘W
 
 Add "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:

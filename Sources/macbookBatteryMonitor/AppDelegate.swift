@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 等使用者允許「輔助使用」：允許了就開始分開設定捲動方向
     private var scrollTrustTimer: Timer?
     private var quitGuardTrustTimer: Timer?
+    private var lastWindowTrustTimer: Timer?
     private var shiftTrustTimer: Timer?
     /// 更新頻率慢於每秒時，下一次更新前 1 秒先讀變壓器輸入（見 BatteryReader.recordAdapterInput）
     private var adapterPreReadTimer: Timer?
@@ -129,6 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
+        settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
+        applyLastWindowQuit(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -258,6 +261,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
+        case .lastWindowQuit: applyLastWindowQuit(prompt: true)
+        }
+    }
+
+    /// 關閉最後視窗時結束 App。需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    private func applyLastWindowQuit(prompt: Bool) {
+        let wanted = settings.isInstalled(.lastWindowQuit)
+        LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
+        let running = LastWindowQuitController.shared.apply(enabled: wanted)
+        ui.lastWindowQuitRunning = wanted && LastWindowQuitController.shared.isRunning
+        lastWindowTrustTimer?.invalidate()
+        lastWindowTrustTimer = nil
+        guard wanted, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        lastWindowTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyLastWindowQuit(prompt: false)
         }
     }
 

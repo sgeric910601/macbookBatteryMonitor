@@ -285,63 +285,12 @@ struct WindowSwitcherSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                let excluded = settings.switcher.excludedBundleIDs.sorted()
-                if excluded.isEmpty {
-                    Text("目前沒有").font(.caption).foregroundStyle(.secondary)
-                }
-                ForEach(excluded, id: \.self) { id in
-                    HStack {
-                        Text(Self.appName(for: id))
-                        Text(id).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                        Spacer()
-                        Button("移除") { settings.switcher.excludedBundleIDs.remove(id) }
-                            .controlSize(.small)
-                    }
-                }
-                HStack {
-                    Menu("加入執行中的 App") {
-                        ForEach(runningCandidates(), id: \.id) { candidate in
-                            Button(candidate.name) { add(candidate.id) }
-                        }
-                    }
-                    Button("從磁碟選擇…") { chooseFromDisk() }
-                }
-                .disabled(settings.switcher.excludedBundleIDs.count >= SwitcherSettings.maxExcludedApps)
+                AppExceptionList(ids: Binding(get: { settings.switcher.excludedBundleIDs }, set: { settings.switcher.excludedBundleIDs = $0 }),
+                                 limit: SwitcherSettings.maxExcludedApps)
             }
         }
     }
 
-    private func runningCandidates() -> [(id: String, name: String)] {
-        let excluded = settings.switcher.excludedBundleIDs
-        let me = Bundle.main.bundleIdentifier
-        return NSWorkspace.shared.runningApplications
-            .compactMap { app -> (id: String, name: String)? in
-                guard app.activationPolicy == .regular, let id = app.bundleIdentifier, id != me, !excluded.contains(id),
-                      SwitcherSettings.isValidBundleID(id) else { return nil }
-                return (id, app.localizedName ?? id)
-            }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
-    private func chooseFromDisk() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let url = panel.url, let id = Bundle(url: url)?.bundleIdentifier else { return }
-        add(id)
-    }
-
-    private func add(_ id: String) {
-        guard SwitcherSettings.isValidBundleID(id), settings.switcher.excludedBundleIDs.count < SwitcherSettings.maxExcludedApps else { return }
-        settings.switcher.excludedBundleIDs.insert(id)
-    }
-
-    private static func appName(for id: String) -> String {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return id }
-        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-    }
 
     // MARK: - 切換中的按鍵
 

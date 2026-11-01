@@ -18,6 +18,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case input
     /// 視窗切換（取代 Cmd+Tab）：快捷鍵、外觀、要列出的視窗、例外清單
     case windowSwitcher
+    /// 視窗與 Dock 的其他擴充功能（關閉最後視窗時結束 App 等）
+    case windows
     /// 登入時自動啟動的項目
     case startup
     /// 用到的系統權限與狀態
@@ -38,6 +40,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .peripherals: return "周邊設備"
         case .input: return "滑鼠、觸控板與鍵盤"
         case .windowSwitcher: return "視窗切換"
+        case .windows: return "視窗與 Dock"
         case .startup: return "登入項目"
         case .permissions: return "權限"
         case .update: return "更新"
@@ -56,6 +59,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .peripherals: return "keyboard"
         case .input: return "computermouse"
         case .windowSwitcher: return "macwindow.on.rectangle"
+        case .windows: return "dock.rectangle"
         case .startup: return "power"
         case .permissions: return "lock.shield"
         case .update: return "arrow.down.circle"
@@ -76,6 +80,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .peripherals: return .purple
         case .input: return .cyan
         case .windowSwitcher: return .blue
+        case .windows: return .mint
         case .features: return .indigo
         case .update: return .green
         }
@@ -94,6 +99,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .peripherals: return "藍牙設備的低電量通知"
         case .input: return "捲動方向、中文輸入法與防誤觸"
         case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
+        case .windows: return "關閉最後視窗時結束 App"
         case .features: return "加入或移除擴充功能"
         case .update: return "版本、自動檢查與一鍵更新"
         }
@@ -104,6 +110,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch feature {
         case .scrollDirection, .inputMethod, .quitGuard: return .input
         case .windowSwitcher: return .windowSwitcher
+        case .lastWindowQuit: return .windows
         }
     }
 
@@ -190,6 +197,7 @@ struct SettingsWindowView: View {
                     case .charging: ChargingPlanView(store: store, settings: settings, ui: ui, embedded: true)
                     case .peripherals: PeripheralAlertsCard(store: store.peripherals, settings: settings)
                     case .windowSwitcher: WindowSwitcherSettingsView(settings: settings, ui: ui)
+                    case .windows: WindowsSettingsView(settings: settings, ui: ui)
                     case .startup: StartupItemsView(manager: startupItems)
                     case .features: FeatureManagerView(settings: settings)
                     case .permissions: PermissionsView(settings: settings)

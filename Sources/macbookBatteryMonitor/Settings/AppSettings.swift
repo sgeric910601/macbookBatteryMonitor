@@ -59,7 +59,7 @@ final class AppSettings {
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
-            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.updateInterval: .int,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
@@ -129,6 +129,15 @@ final class AppSettings {
     }
     static let quitGuardDurations: [Double] = [0.5, 1, 1.5]
     @ObservationIgnored var onQuitGuardChange: (() -> Void)?
+
+    /// 關閉最後視窗時不結束的 App（識別碼；Finder 一律不結束，不用列）
+    var lastWindowQuitExcluded: Set<String> {
+        didSet {
+            defaults.set(lastWindowQuitExcluded.sorted(), forKey: Keys.lastWindowQuitExcluded)
+            onLastWindowQuitChange?()
+        }
+    }
+    @ObservationIgnored var onLastWindowQuitChange: (() -> Void)?
 
     /// 睡眠時關閉藍牙、醒來打開（見 BluetoothSleep）
     var bluetoothOffDuringSleep: Bool {
@@ -412,6 +421,7 @@ final class AppSettings {
         static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
         static let bluetoothOffDuringSleep = "bluetoothOffDuringSleep"
         static let quitGuardQuit = "quitGuardQuit"
+        static let lastWindowQuitExcluded = "lastWindowQuitExcluded"
         static let quitGuardClose = "quitGuardClose"
         static let quitGuardDuration = "quitGuardDuration"
         static let bluetoothTurnedOffForSleep = "bluetoothTurnedOffForSleep"
@@ -533,6 +543,9 @@ final class AppSettings {
         powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
         bluetoothOffDuringSleep = defaults.bool(forKey: Keys.bluetoothOffDuringSleep)
         quitGuardQuit = defaults.bool(forKey: Keys.quitGuardQuit)
+        // 只收合法的識別碼、最多 SwitcherSettings.maxExcludedApps 個（匯入的設定也走這裡）
+        lastWindowQuitExcluded = Set((defaults.stringArray(forKey: Keys.lastWindowQuitExcluded) ?? [])
+            .filter(SwitcherSettings.isValidBundleID).prefix(SwitcherSettings.maxExcludedApps))
         quitGuardClose = defaults.bool(forKey: Keys.quitGuardClose)
         // 只收選單上的值，其他（包括匯入的設定）退回 1 秒
         let duration = defaults.double(forKey: Keys.quitGuardDuration)

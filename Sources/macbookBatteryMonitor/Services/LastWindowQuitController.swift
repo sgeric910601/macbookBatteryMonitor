@@ -94,7 +94,7 @@ final class LastWindowQuitController {
         let counts = Self.windowCounts(pid)
         if logic.shouldQuit(pid: pid, bundleID: app.bundleIdentifier, serverWindows: counts.server, axWindows: counts.ax,
                             excluded: excluded, isHidden: app.isHidden) {
-            Self.log.notice("最後一個視窗關閉，結束 App")
+            Self.log.notice("最後一個視窗關閉，結束 \(app.bundleIdentifier ?? "?", privacy: .public)")
             logic.forget(pid: pid)
             app.terminate()
         } else {

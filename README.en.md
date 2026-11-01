@@ -142,6 +142,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
 | 周邊設備 (Peripherals) | Each device's low-battery notification |
 | 滑鼠與觸控板 (Mouse & trackpad) | Separate scroll directions |
+| 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
 | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
 | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
@@ -234,6 +235,18 @@ This usually happens after updating from v1.7.3 or earlier: the "電池與系統
 2. Select "電池與系統監控" in the list and click "−" below it to remove it (even if its switch still looks on)
 3. Click "+", choose `macbookBatteryMonitor` in Applications, click Open and make sure its switch is on
 4. Back in the app's settings the status turns to "運作中" (working) within seconds, no relaunch needed
+
+## Window switcher
+
+Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) in Settings → Window switching, and Cmd+Tab lists the windows of every app (not just apps), most recently used first:
+
+- **Using it**: hold the modifier and press Tab for the next window, Shift to go back, release to switch; a quick tap goes straight back to the previous window. Arrow keys move, Esc cancels; on the selected window press W to close, M to minimize, F for full screen, H to hide the app, Q to quit it
+- **Settings**: up to 9 shortcuts, each with its own appearance (thumbnails, app icons, titles), size and which windows to list (Space, screen, minimized, hidden, full screen, apps without windows); optionally keep the switcher open after releasing the modifier and confirm with Return; apps on the exception list are never listed
+- **Accessibility (required)**: needed to intercept the shortcut, read window titles and perform window actions. Without it the settings page shows an orange note and "打開輔助使用設定" (open Accessibility settings); it starts working within seconds after you allow it. If the permission is revoked the interception stops and the status no longer shows "運作中" (working)
+- **Screen Recording (optional)**: only used for window thumbnails and the preview. Without it you get app icons and titles only, everything else works; while capturing, macOS shows its screen capture indicator in the menu bar. Turning off "切換時更新視窗縮圖" (refresh thumbnails while switching) or picking the app icon or title appearance avoids capturing
+- **Privacy**: window titles are never logged or uploaded; with the switch off no keys are intercepted
+
+The system integration uses private macOS functions, all loaded at run time and disabled if missing; their sources are listed in [docs/design/window-server-provenance.md](docs/design/window-server-provenance.md) (Chinese).
 
 ## Chinese input methods
 

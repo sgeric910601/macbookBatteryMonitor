@@ -117,6 +117,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.ui.scrollRunning = ScrollDirection.shared.isRunning
         }
         applyScrollDirection(prompt: false)
+        settings.onWindowSwitcherChange = { [weak self] in self?.applyWindowSwitcher(prompt: true) }
+        InputController.shared.onChange = { [weak self] in
+            self?.ui.scrollTrusted = ScrollDirection.trusted
+            self?.ui.inputTapRunning = InputController.shared.isRunning
+        }
+        applyWindowSwitcher(prompt: false)
         settings.onInputSourceFixChange = { [weak self] in self?.applyInputSourceFix(prompt: true) }
         applyInputSourceFix(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
@@ -248,6 +254,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             guard ScrollDirection.trusted else { return }
             delegate.applyScrollDirection(prompt: false)
         }
+    }
+
+    /// 視窗切換同樣需要「輔助使用」；剛打開開關、還沒有權限時跳出系統的詢問，允許之後每 5 秒的檢查會自己開始
+    private func applyWindowSwitcher(prompt: Bool) {
+        let options = settings.switcher
+        InputTap.shared.setSwitcher(shortcuts: options.profiles.map(\.shortcut), vimKeys: options.vimKeys, releaseCommits: !options.keepOpenAfterRelease)
+        WindowSwitcher.shared.configure(options)
+        InputController.shared.apply(keys: settings.windowSwitcher)
+        if prompt, settings.windowSwitcher, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
     }
 
     /// 中文輸入法：Caps Lock 不延遲（hidutil，不需權限）、按住 Shift 打半形（需要「輔助使用」，允許後每 2 秒檢查一次就開始）

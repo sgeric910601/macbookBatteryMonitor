@@ -383,7 +383,7 @@ struct SettingsView: View {
         }
     }
 
-    private struct SwitchRow: View {
+    struct SwitchRow: View {
         let title: String
         let isOn: Binding<Bool>
 

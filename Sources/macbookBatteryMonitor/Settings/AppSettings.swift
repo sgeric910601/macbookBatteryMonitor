@@ -44,14 +44,14 @@ final class AppSettings {
     @ObservationIgnored var onInputSourceFixChange: (() -> Void)?
     @ObservationIgnored var onDesktopPetChange: (() -> Void)?
     /// 加入或移除擴充功能時（參數是改變的功能）
-    @ObservationIgnored var onFeatureInstallChange: ((AppFeature) -> Void)?
+    @ObservationIgnored var onFeatureInstallChange: ((ExtensionFeature) -> Void)?
 
     /// 已加入的擴充功能；沒加入的不啟動，設定裡也看不到
-    private(set) var installedFeatures: Set<AppFeature> = []
+    private(set) var installedFeatures: Set<ExtensionFeature> = []
 
-    func isInstalled(_ feature: AppFeature) -> Bool { installedFeatures.contains(feature) }
+    func isInstalled(_ feature: ExtensionFeature) -> Bool { installedFeatures.contains(feature) }
 
-    func setInstalled(_ feature: AppFeature, _ installed: Bool) {
+    func setInstalled(_ feature: ExtensionFeature, _ installed: Bool) {
         guard isInstalled(feature) != installed else { return }
         if installed { installedFeatures.insert(feature) } else { installedFeatures.remove(feature) }
         // 只改加入狀態，功能自己的設定都不動，重新加入時照舊
@@ -403,10 +403,10 @@ final class AppSettings {
         // 要在寫入任何設定之前判斷（下面寫入安裝狀態後就判斷不出來）；從舊版更新的不算全新安裝，原本的功能都保留
         let usedBefore = Self.usedBefore(defaults)
         if !usedBefore {
-            for (key, installed) in AppFeature.freshInstallChoices { defaults.set(installed, forKey: key) }
+            for (key, installed) in ExtensionFeature.freshInstallChoices { defaults.set(installed, forKey: key) }
         }
-        var installed = Set<AppFeature>()
-        for feature in AppFeature.allCases where AppFeature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool) {
+        var installed = Set<ExtensionFeature>()
+        for feature in ExtensionFeature.allCases where ExtensionFeature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool) {
             installed.insert(feature)
         }
         installedFeatures = installed

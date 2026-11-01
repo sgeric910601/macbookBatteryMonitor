@@ -6,7 +6,7 @@ struct FeatureManagerView: View {
     let settings: AppSettings
 
     private var groups: [String] {
-        AppFeature.allCases.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+        ExtensionFeature.allCases.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
     }
 
     var body: some View {
@@ -15,7 +15,7 @@ struct FeatureManagerView: View {
                 Text("只加入會用到的功能。移除的功能會停止，並從側邊欄拿掉；原本的設定都會保留，重新加入就回來。")
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
-                Text("已加入 \(settings.installedFeatures.count)／\(AppFeature.allCases.count) 項")
+                Text("已加入 \(settings.installedFeatures.count)／\(ExtensionFeature.allCases.count) 項")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -26,7 +26,7 @@ struct FeatureManagerView: View {
                 .padding(.top, 8)
             Card {
                 VStack(alignment: .leading, spacing: 0) {
-                    let features = AppFeature.allCases.filter { $0.group == group }
+                    let features = ExtensionFeature.allCases.filter { $0.group == group }
                     ForEach(features) { feature in
                         row(feature)
                         if feature != features.last { Divider().padding(.vertical, 8) }
@@ -40,7 +40,7 @@ struct FeatureManagerView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func row(_ feature: AppFeature) -> some View {
+    private func row(_ feature: ExtensionFeature) -> some View {
         let installed = settings.isInstalled(feature)
         return HStack(spacing: 12) {
             Image(systemName: feature.symbol)

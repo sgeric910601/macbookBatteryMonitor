@@ -4,7 +4,7 @@ import Foundation
 /// 電池、充電、系統監控、充電夥伴、周邊設備是基本功能，不在這裡、不能移除。
 /// 沒加入的功能不會啟動，設定裡也看不到；移除只改加入狀態，重新加入時原本的設定都還在。
 /// 原始值是存在設定裡的鍵，只能新增、不能改名
-enum AppFeature: String, CaseIterable, Identifiable {
+enum ExtensionFeature: String, CaseIterable, Identifiable {
     case scrollDirection
     case windowSwitcher
 

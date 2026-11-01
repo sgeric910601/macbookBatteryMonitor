@@ -60,7 +60,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     /// 擴充功能的分類：沒加入就不出現在側邊欄
-    var feature: AppFeature? {
+    var feature: ExtensionFeature? {
         switch self {
         case .input: return .scrollDirection
         case .windowSwitcher: return .windowSwitcher
@@ -68,16 +68,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
-    static func section(for feature: AppFeature) -> SettingsSection {
+    static func section(for feature: ExtensionFeature) -> SettingsSection {
         allCases.first { $0.feature == feature } ?? .general
     }
 
     /// 側邊欄的分組：基本、電池（沒有電池時只剩周邊設備）、擴充功能（已加入的功能，最後是功能管理）
-    static func sidebar(hasBattery: Bool, isInstalled: (AppFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
+    static func sidebar(hasBattery: Bool, isInstalled: (ExtensionFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
         [
             ("基本", [.general, .display, .monitors, .startup, .update]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
-            ("擴充功能", AppFeature.allCases.filter(isInstalled).map(section(for:)) + [.features]),
+            ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).map(section(for:)) + [.features]),
         ]
     }
 }

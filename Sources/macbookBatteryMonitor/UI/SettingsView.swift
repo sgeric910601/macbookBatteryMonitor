@@ -401,6 +401,37 @@ struct SettingsView: View {
                 .settingsSection(.input, shown: section)
             }
 
+            if settings.isInstalled(.keyboardCleaning) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("鍵盤清潔模式", systemImage: "sparkles")
+                        HStack {
+                            Picker("停用", selection: binding(\.keyboardCleaningSeconds)) {
+                                ForEach(KeyboardCleaning.durations, id: \.self) { Text("\($0) 秒").tag($0) }
+                            }
+                            .fixedSize()
+                            Button("開始清潔") {
+                                if !KeyboardCleaningController.shared.start(seconds: settings.keyboardCleaningSeconds) {
+                                    ScrollDirection.requestTrust()
+                                }
+                            }
+                        }
+                        Text("暫時停用整個鍵盤，包括功能列的亮度、音量鍵；滑鼠與觸控板照常，點畫面中央的「結束清潔」或時間到就恢復。Touch ID 指紋照常可以用，但它也是電源鍵，按下去 Mac 一樣會鎖定或睡眠，長按會強制關機，擦的時候輕一點。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !ui.scrollTrusted {
+                            Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
+
             if settings.isInstalled(.quitGuard) {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {

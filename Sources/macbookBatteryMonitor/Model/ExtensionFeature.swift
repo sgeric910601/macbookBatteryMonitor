@@ -11,6 +11,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case quitGuard
     case lastWindowQuit
     case dockClick
+    case keyboardCleaning
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .quitGuard: return "⌘Q／⌘W 防誤觸"
         case .lastWindowQuit: return "關閉最後視窗時結束 App"
         case .dockClick: return "點 Dock 圖示縮到 Dock"
+        case .keyboardCleaning: return "鍵盤清潔模式"
         }
     }
 
@@ -35,6 +37,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .quitGuard: return "hand.raised"
         case .lastWindowQuit: return "xmark.app"
         case .dockClick: return "dock.arrow.down.rectangle"
+        case .keyboardCleaning: return "sparkles"
         }
     }
 
@@ -47,6 +50,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .quitGuard: return "滑鼠與鍵盤"
         case .lastWindowQuit: return "視窗與 Dock"
         case .dockClick: return "視窗與 Dock"
+        case .keyboardCleaning: return "滑鼠與鍵盤"
         }
     }
 
@@ -59,6 +63,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .quitGuard: return "監聽鍵盤"
         case .lastWindowQuit: return "監聽視窗"
         case .dockClick: return "監聽滑鼠點擊"
+        case .keyboardCleaning: return "清潔時攔截鍵盤"
         }
     }
 
@@ -70,6 +75,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .quitGuard: return "要按住 ⌘Q 或 ⌘W 一下子才結束 App 或關閉，避免誤按"
         case .lastWindowQuit: return "App 最後一個視窗關掉時自動結束它，可以設定例外"
         case .dockClick: return "點目前 App 的 Dock 圖示，把它的視窗縮到 Dock 或隱藏，再點一次叫回來"
+        case .keyboardCleaning: return "暫時停用鍵盤，方便擦鍵盤；時間到或點「結束清潔」就恢復"
         }
     }
 

@@ -262,6 +262,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
         case .lastWindowQuit, .dockClick: applyLastWindowQuit(prompt: true)
+        case .keyboardCleaning:
+            // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
+            if settings.isInstalled(.keyboardCleaning) {
+                if !ScrollDirection.trusted { ScrollDirection.requestTrust() }
+            } else {
+                KeyboardCleaningController.shared.stop()
+            }
         }
     }
 

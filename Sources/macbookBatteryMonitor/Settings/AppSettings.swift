@@ -59,7 +59,7 @@ final class AppSettings {
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
-            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.updateInterval: .int,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
@@ -115,6 +115,17 @@ final class AppSettings {
     /// 只在使用電池時套用省電模式，接上電源就恢復一般模式
     var powerSavingOnBatteryOnly: Bool {
         didSet { defaults.set(powerSavingOnBatteryOnly, forKey: Keys.powerSavingOnBatteryOnly); onIntervalChange?() }
+    }
+
+    /// 睡眠時關閉藍牙、醒來打開（見 BluetoothSleep）
+    var bluetoothOffDuringSleep: Bool {
+        didSet { defaults.set(bluetoothOffDuringSleep, forKey: Keys.bluetoothOffDuringSleep) }
+    }
+
+    /// 這次睡眠的藍牙是我們關掉的（不匯出；睡眠中 App 被結束時，下次啟動靠它打開）
+    var bluetoothTurnedOffForSleep: Bool {
+        get { defaults.bool(forKey: Keys.bluetoothTurnedOffForSleep) }
+        set { defaults.set(newValue, forKey: Keys.bluetoothTurnedOffForSleep) }
     }
 
     /// 目前是否接著電源（不存檔，由 AppDelegate 每次更新時帶入；桌上型 Mac 一律視為接著電源）
@@ -386,6 +397,8 @@ final class AppSettings {
         static let menuBarCombined = "menuBarCombined"
         static let powerSaving = "powerSaving"
         static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
+        static let bluetoothOffDuringSleep = "bluetoothOffDuringSleep"
+        static let bluetoothTurnedOffForSleep = "bluetoothTurnedOffForSleep"
         static let updateInterval = "updateInterval"
         static let hiddenFlowItems = "hiddenFlowItems"
         static let hiddenDetailFields = "hiddenDetailFields"
@@ -437,6 +450,7 @@ final class AppSettings {
             Keys.networkSpeedTest: false,
             Keys.powerSaving: false,
             Keys.powerSavingOnBatteryOnly: false,
+            Keys.bluetoothOffDuringSleep: false,
             Keys.updateInterval: 1,
             Keys.adminCPUSampling: false,
             Keys.autoCheckUpdates: true,
@@ -498,6 +512,7 @@ final class AppSettings {
         }
         powerSaving = defaults.bool(forKey: Keys.powerSaving)
         powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
+        bluetoothOffDuringSleep = defaults.bool(forKey: Keys.bluetoothOffDuringSleep)
         let interval = defaults.integer(forKey: Keys.updateInterval)
         updateInterval = Self.updateIntervals.contains(interval) ? interval : 1
         hiddenFlowItems = Set(defaults.stringArray(forKey: Keys.hiddenFlowItems) ?? [])

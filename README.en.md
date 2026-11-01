@@ -26,6 +26,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Separate mouse and trackpad scroll directions**: for example natural scrolling on the trackpad and the traditional direction on the mouse wheel
 - **Login items**: lists the apps, agents and daemons that start at login, shows what each one is and where it comes from, and lets you clear the user-level config files an uninstalled app left behind; system-level items are view-only
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
+- **Bluetooth off during sleep**: turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, so they can still wake the Mac. Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
 - **No Xcode needed**: the Command Line Tools are enough to build it
@@ -137,7 +138,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 |---|---|
 | 一般 (General) | App icon color, notification thresholds, launch at login |
 | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, system monitor master switch and each monitor, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
+| 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, Bluetooth off during sleep, system monitor master switch and each monitor, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
 | 充電 (Charging) | Charge limit slider, smart charging |
 | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
 | 周邊設備 (Peripherals) | Each device's low-battery notification |

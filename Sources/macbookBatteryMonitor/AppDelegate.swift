@@ -159,6 +159,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil
         )
+        // 上次睡眠關掉藍牙、還沒等到醒來 App 就結束了：打開
+        applyBluetooth(bluetoothSleep.didLaunch())
         registerLoginItemIfNeeded()
         runPanelSelfTestIfRequested()
         runUpdateSelfTestIfRequested()
@@ -525,11 +527,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.setProcessSampling(active: false)
         monitors.setSleeping(true)
         store.history.save()
+        if settings.bluetoothOffDuringSleep, BluetoothPower.isAvailable {
+            applyBluetooth(bluetoothSleep.willSleep(enabled: true, poweredOn: BluetoothPower.isOn,
+                                                   wakeInputConnected: BluetoothPower.wakeInputConnected()))
+        }
+    }
+
+    private lazy var bluetoothSleep = BluetoothSleep(turnedOff: settings.bluetoothTurnedOffForSleep)
+
+    private func applyBluetooth(_ action: BluetoothSleep.Action) {
+        // 先記下狀態再開關：開關途中 App 被結束，下次啟動仍知道要不要打開
+        settings.bluetoothTurnedOffForSleep = bluetoothSleep.turnedOff
+        switch action {
+        case .none: return
+        case .powerOff: BluetoothPower.setOn(false)
+        case .powerOn: BluetoothPower.setOn(true)
+        }
     }
 
     @objc private func didWake() {
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統已喚醒") }
         sleeping = false
+        applyBluetooth(bluetoothSleep.didWake())
         monitors.setSleeping(false)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設

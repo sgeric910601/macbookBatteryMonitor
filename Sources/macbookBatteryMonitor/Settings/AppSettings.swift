@@ -59,7 +59,7 @@ final class AppSettings {
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
-            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.updateInterval: .int,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
@@ -138,6 +138,11 @@ final class AppSettings {
         }
     }
     @ObservationIgnored var onLastWindowQuitChange: (() -> Void)?
+
+    /// 點 Dock 圖示時縮到 Dock 還是隱藏 App
+    var dockClickMode: DockClick.Mode {
+        didSet { defaults.set(dockClickMode.rawValue, forKey: Keys.dockClickMode); onLastWindowQuitChange?() }
+    }
 
     /// 睡眠時關閉藍牙、醒來打開（見 BluetoothSleep）
     var bluetoothOffDuringSleep: Bool {
@@ -422,6 +427,7 @@ final class AppSettings {
         static let bluetoothOffDuringSleep = "bluetoothOffDuringSleep"
         static let quitGuardQuit = "quitGuardQuit"
         static let lastWindowQuitExcluded = "lastWindowQuitExcluded"
+        static let dockClickMode = "dockClickMode"
         static let quitGuardClose = "quitGuardClose"
         static let quitGuardDuration = "quitGuardDuration"
         static let bluetoothTurnedOffForSleep = "bluetoothTurnedOffForSleep"
@@ -543,6 +549,7 @@ final class AppSettings {
         powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
         bluetoothOffDuringSleep = defaults.bool(forKey: Keys.bluetoothOffDuringSleep)
         quitGuardQuit = defaults.bool(forKey: Keys.quitGuardQuit)
+        dockClickMode = DockClick.Mode(rawValue: defaults.string(forKey: Keys.dockClickMode) ?? "") ?? .minimize
         // 只收合法的識別碼、最多 SwitcherSettings.maxExcludedApps 個（匯入的設定也走這裡）
         lastWindowQuitExcluded = Set((defaults.stringArray(forKey: Keys.lastWindowQuitExcluded) ?? [])
             .filter(SwitcherSettings.isValidBundleID).prefix(SwitcherSettings.maxExcludedApps))

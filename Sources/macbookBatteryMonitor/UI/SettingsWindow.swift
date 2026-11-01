@@ -99,7 +99,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .peripherals: return "藍牙設備的低電量通知"
         case .input: return "捲動方向、中文輸入法與防誤觸"
         case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
-        case .windows: return "關閉最後視窗時結束 App"
+        case .windows: return "關閉最後視窗時結束 App、點 Dock 圖示縮到 Dock"
         case .features: return "加入或移除擴充功能"
         case .update: return "版本、自動檢查與一鍵更新"
         }
@@ -110,7 +110,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch feature {
         case .scrollDirection, .inputMethod, .quitGuard: return .input
         case .windowSwitcher: return .windowSwitcher
-        case .lastWindowQuit: return .windows
+        case .lastWindowQuit, .dockClick: return .windows
         }
     }
 

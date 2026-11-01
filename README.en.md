@@ -251,6 +251,14 @@ Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) 
 
 The system integration uses private macOS functions, all loaded at run time and disabled if missing; their sources are listed in [docs/design/window-server-provenance.md](docs/design/window-server-provenance.md) (Chinese).
 
+## Click a Dock icon to minimize
+
+Add "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
+
+- **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a click, not a drag. Clicking another app switches to it as usual; windows you minimized yourself are not restored
+- **Nothing is intercepted**: it only listens to the mouse, so Dock clicks, drags and right-clicks work as usual; Dock icon positions are read only for clicks near a screen edge
+- **Permission**: needs Accessibility; nothing is observed while the feature is removed
+
 ## Quit an app when its last window closes
 
 Add "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):

@@ -10,6 +10,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case inputMethod
     case quitGuard
     case lastWindowQuit
+    case dockClick
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .inputMethod: return "中文輸入法"
         case .quitGuard: return "⌘Q／⌘W 防誤觸"
         case .lastWindowQuit: return "關閉最後視窗時結束 App"
+        case .dockClick: return "點 Dock 圖示縮到 Dock"
         }
     }
 
@@ -32,6 +34,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .inputMethod: return "keyboard"
         case .quitGuard: return "hand.raised"
         case .lastWindowQuit: return "xmark.app"
+        case .dockClick: return "dock.arrow.down.rectangle"
         }
     }
 
@@ -43,6 +46,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .inputMethod: return "滑鼠與鍵盤"
         case .quitGuard: return "滑鼠與鍵盤"
         case .lastWindowQuit: return "視窗與 Dock"
+        case .dockClick: return "視窗與 Dock"
         }
     }
 
@@ -54,6 +58,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .inputMethod: return "監聽鍵盤"
         case .quitGuard: return "監聽鍵盤"
         case .lastWindowQuit: return "監聽視窗"
+        case .dockClick: return "監聽滑鼠點擊"
         }
     }
 
@@ -64,6 +69,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .inputMethod: return "Caps Lock 切換中英不延遲、按住 Shift 打半形英文與符號"
         case .quitGuard: return "要按住 ⌘Q 或 ⌘W 一下子才結束 App 或關閉，避免誤按"
         case .lastWindowQuit: return "App 最後一個視窗關掉時自動結束它，可以設定例外"
+        case .dockClick: return "點目前 App 的 Dock 圖示，把它的視窗縮到 Dock 或隱藏，再點一次叫回來"
         }
     }
 

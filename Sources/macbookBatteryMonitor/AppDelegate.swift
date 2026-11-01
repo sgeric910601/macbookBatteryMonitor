@@ -261,16 +261,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
-        case .lastWindowQuit: applyLastWindowQuit(prompt: true)
+        case .lastWindowQuit, .dockClick: applyLastWindowQuit(prompt: true)
         }
     }
 
-    /// 關閉最後視窗時結束 App。需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    /// 「視窗與 Dock」的擴充功能：關閉最後視窗時結束 App、點 Dock 圖示縮到 Dock。
+    /// 需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyLastWindowQuit(prompt: Bool) {
-        let wanted = settings.isInstalled(.lastWindowQuit)
+        let lastWindow = settings.isInstalled(.lastWindowQuit), dock = settings.isInstalled(.dockClick)
+        let wanted = lastWindow || dock
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
-        let running = LastWindowQuitController.shared.apply(enabled: wanted)
-        ui.lastWindowQuitRunning = wanted && LastWindowQuitController.shared.isRunning
+        DockClickController.shared.mode = settings.dockClickMode
+        let running = LastWindowQuitController.shared.apply(enabled: lastWindow) && DockClickController.shared.apply(enabled: dock)
+        ui.lastWindowQuitRunning = lastWindow && LastWindowQuitController.shared.isRunning
+        ui.dockClickRunning = dock && DockClickController.shared.isRunning
         lastWindowTrustTimer?.invalidate()
         lastWindowTrustTimer = nil
         guard wanted, !running else { return }

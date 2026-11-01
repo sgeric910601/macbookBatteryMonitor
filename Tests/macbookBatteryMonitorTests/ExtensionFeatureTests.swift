@@ -7,15 +7,21 @@ struct ExtensionFeatureTests {
         XCTAssertEqual(ExtensionFeature.windowSwitcher.installedKey, "feature.windowSwitcher.installed")
     }
 
-    /// 從舊版更新：沒存過加入狀態時，舊版就有的功能保留，新功能不會自己出現；存過的照存的
+    /// 從舊版更新：沒存過加入狀態時，捲動方向和已經打開過的功能保留，沒用過的新功能不會自己出現；存過的照存的
     func testUpgradeKeepsReleasedFeatures() {
-        XCTAssertTrue(ExtensionFeature.scrollDirection.isInstalled(stored: nil))
-        XCTAssertTrue(!ExtensionFeature.windowSwitcher.isInstalled(stored: nil))
-        XCTAssertTrue(!ExtensionFeature.inputMethod.isInstalled(stored: nil))
+        XCTAssertTrue(ExtensionFeature.scrollDirection.isInstalled(stored: nil, switchedOn: false))
+        XCTAssertTrue(!ExtensionFeature.windowSwitcher.isInstalled(stored: nil, switchedOn: false))
+        XCTAssertTrue(!ExtensionFeature.inputMethod.isInstalled(stored: nil, switchedOn: false))
         for feature in ExtensionFeature.allCases {
-            XCTAssertTrue(feature.isInstalled(stored: true))
-            XCTAssertTrue(!feature.isInstalled(stored: false))
+            XCTAssertTrue(feature.isInstalled(stored: true, switchedOn: false))
+            XCTAssertTrue(!feature.isInstalled(stored: false, switchedOn: true))
         }
+    }
+
+    /// 已經發布過、使用者也打開了的功能（例如舊版就開著視窗切換），更新後不會消失
+    func testUpgradeKeepsFeaturesInUse() {
+        XCTAssertTrue(ExtensionFeature.windowSwitcher.isInstalled(stored: nil, switchedOn: true))
+        XCTAssertTrue(ExtensionFeature.inputMethod.isInstalled(stored: nil, switchedOn: true))
     }
 
     /// 全新安裝：擴充功能都不預先加入

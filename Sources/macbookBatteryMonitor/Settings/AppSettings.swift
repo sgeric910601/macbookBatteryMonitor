@@ -406,7 +406,13 @@ final class AppSettings {
             for (key, installed) in ExtensionFeature.freshInstallChoices { defaults.set(installed, forKey: key) }
         }
         var installed = Set<ExtensionFeature>()
-        for feature in ExtensionFeature.allCases where feature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool) {
+        // 功能自己的開關有沒有打開過：舊版就用著的功能，更新後也要在
+        let switchedOn: [ExtensionFeature: Bool] = [
+            .windowSwitcher: defaults.bool(forKey: Keys.windowSwitcher),
+            .inputMethod: defaults.bool(forKey: Keys.capsLockNoDelay) || defaults.bool(forKey: Keys.shiftHalfWidth),
+        ]
+        for feature in ExtensionFeature.allCases
+        where feature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool, switchedOn: switchedOn[feature] ?? false) {
             installed.insert(feature)
         }
         installedFeatures = installed

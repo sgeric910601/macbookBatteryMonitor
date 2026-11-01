@@ -55,9 +55,9 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 沒存過加入狀態（從還沒有擴充功能的舊版更新）時：舊版就有的功能視為已加入，更新不會讓它消失；
-    /// 新功能不會自己出現，要到「功能管理」加入
-    func isInstalled(stored: Bool?) -> Bool { stored ?? (self == .scrollDirection) }
+    /// 沒存過加入狀態（從還沒有擴充功能的舊版更新）時：捲動方向，以及開關已經打開過的功能（switchedOn）視為已加入，
+    /// 更新不會讓它消失；沒用過的新功能不會自己出現，要到「功能管理」加入
+    func isInstalled(stored: Bool?, switchedOn: Bool) -> Bool { stored ?? (self == .scrollDirection || switchedOn) }
 
     /// 全新安裝第一次啟動時寫入：擴充功能都要「輔助使用」權限，一開始都不加入，免得一裝好就看到權限要求
     static var freshInstallChoices: [String: Bool] {

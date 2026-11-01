@@ -51,6 +51,46 @@ final class AppSettings {
 
     func isInstalled(_ feature: ExtensionFeature) -> Bool { installedFeatures.contains(feature) }
 
+    /// 可以匯出、帶到另一台 Mac 的設定。不含要另外安裝系統服務的（管理員 CPU 取樣、精準喚醒）、一次性的轉換標記，
+    /// 也不含周邊設備的低電量門檻（以藍牙裝置的硬體位址為鍵，匯出檔可能被分享）
+    static let backupSchema: [String: SettingsBackup.Kind] = {
+        var schema: [String: SettingsBackup.Kind] = [
+            Keys.display: .string, Keys.lowAlertEnabled: .bool, Keys.lowThreshold: .int, Keys.fullAlertEnabled: .bool,
+            Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
+            Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
+            Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.updateInterval: .int,
+            Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
+            Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
+            Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
+            Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
+            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.windowSwitcher: .bool,
+            Keys.switcher: .dictionary, Keys.capsLockNoDelay: .bool, Keys.shiftHalfWidth: .bool,
+            Keys.chargingTargetPercent: .int, Keys.chargingHoldPercent: .int, Keys.chargingSleepStrategy: .string,
+        ]
+        for feature in ExtensionFeature.allCases { schema[feature.installedKey] = .bool }
+        return schema
+    }()
+
+    func exportBackup() throws -> Data {
+        var values: [String: Any] = [:]
+        for key in Self.backupSchema.keys { values[key] = defaults.object(forKey: key) }
+        // 加入狀態用實際的值：從舊版更新、沒存過的也要帶過去，否則在全新安裝的 Mac 匯入後功能會變成沒加入
+        values.merge(ExtensionFeature.installedValues(isInstalled)) { _, actual in actual }
+        return try SettingsBackup.export(values, schema: Self.backupSchema)
+    }
+
+    /// 寫入通過檢查的設定，回傳寫入幾項；檔案裡沒有的設定維持原樣。重新開啟 App 後全部生效
+    func importBackup(_ data: Data) throws -> Int {
+        let values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        for (key, value) in values {
+            // 視窗切換的設定先整理成認得的欄位再存，不把檔案裡的原始內容整包存進去
+            let clean = key == Keys.switcher ? (value as? [String: Any]).map { SwitcherSettings(stored: $0).stored } ?? value : value
+            defaults.set(clean, forKey: key)
+        }
+        return values.count
+    }
+
     func setInstalled(_ feature: ExtensionFeature, _ installed: Bool) {
         guard isInstalled(feature) != installed else { return }
         if installed { installedFeatures.insert(feature) } else { installedFeatures.remove(feature) }
@@ -240,7 +280,7 @@ final class AppSettings {
     static let desktopPetScaleRange: ClosedRange<Double> = 0.5...2
 
     static func clampPetScale(_ value: Double) -> Double {
-        min(max(value, desktopPetScaleRange.lowerBound), desktopPetScaleRange.upperBound)
+        value.isFinite ? min(max(value, desktopPetScaleRange.lowerBound), desktopPetScaleRange.upperBound) : 1
     }
     /// 智慧充電的完成目標與保養上限（建立排程時的預設值）。完成目標預設是「原本的上限」（存成 0）：
     /// 建立排程時的系統充電上限，充好後就停在平常的上限，不會多充到 100%
@@ -432,9 +472,9 @@ final class AppSettings {
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)
         display = MenuBarDisplay(rawValue: defaults.string(forKey: Keys.display) ?? "") ?? .iconAndPercent
         lowAlertEnabled = defaults.bool(forKey: Keys.lowAlertEnabled)
-        lowThreshold = defaults.integer(forKey: Keys.lowThreshold)
+        lowThreshold = min(max(defaults.integer(forKey: Keys.lowThreshold), 5), 50)
         fullAlertEnabled = defaults.bool(forKey: Keys.fullAlertEnabled)
-        fullThreshold = defaults.integer(forKey: Keys.fullThreshold)
+        fullThreshold = min(max(defaults.integer(forKey: Keys.fullThreshold), 50), 100)
         monitorCPU = defaults.bool(forKey: Keys.monitorCPU)
         monitorMemory = defaults.bool(forKey: Keys.monitorMemory)
         monitorDisk = defaults.bool(forKey: Keys.monitorDisk)

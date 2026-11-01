@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     let settings: AppSettings
@@ -316,6 +317,21 @@ struct SettingsView: View {
             }
             .settingsSection(.general, shown: section)
 
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("設定備份", systemImage: "square.and.arrow.up.on.square")
+                    HStack {
+                        Button("匯出設定…") { exportSettings() }
+                        Button("匯入設定…") { importSettings() }
+                    }
+                    Text("換 Mac 或重灌時，把設定存成一個檔案帶過去。不含管理員 CPU 取樣、精準喚醒（要在新的 Mac 重新開啟）、自己的照片與周邊設備的低電量門檻。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .settingsSection(.general, shown: section)
+
             if settings.isInstalled(.scrollDirection) {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {
@@ -429,6 +445,52 @@ struct SettingsView: View {
 
     private func binding<T>(_ keyPath: ReferenceWritableKeyPath<AppSettings, T>) -> Binding<T> {
         Binding(get: { settings[keyPath: keyPath] }, set: { settings[keyPath: keyPath] = $0 })
+    }
+
+    private func exportSettings() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(AppEdition.appName)設定.plist"
+        panel.allowedContentTypes = [.propertyList]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try settings.exportBackup().write(to: url, options: .atomic)
+        } catch {
+            showAlert("無法匯出設定", "請換一個位置再試一次。")
+        }
+    }
+
+    private func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.propertyList]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // 只讀一般檔案，最多讀到上限多一個位元組：太大的檔案由 read 判斷，不會整個讀進記憶體
+        let isFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        let handle = isFile ? try? FileHandle(forReadingFrom: url) : nil
+        let data = (try? handle?.read(upToCount: SettingsBackup.maxSize + 1)) ?? nil
+        try? handle?.close()
+        let count: Int
+        do {
+            count = try settings.importBackup(data ?? Data())
+        } catch SettingsBackup.ReadError.newerVersion {
+            return showAlert("無法匯入設定", "這個檔案是較新版本匯出的，請先更新\(AppEdition.appName)。")
+        } catch {
+            return showAlert("無法匯入設定", "這不是\(AppEdition.appName)匯出的設定檔，或檔案已損壞。")
+        }
+        let alert = NSAlert()
+        alert.messageText = "已匯入 \(count) 項設定"
+        alert.informativeText = "重新開啟\(AppEdition.appName)後全部生效。"
+        alert.addButton(withTitle: "立即重新開啟")
+        alert.addButton(withTitle: "稍後")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        if (try? AppLocation.reopenAfterExit(Bundle.main.bundleURL)) != nil { NSApp.terminate(nil) }
+    }
+
+    private func showAlert(_ title: String, _ message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.runModal()
     }
 
     private func setLoginItem(_ enabled: Bool) {

@@ -24,6 +24,15 @@ struct ExtensionFeatureTests {
         XCTAssertTrue(ExtensionFeature.inputMethod.isInstalled(stored: nil, switchedOn: true))
     }
 
+    /// 匯出設定時寫出每個功能實際的加入狀態，沒存過、靠規則算出來的也要寫，換到全新安裝的 Mac 才不會變成沒加入
+    func testBackupWritesEveryInstalledState() {
+        let values = ExtensionFeature.installedValues { $0 != .inputMethod }
+        XCTAssertEqual(values.count, ExtensionFeature.allCases.count)
+        XCTAssertEqual(values["feature.scrollDirection.installed"], true)
+        XCTAssertEqual(values["feature.windowSwitcher.installed"], true)
+        XCTAssertEqual(values["feature.inputMethod.installed"], false)
+    }
+
     /// 全新安裝：擴充功能都不預先加入
     func testFreshInstallAddsNothing() {
         let choices = ExtensionFeature.freshInstallChoices

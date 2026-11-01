@@ -20,6 +20,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case windowSwitcher
     /// 登入時自動啟動的項目
     case startup
+    /// 用到的系統權限與狀態
+    case permissions
     case update
     /// 擴充功能組最後一項：加入或移除擴充功能
     case features
@@ -37,6 +39,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .input: return "滑鼠、觸控板與鍵盤"
         case .windowSwitcher: return "視窗切換"
         case .startup: return "登入項目"
+        case .permissions: return "權限"
         case .update: return "更新"
         case .features: return "功能管理"
         }
@@ -54,6 +57,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .input: return "computermouse"
         case .windowSwitcher: return "macwindow.on.rectangle"
         case .startup: return "power"
+        case .permissions: return "lock.shield"
         case .update: return "arrow.down.circle"
         case .features: return "square.grid.2x2"
         }
@@ -66,6 +70,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: return .blue
         case .monitors: return .orange
         case .startup: return .indigo
+        case .permissions: return .teal
         case .charging: return .green
         case .companion: return .pink
         case .peripherals: return .purple
@@ -79,10 +84,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// 頁首標題下的一行說明
     var subtitle: String {
         switch self {
-        case .general: return "App 圖示、通知與開機啟動"
+        case .general: return "App 圖示、通知、開機啟動與設定備份"
         case .display: return "選單列的顯示方式與面板裡的項目"
         case .monitors: return "更新頻率、省電與系統監控"
         case .startup: return "登入時自動啟動的項目與它們的來歷"
+        case .permissions: return "這個 App 用到的系統權限與狀態"
         case .charging: return "充電上限與智慧充電"
         case .companion: return "充電夥伴的外觀與桌面寵物"
         case .peripherals: return "藍牙設備的低電量通知"
@@ -105,7 +111,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// 最後一組「關於」只有「更新」，單獨放在最下面
     static func sidebar(hasBattery: Bool, isInstalled: (ExtensionFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
         [
-            ("基本", [.general, .display, .monitors, .startup]),
+            ("基本", [.general, .display, .monitors, .startup, .permissions]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
             ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).map(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
             ("關於", [.update]),
@@ -186,6 +192,7 @@ struct SettingsWindowView: View {
                     case .windowSwitcher: WindowSwitcherSettingsView(settings: settings, ui: ui)
                     case .startup: StartupItemsView(manager: startupItems)
                     case .features: FeatureManagerView(settings: settings)
+                    case .permissions: PermissionsView(settings: settings)
                     default: EmptyView()
                     }
                 }

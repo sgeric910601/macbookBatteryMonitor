@@ -59,6 +59,11 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     /// 更新不會讓它消失；沒用過的新功能不會自己出現，要到「功能管理」加入
     func isInstalled(stored: Bool?, switchedOn: Bool) -> Bool { stored ?? (self == .scrollDirection || switchedOn) }
 
+    /// 每個功能實際的加入狀態，寫進匯出的設定：沒存過、靠規則算出來的也寫出來
+    static func installedValues(_ isInstalled: (ExtensionFeature) -> Bool) -> [String: Bool] {
+        Dictionary(uniqueKeysWithValues: allCases.map { ($0.installedKey, isInstalled($0)) })
+    }
+
     /// 全新安裝第一次啟動時寫入：擴充功能都要「輔助使用」權限，一開始都不加入，免得一裝好就看到權限要求
     static var freshInstallChoices: [String: Bool] {
         Dictionary(uniqueKeysWithValues: allCases.map { ($0.installedKey, false) })

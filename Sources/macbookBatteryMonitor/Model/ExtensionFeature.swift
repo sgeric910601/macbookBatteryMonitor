@@ -8,6 +8,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case scrollDirection
     case windowSwitcher
     case inputMethod
+    case quitGuard
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .scrollDirection: return "捲動方向"
         case .windowSwitcher: return "視窗切換"
         case .inputMethod: return "中文輸入法"
+        case .quitGuard: return "⌘Q／⌘W 防誤觸"
         }
     }
 
@@ -26,6 +28,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .scrollDirection: return "arrow.up.arrow.down"
         case .windowSwitcher: return "macwindow.on.rectangle"
         case .inputMethod: return "keyboard"
+        case .quitGuard: return "hand.raised"
         }
     }
 
@@ -35,6 +38,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .scrollDirection: return "滑鼠與鍵盤"
         case .windowSwitcher: return "視窗與 Dock"
         case .inputMethod: return "滑鼠與鍵盤"
+        case .quitGuard: return "滑鼠與鍵盤"
         }
     }
 
@@ -44,6 +48,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .scrollDirection: return "監聽滑鼠捲動"
         case .windowSwitcher: return "監聽鍵盤"
         case .inputMethod: return "監聽鍵盤"
+        case .quitGuard: return "監聽鍵盤"
         }
     }
 
@@ -52,6 +57,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .scrollDirection: return "滑鼠與觸控板分開設定捲動方向"
         case .windowSwitcher: return "用視窗切換取代 Cmd+Tab"
         case .inputMethod: return "Caps Lock 切換中英不延遲、按住 Shift 打半形英文與符號"
+        case .quitGuard: return "要按住 ⌘Q 或 ⌘W 一下子才結束 App 或關閉，避免誤按"
         }
     }
 

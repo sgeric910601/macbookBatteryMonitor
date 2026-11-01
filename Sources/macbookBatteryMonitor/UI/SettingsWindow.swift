@@ -92,7 +92,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .charging: return "充電上限與智慧充電"
         case .companion: return "充電夥伴的外觀與桌面寵物"
         case .peripherals: return "藍牙設備的低電量通知"
-        case .input: return "捲動方向與中文輸入法"
+        case .input: return "捲動方向、中文輸入法與防誤觸"
         case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
         case .features: return "加入或移除擴充功能"
         case .update: return "版本、自動檢查與一鍵更新"
@@ -102,7 +102,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// 擴充功能所在的分類。「滑鼠、觸控板與鍵盤」放捲動方向與中文輸入法，加入其中一個就出現
     static func section(for feature: ExtensionFeature) -> SettingsSection {
         switch feature {
-        case .scrollDirection, .inputMethod: return .input
+        case .scrollDirection, .inputMethod, .quitGuard: return .input
         case .windowSwitcher: return .windowSwitcher
         }
     }

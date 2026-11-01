@@ -59,7 +59,7 @@ final class AppSettings {
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
-            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.updateInterval: .int,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
@@ -116,6 +116,19 @@ final class AppSettings {
     var powerSavingOnBatteryOnly: Bool {
         didSet { defaults.set(powerSavingOnBatteryOnly, forKey: Keys.powerSavingOnBatteryOnly); onIntervalChange?() }
     }
+
+    /// ⌘Q／⌘W 防誤觸：要按住幾秒、各自開不開（見 QuitGuard）
+    var quitGuardQuit: Bool {
+        didSet { defaults.set(quitGuardQuit, forKey: Keys.quitGuardQuit); onQuitGuardChange?() }
+    }
+    var quitGuardClose: Bool {
+        didSet { defaults.set(quitGuardClose, forKey: Keys.quitGuardClose); onQuitGuardChange?() }
+    }
+    var quitGuardDuration: Double {
+        didSet { defaults.set(quitGuardDuration, forKey: Keys.quitGuardDuration); onQuitGuardChange?() }
+    }
+    static let quitGuardDurations: [Double] = [0.5, 1, 1.5]
+    @ObservationIgnored var onQuitGuardChange: (() -> Void)?
 
     /// 睡眠時關閉藍牙、醒來打開（見 BluetoothSleep）
     var bluetoothOffDuringSleep: Bool {
@@ -398,6 +411,9 @@ final class AppSettings {
         static let powerSaving = "powerSaving"
         static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
         static let bluetoothOffDuringSleep = "bluetoothOffDuringSleep"
+        static let quitGuardQuit = "quitGuardQuit"
+        static let quitGuardClose = "quitGuardClose"
+        static let quitGuardDuration = "quitGuardDuration"
         static let bluetoothTurnedOffForSleep = "bluetoothTurnedOffForSleep"
         static let updateInterval = "updateInterval"
         static let hiddenFlowItems = "hiddenFlowItems"
@@ -451,6 +467,9 @@ final class AppSettings {
             Keys.powerSaving: false,
             Keys.powerSavingOnBatteryOnly: false,
             Keys.bluetoothOffDuringSleep: false,
+            Keys.quitGuardQuit: true,
+            Keys.quitGuardClose: false,
+            Keys.quitGuardDuration: 1.0,
             Keys.updateInterval: 1,
             Keys.adminCPUSampling: false,
             Keys.autoCheckUpdates: true,
@@ -513,6 +532,11 @@ final class AppSettings {
         powerSaving = defaults.bool(forKey: Keys.powerSaving)
         powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
         bluetoothOffDuringSleep = defaults.bool(forKey: Keys.bluetoothOffDuringSleep)
+        quitGuardQuit = defaults.bool(forKey: Keys.quitGuardQuit)
+        quitGuardClose = defaults.bool(forKey: Keys.quitGuardClose)
+        // 只收選單上的值，其他（包括匯入的設定）退回 1 秒
+        let duration = defaults.double(forKey: Keys.quitGuardDuration)
+        quitGuardDuration = Self.quitGuardDurations.contains(duration) ? duration : 1
         let interval = defaults.integer(forKey: Keys.updateInterval)
         updateInterval = Self.updateIntervals.contains(interval) ? interval : 1
         hiddenFlowItems = Set(defaults.stringArray(forKey: Keys.hiddenFlowItems) ?? [])

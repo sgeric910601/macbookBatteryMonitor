@@ -251,6 +251,13 @@ Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) 
 
 The system integration uses private macOS functions, all loaded at run time and disabled if missing; their sources are listed in [docs/design/window-server-provenance.md](docs/design/window-server-provenance.md) (Chinese).
 
+## Hold ⌘Q / ⌘W
+
+Add "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
+
+- **How it works**: on key down it remembers the frontmost app and shows a progress ring in the middle of the screen. Only when the hold completes does it send ⌘Q / ⌘W directly to that app, not to whatever is frontmost at that moment. Releasing early, switching to another app or pressing another key cancels, so a window behind can never be closed by mistake. Before sending ⌘W it also checks that the app's focused window has not changed; in browsers ⌘W still closes the tab as usual
+- **Permission**: needs Accessibility; with the feature removed or both switches off no keys are intercepted. Secure input (password fields) is never touched, and no keys are logged
+
 ## Chinese input methods
 
 The "中文輸入法" (Chinese input) card under Settings → 滑鼠、觸控板與鍵盤 has two switches, both off by default:

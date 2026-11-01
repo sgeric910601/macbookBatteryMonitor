@@ -3,7 +3,7 @@ import Foundation
 struct ExtensionFeatureTests {
     /// 原始值存在設定裡（加入狀態的鍵），改名會讓所有人的選擇失效；基本功能不在清單裡
     func testRawValuesAreStable() {
-        XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod"])
+        XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod", "quitGuard"])
         XCTAssertEqual(ExtensionFeature.windowSwitcher.installedKey, "feature.windowSwitcher.installed")
     }
 

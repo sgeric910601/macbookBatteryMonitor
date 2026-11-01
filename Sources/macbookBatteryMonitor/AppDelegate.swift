@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var refreshTimer: Timer?
     /// 等使用者允許「輔助使用」：允許了就開始分開設定捲動方向
     private var scrollTrustTimer: Timer?
+    private var quitGuardTrustTimer: Timer?
     private var shiftTrustTimer: Timer?
     /// 更新頻率慢於每秒時，下一次更新前 1 秒先讀變壓器輸入（見 BatteryReader.recordAdapterInput）
     private var adapterPreReadTimer: Timer?
@@ -126,6 +127,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onInputSourceFixChange = { [weak self] in self?.applyInputSourceFix(prompt: true) }
         applyInputSourceFix(prompt: false)
         settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
+        settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
+        applyQuitGuard(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -254,6 +257,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .scrollDirection: applyScrollDirection(prompt: true)
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
+        case .quitGuard: applyQuitGuard(prompt: true)
+        }
+    }
+
+    /// ⌘Q／⌘W 防誤觸。需要「輔助使用」：剛加入或打開時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    private func applyQuitGuard(prompt: Bool) {
+        let installed = settings.isInstalled(.quitGuard)
+        let quit = installed && settings.quitGuardQuit, close = installed && settings.quitGuardClose
+        let running = QuitGuardController.shared.apply(quit: quit, close: close, duration: settings.quitGuardDuration)
+        ui.quitGuardRunning = (quit || close) && QuitGuardController.shared.isRunning
+        quitGuardTrustTimer?.invalidate()
+        quitGuardTrustTimer = nil
+        guard quit || close, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        quitGuardTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyQuitGuard(prompt: false)
         }
     }
 

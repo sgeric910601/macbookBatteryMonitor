@@ -401,6 +401,37 @@ struct SettingsView: View {
                 .settingsSection(.input, shown: section)
             }
 
+            if settings.isInstalled(.quitGuard) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("⌘Q／⌘W 防誤觸", systemImage: "hand.raised")
+                        SwitchRow("按住 ⌘Q 才結束 App", isOn: binding(\.quitGuardQuit))
+                        SwitchRow("按住 ⌘W 才關閉", isOn: binding(\.quitGuardClose))
+                        Picker("要按住", selection: binding(\.quitGuardDuration)) {
+                            ForEach(AppSettings.quitGuardDurations, id: \.self) { Text("\($0.formatted()) 秒").tag($0) }
+                        }
+                        Text("按下時記住最前面的 App，按滿時間才把 ⌘Q／⌘W 送給它；中途放開、換到別的 App 或按了別的鍵都會取消，不會關到後面的視窗。⌘W 送出前也會確認焦點視窗沒換。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if settings.quitGuardQuit || settings.quitGuardClose {
+                            if ui.quitGuardRunning {
+                                Label("運作中", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else if !ui.scrollTrusted {
+                                Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
+
             UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked, ui: ui)
                 .settingsSection(.update, shown: section)
         }

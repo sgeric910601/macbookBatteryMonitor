@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import IOKit.pwr_mgt
 import Observation
@@ -24,6 +25,59 @@ final class KeepAwakeController {
 
     @ObservationIgnored private var assertions: [IOPMAssertionID] = []
     @ObservationIgnored private var timer: Timer?
+
+    // MARK: 指定的 App 執行中時自動防止休眠
+
+    /// 由 AppDelegate 依設定帶入；清單空的時候不監聽任何東西
+    var autoApps: Set<String> = [] {
+        didSet { if autoApps != oldValue { updateAuto() } }
+    }
+    /// 自動防止休眠中（面板的咖啡杯也顯示）
+    private(set) var autoActive = false
+    @ObservationIgnored private var autoAssertion: IOPMAssertionID?
+    @ObservationIgnored private var autoObservers: [NSObjectProtocol] = []
+    /// 自動防止休眠期間才每 60 秒看一次電量
+    @ObservationIgnored private var autoTimer: Timer?
+
+    /// App 開啟、結束時與電量檢查時重新判斷；只監聽 App 開關的通知，不輪詢
+    func updateAuto() {
+        guard !autoApps.isEmpty else {
+            for token in autoObservers { NSWorkspace.shared.notificationCenter.removeObserver(token) }
+            autoObservers = []
+            setAuto(false)
+            return
+        }
+        if autoObservers.isEmpty {
+            let center = NSWorkspace.shared.notificationCenter
+            autoObservers = [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification].map { name in
+                center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                    MainActor.assumeIsolated { KeepAwakeController.shared.updateAuto() }
+                }
+            }
+        }
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let battery = battery()
+        setAuto(KeepAwake.autoHolds(running: running, list: autoApps, batteryPercent: battery.percent, onBattery: battery.onBattery))
+    }
+
+    private func setAuto(_ hold: Bool) {
+        if hold, autoAssertion == nil {
+            var id = IOPMAssertionID(0)
+            if IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                           "macbookBatteryMonitor keep awake while apps run" as CFString, &id) == kIOReturnSuccess {
+                autoAssertion = id
+            }
+            autoTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                MainActor.assumeIsolated { KeepAwakeController.shared.updateAuto() }
+            }
+        } else if !hold, let id = autoAssertion {
+            IOPMAssertionRelease(id)
+            autoAssertion = nil
+            autoTimer?.invalidate()
+            autoTimer = nil
+        }
+        autoActive = autoAssertion != nil
+    }
 
     func start(_ duration: KeepAwake.Duration) {
         now = Date()

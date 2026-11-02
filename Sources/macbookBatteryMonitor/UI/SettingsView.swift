@@ -94,6 +94,13 @@ struct SettingsView: View {
                     Text(powerSavingNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Divider().padding(.vertical, 2)
+                    Text("這些 App 執行中時防止休眠").font(.body)
+                    AppExceptionList(ids: binding(\.keepAwakeApps), limit: SwitcherSettings.maxExcludedApps)
+                    Text("清單裡有任何一個 App 在執行，Mac 就不會自己睡著（螢幕照常會關），全部結束就恢復，例如簡報、播放或下載時。用電池而且電量到 10% 以下時自動停止。只監聽 App 開啟與結束，不會一直檢查。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     if BluetoothPower.isAvailable, hasBattery {
                         Divider().padding(.vertical, 2)
                         SwitchRow("睡眠時關閉藍牙", isOn: binding(\.bluetoothOffDuringSleep))

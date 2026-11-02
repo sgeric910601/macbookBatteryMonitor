@@ -49,6 +49,13 @@ struct KeepAwake {
         return false
     }
 
+    /// 指定的 App 執行中時自動防止休眠：清單裡有任何一個在執行就防止；用電池而且電量到 lowBatteryStop 以下時不防止
+    static func autoHolds(running: Set<String>, list: Set<String>, batteryPercent: Int?, onBattery: Bool) -> Bool {
+        guard !list.isDisjoint(with: running) else { return false }
+        if onBattery, let batteryPercent, batteryPercent <= lowBatteryStop { return false }
+        return true
+    }
+
     /// 剩下多久，無條件進位到分鐘；直到關閉時為 nil
     func remainingText(now: Date) -> String? {
         guard isActive, let until else { return nil }

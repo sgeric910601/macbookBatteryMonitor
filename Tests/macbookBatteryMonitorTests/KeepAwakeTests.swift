@@ -49,4 +49,15 @@ struct KeepAwakeTests {
         XCTAssertEqual(KeepAwake.Duration.hour2.seconds, 7200)
         XCTAssertEqual(KeepAwake.Duration.indefinitely.seconds, nil)
     }
+
+    /// 指定的 App 有任何一個在執行就防止休眠；清單空的、都沒在執行、用電池而且電量到 10% 以下時不防止
+    func testAutoWhileAppsRun() {
+        let list: Set<String> = ["com.example.Slides", "com.example.Player"]
+        XCTAssertTrue(KeepAwake.autoHolds(running: ["com.apple.finder", "com.example.Player"], list: list, batteryPercent: 80, onBattery: true))
+        XCTAssertTrue(!KeepAwake.autoHolds(running: ["com.apple.finder"], list: list, batteryPercent: 80, onBattery: true))
+        XCTAssertTrue(!KeepAwake.autoHolds(running: ["com.example.Player"], list: [], batteryPercent: 80, onBattery: true))
+        XCTAssertTrue(!KeepAwake.autoHolds(running: ["com.example.Player"], list: list, batteryPercent: 10, onBattery: true))
+        XCTAssertTrue(KeepAwake.autoHolds(running: ["com.example.Player"], list: list, batteryPercent: 5, onBattery: false))
+        XCTAssertTrue(KeepAwake.autoHolds(running: ["com.example.Slides"], list: list, batteryPercent: nil, onBattery: false))
+    }
 }

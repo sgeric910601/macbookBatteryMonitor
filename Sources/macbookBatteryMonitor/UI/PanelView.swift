@@ -176,7 +176,7 @@ private struct KeepAwakeButton: View {
             Toggle("螢幕也保持亮著", isOn: $controller.keepDisplayOn)
         } label: {
             HStack(spacing: 3) {
-                Image(systemName: controller.state.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
+                Image(systemName: controller.state.isActive || controller.autoActive ? "cup.and.saucer.fill" : "cup.and.saucer")
                 if let remaining = controller.state.remainingText(now: controller.now) {
                     Text(remaining).font(.caption)
                 }
@@ -185,7 +185,7 @@ private struct KeepAwakeButton: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(controller.state.isActive ? "防止休眠中" : "防止休眠")
+        .help(controller.state.isActive ? "防止休眠中" : controller.autoActive ? "指定的 App 執行中，自動防止休眠" : "防止休眠")
         .accessibilityLabel(controller.state.isActive ? "防止休眠中" : "防止休眠")
     }
 }

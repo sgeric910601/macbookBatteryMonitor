@@ -181,6 +181,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             guard let s = self?.store.snapshot else { return (nil, false) }
             return (s.percent, !s.externalConnected)
         }
+        KeepAwakeController.shared.autoApps = settings.keepAwakeApps
+        settings.onKeepAwakeAppsChange = { [weak self] in
+            guard let self else { return }
+            KeepAwakeController.shared.autoApps = self.settings.keepAwakeApps
+        }
         // 上次睡眠關掉藍牙、還沒等到醒來 App 就結束了：打開
         applyBluetooth(bluetoothSleep.didLaunch())
         registerLoginItemIfNeeded()

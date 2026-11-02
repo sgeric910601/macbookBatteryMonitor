@@ -273,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
-        case .lastWindowQuit, .dockClick: applyLastWindowQuit(prompt: true)
+        case .lastWindowQuit, .dockClick, .greenButton: applyLastWindowQuit(prompt: true)
         case .mouseButtons: applyMouseButtons(prompt: true)
         // 只在面板上多一個按鈕，加入或移除時面板自己會更新
         case .audioSwitch: break
@@ -291,10 +291,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyLastWindowQuit(prompt: Bool) {
         let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
-        let wanted = lastWindow || dock
+        let green = sessionActive && settings.isInstalled(.greenButton)
+        let wanted = lastWindow || dock || green
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
         DockClickController.shared.mode = settings.dockClickMode
         let running = LastWindowQuitController.shared.apply(enabled: lastWindow) && DockClickController.shared.apply(enabled: dock)
+            && WindowMaximizeController.shared.apply(enabled: green)
+        ui.greenButtonRunning = green && WindowMaximizeController.shared.isRunning
         ui.lastWindowQuitRunning = lastWindow && LastWindowQuitController.shared.isRunning
         ui.dockClickRunning = dock && DockClickController.shared.isRunning
         lastWindowTrustTimer?.invalidate()

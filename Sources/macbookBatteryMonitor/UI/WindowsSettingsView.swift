@@ -6,6 +6,18 @@ struct WindowsSettingsView: View {
     let ui: PanelState
 
     var body: some View {
+        if settings.isInstalled(.greenButton) {
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("綠色按鈕放大", systemImage: "arrow.up.left.and.arrow.down.right")
+                    Text("點視窗左上角的綠色按鈕，改成放大到填滿螢幕的可用範圍（選單列與 Dock 還在，不進全螢幕）；再按一次還原成原本的位置大小。按著 Option 點照系統原本的行為。判斷是不是點到綠色按鈕最多等 15 毫秒，來不及時那一下照原本的方式進入全螢幕，不會拖慢點擊。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    status(running: ui.greenButtonRunning)
+                }
+            }
+        }
         if settings.isInstalled(.dockClick) {
             Card {
                 VStack(alignment: .leading, spacing: 8) {

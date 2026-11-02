@@ -78,6 +78,8 @@ final class PanelState {
     var lastWindowQuitRunning = false
     /// 點 Dock 圖示縮到 Dock 在運作
     var dockClickRunning = false
+    /// 綠色按鈕放大在運作
+    var greenButtonRunning = false
     /// 智慧充電頁的輸入：指定完成時間、每週排程的星期與時間
     var chargingCustomDeadline = Date().addingTimeInterval(4 * 3600)
     var chargingWeekdays: Set<Int> = [2, 3, 4, 5, 6]

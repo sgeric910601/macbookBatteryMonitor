@@ -279,6 +279,14 @@ Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, 
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 
+## Green button maximizes
+
+Add "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the screen's usable area instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size:
+
+- **Option-click**: keeps the system behaviour
+- **Clicks stay fast**: each left mouse down asks Accessibility what is under the pointer, on its own thread and waiting at most 15 ms; if that is too slow, that one click enters full screen as usual
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is removed
+
 ## Click a Dock icon to minimize
 
 Add "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:

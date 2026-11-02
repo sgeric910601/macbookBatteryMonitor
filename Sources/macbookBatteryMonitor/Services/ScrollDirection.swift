@@ -26,14 +26,15 @@ final class ScrollDirection {
 
     /// 依設定開始或停止攔截；需要攔截但沒有權限時回傳 false
     @discardableResult
-    func apply(reverseMouse: Bool, reverseTrackpad: Bool, reverseHorizontal: Bool = true, linearLines: Int = 0) -> Bool {
+    func apply(reverseMouse: Bool, reverseTrackpad: Bool, reverseHorizontal: Bool = true, linearLines: Int = 0,
+               horizontalKey: ScrollHorizontalKey = .off) -> Bool {
         // 開發用：`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，
         // 每個捲動事件的判斷與改寫前後的值會寫進系統記錄
         tap.configure(.init(reverseMouse: reverseMouse, reverseTrackpad: reverseTrackpad, reverseHorizontal: reverseHorizontal,
-                            linearLines: ScrollLinear.valid(linearLines),
+                            linearLines: ScrollLinear.valid(linearLines), horizontalKey: horizontalKey,
                             debug: UserDefaults.standard.bool(forKey: "scrollDebug"),
                             rebuild: UserDefaults.standard.object(forKey: "scrollRebuild") as? Bool ?? true))
-        wanted = reverseMouse || reverseTrackpad || ScrollLinear.valid(linearLines) > 0
+        wanted = reverseMouse || reverseTrackpad || ScrollLinear.valid(linearLines) > 0 || horizontalKey != .off
         guard wanted else {
             watchdog?.invalidate()
             watchdog = nil
@@ -107,6 +108,8 @@ final class ScrollTap: @unchecked Sendable {
         var reverseHorizontal = true
         /// 一般滾輪每格固定捲幾行，0 是關閉（見 ScrollLinear）
         var linearLines = 0
+        /// 按住這個鍵時一般滾輪改成左右捲動
+        var horizontalKey = ScrollHorizontalKey.off
         var debug = false
         /// 連續捲動（觸控板、Magic Mouse）改用新造的事件取代原本的；開發時可以用 scrollRebuild 關掉，比較兩種做法
         var rebuild = true
@@ -230,6 +233,11 @@ final class ScrollTap: @unchecked Sendable {
         if config.linearLines > 0, event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0 {
             Self.makeLinear(event, lines: config.linearLines)
         }
+        let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        if config.horizontalKey.swaps(flags: event.flags.rawValue, continuous: continuous) {
+            Self.swapToHorizontal(event)
+            event.flags = CGEventFlags(rawValue: config.horizontalKey.flagsAfterSwap(event.flags.rawValue))
+        }
         guard currentIsTrackpad ? config.reverseTrackpad : config.reverseMouse else { return event }
         let horizontal = config.reverseHorizontal
         if config.rebuild, event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
@@ -299,6 +307,19 @@ final class ScrollTap: @unchecked Sendable {
             event.setDoubleValueField(fixedField, value: delta.fixed)
             event.setIntegerValueField(pointField, value: delta.points)
         }
+    }
+
+    /// 上下的捲動量搬到左右（原本左右的量不保留，滾輪本來就只有上下）
+    static func swapToHorizontal(_ event: CGEvent) {
+        let lines = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
+        let fixed = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+        let points = event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: lines)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixed)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: points)
     }
 
     /// 這個欄位要乘的數：上下一律 -1，左右看設定（見 ScrollAxes）
@@ -417,6 +438,31 @@ extension ScrollDirection {
             event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
             let out = tap.handle(.scrollWheel, event)
             print("selftest-scroll: 線性捲動不動觸控板：\(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 25 ? "正確" : "異常")")
+        }
+        // 按住 Shift 轉滾輪：上下的量搬到左右、拿掉 Shift、保留 Command；搭配線性 3 行與反向；觸控板不動
+        for (linear, reverse) in [(0, false), (3, true)] {
+            tap.configure(.init(reverseMouse: reverse, reverseTrackpad: false, linearLines: linear, horizontalKey: .shift))
+            tap.resetTouchesForTest()
+            guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: 2, wheel2: 0, wheel3: 0) else { continue }
+            event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 0)
+            event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 20)
+            event.flags = [.maskShift, .maskCommand]
+            let out = tap.handle(.scrollWheel, event)
+            let expected: Int64 = (linear > 0 ? 3 : 2) * (reverse ? -1 : 1)
+            let ok = out.getIntegerValueField(.scrollWheelEventDeltaAxis1) == 0 && out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 0
+                && out.getIntegerValueField(.scrollWheelEventDeltaAxis2) == expected
+                && out.getIntegerValueField(.scrollWheelEventPointDeltaAxis2) == expected * 10
+                && !out.flags.contains(.maskShift) && out.flags.contains(.maskCommand)
+            print("selftest-scroll: Shift 轉成左右（線性 \(linear)、反向 \(reverse)）：\(ok ? "正確" : "異常（上下 \(out.getIntegerValueField(.scrollWheelEventDeltaAxis1))、左右 \(out.getIntegerValueField(.scrollWheelEventDeltaAxis2))／\(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis2))、Shift \(out.flags.contains(.maskShift))）")")
+        }
+        tap.configure(.init(reverseMouse: false, reverseTrackpad: false, horizontalKey: .shift))
+        tap.markTouchesForTest()
+        if let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 25, wheel2: 0, wheel3: 0) {
+            event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+            event.flags = .maskShift
+            let out = tap.handle(.scrollWheel, event)
+            print("selftest-scroll: Shift 轉成左右不動觸控板：\(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 25 && out.flags.contains(.maskShift) ? "正確" : "異常")")
         }
         // 攔截執行緒：開始、檢查、停止都正常（需要「輔助使用」權限，沒有時只印出狀態）
         if ScrollDirection.trusted {

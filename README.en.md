@@ -145,7 +145,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
-| | 周邊設備 (Peripherals) | Each device's low-battery notification |
+| | 周邊設備 (Peripherals) | Each device's low-battery notification, and the external displays, USB and Thunderbolt devices connected right now (built-in parts and USB hubs are left out; read only when the page opens) |
 | 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
 | | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
 | | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, quit when the last window closes, click a Dock icon to minimize |

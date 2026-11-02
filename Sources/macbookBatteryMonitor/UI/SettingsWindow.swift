@@ -96,7 +96,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .permissions: return "這個 App 用到的系統權限與狀態"
         case .charging: return "充電上限與智慧充電"
         case .companion: return "充電夥伴的外觀與桌面寵物"
-        case .peripherals: return "藍牙設備的低電量通知"
+        case .peripherals: return "藍牙設備的低電量通知與目前連著的裝置"
         case .input: return "捲動、滑鼠側鍵、中文輸入法、防誤觸與鍵盤清潔"
         case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
         case .windows: return "視窗吸附、綠色按鈕放大、關閉最後視窗、Dock 點擊"
@@ -197,7 +197,9 @@ struct SettingsWindowView: View {
                     switch current {
                     case .display: DisplayItemsView(settings: settings, limitSlider: store.chargeLimit.supported)
                     case .charging: ChargingPlanView(store: store, settings: settings, ui: ui, embedded: true)
-                    case .peripherals: PeripheralAlertsCard(store: store.peripherals, settings: settings)
+                    case .peripherals:
+                        PeripheralAlertsCard(store: store.peripherals, settings: settings)
+                        ConnectedDevicesCard()
                     case .windowSwitcher: WindowSwitcherSettingsView(settings: settings, ui: ui)
                     case .windows: WindowsSettingsView(settings: settings, ui: ui)
                     case .startup: StartupItemsView(manager: startupItems)
@@ -353,5 +355,56 @@ private struct SidebarRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// 設定 →「周邊設備」：目前連著的外接螢幕、USB 與 Thunderbolt 裝置。打開這頁時才讀，按「重新整理」再讀一次
+private struct ConnectedDevicesCard: View {
+    @State private var items: [ConnectedDevices.Item] = []
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    CardTitle("目前連著的裝置", systemImage: "cable.connector")
+                    Spacer()
+                    Button("重新整理") { items = ConnectedDeviceReader.read() }
+                        .controlSize(.small)
+                }
+                if items.isEmpty {
+                    Text("沒有外接螢幕、USB 或 Thunderbolt 裝置").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(items) { item in
+                    HStack(spacing: 8) {
+                        Image(systemName: Self.symbol(item.kind)).frame(width: 18).foregroundStyle(.secondary).accessibilityHidden(true)
+                        Text(item.name)
+                        if let detail = item.detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
+                        Spacer()
+                        Text(Self.kindName(item.kind)).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Text("Mac 內建的元件與 USB Hub 不列。藍牙設備的電量在面板的「周邊設備」分頁。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear { items = ConnectedDeviceReader.read() }
+    }
+
+    private static func symbol(_ kind: ConnectedDevices.Kind) -> String {
+        switch kind {
+        case .display: return "display"
+        case .usb: return "cable.connector.horizontal"
+        case .thunderbolt: return "bolt.horizontal"
+        }
+    }
+
+    private static func kindName(_ kind: ConnectedDevices.Kind) -> String {
+        switch kind {
+        case .display: return "螢幕"
+        case .usb: return "USB"
+        case .thunderbolt: return "Thunderbolt"
+        }
     }
 }

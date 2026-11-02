@@ -19,6 +19,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case finderKeys
     case quickMenu
     case portManager
+    case clipboardHistory
 
     var id: String { rawValue }
 
@@ -40,6 +41,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .finderKeys: return "Finder 加強"
         case .quickMenu: return "貓咪快捷選單"
         case .portManager: return "Port 管理與結束程式"
+        case .clipboardHistory: return "剪貼簿歷史"
         }
     }
 
@@ -59,6 +61,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .finderKeys: return "folder"
         case .quickMenu: return "cat"
         case .portManager: return "point.3.connected.trianglepath.dotted"
+        case .clipboardHistory: return "doc.on.clipboard"
         }
     }
 
@@ -79,6 +82,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .finderKeys: return "視窗與 Dock"
         case .quickMenu: return "選單列"
         case .portManager: return "系統監控"
+        case .clipboardHistory: return "選單列"
         }
     }
 
@@ -99,6 +103,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .finderKeys: return "監聽鍵盤"
         case .quickMenu: return "不需要權限"
         case .portManager: return "不需要權限"
+        case .clipboardHistory: return "每 0.75 秒看剪貼簿"
         }
     }
 
@@ -118,13 +123,14 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
         case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、音訊、麥克風、鍵盤清潔與擴充功能開關"
         case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
+        case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
         }
     }
 
     /// 需要「輔助使用」權限（權限頁依這個列出用到的功能）
     var needsAccessibility: Bool {
         switch self {
-        case .audioSwitch, .quickMenu, .portManager: return false
+        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory: return false
         default: return true
         }
     }

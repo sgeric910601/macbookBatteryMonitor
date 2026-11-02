@@ -96,6 +96,30 @@ final class QuickMenuController: NSObject, NSMenuDelegate {
             menu.addItem(clean)
         }
 
+        // 剪貼簿歷史（啟用了才有）
+        if settings.isInstalled(.clipboardHistory) {
+            let clip = NSMenuItem(title: "剪貼簿歷史", action: nil, keyEquivalent: "")
+            clip.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
+            let clipMenu = NSMenu()
+            let items = ClipboardHistoryController.shared.history.items
+            if items.isEmpty {
+                let empty = NSMenuItem(title: "還沒有記錄", action: nil, keyEquivalent: "")
+                empty.isEnabled = false
+                clipMenu.addItem(empty)
+            }
+            for text in items {
+                let item = action(ClipboardHistory.preview(text)) { ClipboardHistoryController.shared.restore(text) }
+                item.toolTip = String(text.prefix(500))
+                clipMenu.addItem(item)
+            }
+            if !items.isEmpty {
+                clipMenu.addItem(.separator())
+                clipMenu.addItem(action("清除歷史") { ClipboardHistoryController.shared.clear() })
+            }
+            clip.submenu = clipMenu
+            menu.addItem(clip)
+        }
+
         // 擴充功能開關
         menu.addItem(.separator())
         let featuresItem = NSMenuItem(title: "擴充功能", action: nil, keyEquivalent: "")

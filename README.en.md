@@ -302,6 +302,15 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 
+## Clipboard history
+
+Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu:
+
+- **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits or the feature is turned off; up to 10,000 characters each
+- **No passwords**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded
+- **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
+- The menu can clear the history; no permission needed
+
 ## Ports and quitting processes
 
 Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings → 功能管理 and:

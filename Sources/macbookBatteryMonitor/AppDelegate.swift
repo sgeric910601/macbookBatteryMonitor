@@ -135,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
         applyQuickMenu()
+        ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory))
         settings.onMouseButtonsChange = { [weak self] in self?.applyMouseButtons(prompt: true) }
         applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
@@ -286,6 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .quickMenu: applyQuickMenu()
         // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
         case .portManager: break
+        case .clipboardHistory: ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory))
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {

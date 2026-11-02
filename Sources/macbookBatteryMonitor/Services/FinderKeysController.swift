@@ -1,0 +1,204 @@
+import AppKit
+import ApplicationServices
+import Carbon
+import OSLog
+
+/// Finder 加強（判斷在 FinderKeys）。攔截在自己的執行緒上跑；只有 X、C、V、F2 而且 Finder 在最前面時才問
+/// 「輔助使用」現在是不是在打字（最多等 50 毫秒），其他按鍵直接放行。要改寫的鍵：攔下原本的事件、另外送出新的按鍵
+/// （直接改鍵盤送來的事件，Finder 不認），放開時也一樣。
+/// 需要「輔助使用」權限；停用時完全不攔截
+@MainActor
+final class FinderKeysController {
+    static let shared = FinderKeysController()
+    nonisolated static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "finderKeys")
+
+    private let tap = FinderKeysTap()
+    private var watchdog: Timer?
+    private var activationObserver: NSObjectProtocol?
+
+    var isRunning: Bool { tap.isRunning }
+
+    @discardableResult
+    func apply(enabled: Bool) -> Bool {
+        guard enabled else {
+            watchdog?.invalidate()
+            watchdog = nil
+            tap.stop()
+            if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+            activationObserver = nil
+            return true
+        }
+        guard AXIsProcessTrusted() else { return false }
+        if activationObserver == nil {
+            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+            ) { _ in MainActor.assumeIsolated { FinderKeysController.shared.updateFrontApp() } }
+        }
+        updateFrontApp()
+        if !tap.isRunning {
+            let started = tap.start()
+            Self.log.notice("Finder 加強：\(started ? "開始" : "失敗", privacy: .public)")
+        }
+        if watchdog == nil {
+            watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                MainActor.assumeIsolated { FinderKeysController.shared.tap.keepAlive() }
+            }
+        }
+        return tap.isRunning
+    }
+
+    private func updateFrontApp() {
+        let front = NSWorkspace.shared.frontmostApplication
+        tap.setFinder(front?.bundleIdentifier == "com.apple.finder" ? front?.processIdentifier : nil)
+    }
+}
+
+final class FinderKeysTap: @unchecked Sendable {
+    private let lock = NSLock()
+    private var port: CFMachPort?
+    private var runLoop: CFRunLoop?
+    private var logic = FinderKeys()
+    /// Finder 在最前面時是它的「輔助使用」物件（等待上限只設在這個物件上），否則 nil
+    private var finder: AXUIElement?
+    /// 按下時改寫了的鍵：原本的鍵碼 → 改成的鍵與是否加 Option；放開時跟著改（只在攔截執行緒使用）
+    private var remapped: [Int64: (keyCode: Int64, option: Bool, flags: CGEventFlags)] = [:]
+    /// 自己送出的按鍵帶這個標記，攔截時直接放行
+    private static let postedMark: Int64 = 0x4644_4B45_5953 // "FDKEYS"
+
+    private func locked<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
+
+    var isRunning: Bool {
+        guard let port = locked({ self.port }) else { return false }
+        return CFMachPortIsValid(port) && CGEvent.tapIsEnabled(tap: port)
+    }
+
+    func setFinder(_ pid: pid_t?) {
+        let element = pid.map { pid -> AXUIElement in
+            let element = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(element, 0.05)
+            return element
+        }
+        locked { finder = element }
+    }
+
+    func keepAlive() {
+        guard let port = locked({ self.port }) else { return }
+        if !CFMachPortIsValid(port) {
+            stop()
+            _ = start()
+        } else if !CGEvent.tapIsEnabled(tap: port) {
+            CGEvent.tapEnable(tap: port, enable: true)
+        }
+    }
+
+    func start() -> Bool {
+        guard locked({ port }) == nil else { return isRunning }
+        let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+        let ready = DispatchSemaphore(value: 0)
+        let thread = Thread { [self] in
+            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                               eventsOfInterest: mask, callback: finderKeysCallback,
+                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+                ready.signal()
+                return
+            }
+            let loop = CFRunLoopGetCurrent()
+            CFRunLoopAddSource(loop, CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+            CGEvent.tapEnable(tap: port, enable: true)
+            locked {
+                self.port = port
+                self.runLoop = loop
+                logic = FinderKeys()
+            }
+            ready.signal()
+            CFRunLoopRun()
+        }
+        thread.name = "Finder 加強"
+        thread.qualityOfService = .userInteractive
+        thread.start()
+        ready.wait()
+        return isRunning
+    }
+
+    func stop() {
+        let (port, loop) = locked { () -> (CFMachPort?, CFRunLoop?) in
+            defer {
+                self.port = nil
+                self.runLoop = nil
+            }
+            return (self.port, self.runLoop)
+        }
+        if let port {
+            CGEvent.tapEnable(tap: port, enable: false)
+            CFMachPortInvalidate(port)
+        }
+        if let loop { CFRunLoopStop(loop) }
+    }
+
+    /// Finder 現在有焦點的元件是可以打字的欄位（改檔名、搜尋框、路徑列）
+    private static func editingText(_ finder: AXUIElement) -> Bool {
+        var focused: AnyObject?
+        guard AXUIElementCopyAttributeValue(finder, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+              let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
+        var role: AnyObject?
+        AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXRoleAttribute as CFString, &role)
+        return [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField"].contains(role as? String ?? "")
+    }
+
+    private static let watchedKeys: Set<Int64> = [Int64(FinderKeys.xKey), Int64(FinderKeys.cKey), Int64(FinderKeys.vKey), Int64(FinderKeys.f2Key)]
+
+    fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
+        let pass = Unmanaged.passUnretained(event)
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if type == .tapDisabledByTimeout, let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
+            remapped = [:]
+            return pass
+        }
+        if event.getIntegerValueField(.eventSourceUserData) == Self.postedMark { return pass }
+        let code = event.getIntegerValueField(.keyboardEventKeycode)
+        if type == .keyUp {
+            // 放開跟著按下時的改寫：攔下原本的放開、送出改寫後的放開
+            guard let mapped = remapped.removeValue(forKey: code) else { return pass }
+            Self.post(mapped.keyCode, down: false, flags: mapped.flags, option: mapped.option)
+            return nil
+        }
+        guard Self.watchedKeys.contains(code), !IsSecureEventInputEnabled(), let finder = locked({ finder }) else { return pass }
+        let flags = event.flags
+        let editing = Self.editingText(finder)
+        let action = locked {
+            logic.keyDown(keyCode: Int(code), command: flags.contains(.maskCommand),
+                          otherModifiers: !flags.intersection([.maskShift, .maskControl, .maskAlternate]).isEmpty,
+                          finderFront: true, editingText: editing, pasteboardChange: NSPasteboard.general.changeCount)
+        }
+        guard case let .remap(newCode, option) = action else { return pass }
+        Self.post(Int64(newCode), down: true, flags: flags, option: option)
+        remapped[code] = (Int64(newCode), option, flags)
+        if code == Int64(FinderKeys.xKey) {
+            // 剪下用的 ⌘C 做完後記下剪貼簿的變更次數，之後換掉了就取消剪下
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.3) { [self] in
+                let change = NSPasteboard.general.changeCount
+                locked { logic.copied(pasteboardChange: change) }
+            }
+        }
+        return nil
+    }
+
+    /// 送出改寫後的按鍵給最前面的 App（Finder）；帶標記，自己的攔截直接放行
+    private static func post(_ keyCode: Int64, down: Bool, flags: CGEventFlags, option: Bool) {
+        guard let event = CGEvent(keyboardEventSource: CGEventSource(stateID: .privateState), virtualKey: CGKeyCode(keyCode), keyDown: down) else { return }
+        var newFlags = flags.intersection([.maskCommand, .maskShift, .maskControl, .maskAlternate])
+        if option { newFlags.insert(.maskAlternate) }
+        event.flags = newFlags
+        event.setIntegerValueField(.eventSourceUserData, value: postedMark)
+        event.post(tap: .cgSessionEventTap)
+    }
+}
+
+private func finderKeysCallback(proxy _: CGEventTapProxy, type: CGEventType, event: CGEvent, userInfo: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+    guard let userInfo else { return Unmanaged.passUnretained(event) }
+    return Unmanaged<FinderKeysTap>.fromOpaque(userInfo).takeUnretainedValue().handle(type, event)
+}

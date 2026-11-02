@@ -6,6 +6,18 @@ struct WindowsSettingsView: View {
     let ui: PanelState
 
     var body: some View {
+        if settings.isInstalled(.finderKeys) {
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("Finder 加強", systemImage: "folder")
+                    Text("在 Finder 按 ⌘X 剪下檔案，到別的資料夾按 ⌘V 就是搬移（等於 Finder 的 ⌥⌘V「搬移項目到這裡」）；剪下後如果又複製了別的東西，⌘V 照常拷貝，不會誤把檔案搬走。按 F2 重新命名（等於按 Return）。只在 Finder 是最前面的 App、而且不是在改檔名或搜尋框打字時才轉換。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    status(running: ui.finderKeysRunning)
+                }
+            }
+        }
         if settings.isInstalled(.windowSnap) {
             Card {
                 VStack(alignment: .leading, spacing: 8) {

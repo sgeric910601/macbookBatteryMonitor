@@ -148,7 +148,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | | 周邊設備 (Peripherals) | Each device's low-battery notification, and the external displays, USB and Thunderbolt devices connected right now (built-in parts and USB hubs are left out; read only when the page opens) |
 | 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
 | | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
-| | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, quit when the last window closes, click a Dock icon to minimize |
+| | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, Finder shortcuts, quit when the last window closes, click a Dock icon to minimize |
 | | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
 | 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
@@ -301,6 +301,15 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 - **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown (held-down autorepeat does not), it always ends after at most 5 minutes, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
+
+## Finder shortcuts
+
+Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
+
+- **⌘X to cut, ⌘V to move**: select files in Finder, press ⌘X, then ⌘V in another folder to move them (Finder's ⌥⌘V "Move Item Here"). If something else is copied after cutting, ⌘V pastes the clipboard as usual and never moves the files by mistake
+- **F2 to rename**: press F2 on a selected file to rename it (same as Return)
+- **Only in Finder, never while typing**: when Finder is not frontmost, or while renaming or typing in the search field, ⌘X, ⌘V and F2 behave as usual
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is off
 
 ## Window snapping
 

@@ -278,7 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
-        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap: applyLastWindowQuit(prompt: true)
+        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: applyLastWindowQuit(prompt: true)
         case .mouseButtons: applyMouseButtons(prompt: true)
         // 只在面板上多一個按鈕，加入或移除時面板自己會更新
         case .audioSwitch: break
@@ -298,12 +298,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
         let green = sessionActive && settings.isInstalled(.greenButton)
         let snap = sessionActive && settings.isInstalled(.windowSnap)
-        let wanted = lastWindow || dock || green || snap
+        let finder = sessionActive && settings.isInstalled(.finderKeys)
+        let wanted = lastWindow || dock || green || snap || finder
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
         DockClickController.shared.mode = settings.dockClickMode
         // 每一個都要呼叫到（不能用 && 短路）：前面一個沒權限失敗時，後面該停的也要停
         let results = [LastWindowQuitController.shared.apply(enabled: lastWindow), DockClickController.shared.apply(enabled: dock),
-                       WindowMaximizeController.shared.apply(enabled: green), WindowSnapController.shared.apply(enabled: snap)]
+                       WindowMaximizeController.shared.apply(enabled: green), WindowSnapController.shared.apply(enabled: snap),
+                       FinderKeysController.shared.apply(enabled: finder)]
+        ui.finderKeysRunning = finder && FinderKeysController.shared.isRunning
         let running = results.allSatisfy { $0 }
         ui.windowSnapRunning = snap && WindowSnapController.shared.isRunning
         ui.greenButtonRunning = green && WindowMaximizeController.shared.isRunning

@@ -99,7 +99,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .peripherals: return "藍牙設備的低電量通知與目前連著的裝置"
         case .input: return "捲動、滑鼠側鍵、中文輸入法、防誤觸與鍵盤清潔"
         case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
-        case .windows: return "視窗吸附、綠色按鈕放大、關閉最後視窗、Dock 點擊"
+        case .windows: return "視窗吸附、綠色按鈕放大、Finder 加強、關閉最後視窗、Dock 點擊"
         case .features: return "啟用或停用擴充功能"
         case .update: return "版本、自動檢查與一鍵更新"
         }
@@ -111,7 +111,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch feature {
         case .scrollDirection, .inputMethod, .quitGuard, .keyboardCleaning, .mouseButtons: return .input
         case .windowSwitcher: return .windowSwitcher
-        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap: return .windows
+        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
         case .audioSwitch: return nil
         }
     }

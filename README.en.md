@@ -224,10 +224,10 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you turn it on in Settings → 功能管理 (feature management), and can be turned off again:
 
 - **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
-- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher needs no permission
+- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports and clipboard history need no permission
 - **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
 - **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
-- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping
+- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history
 
 ## Settings backup and permissions
 
@@ -236,7 +236,7 @@ Battery, charging, system monitors, the charging companion and peripherals are b
 
 ## Monitor alerts
 
-"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load, critical memory pressure and low free disk space, each on its own. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk, each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
 
 ## Mouse and trackpad scroll directions
 
@@ -291,7 +291,7 @@ Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speak
 Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:
 
 - **Only those two, only when set**: a button left at "不處理" (do nothing), and the left, right and middle buttons, go to apps as usual
-- **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor
+- **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor; Mission Control works over any app
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is off or both buttons do nothing
 
 ## Keyboard cleaning mode
@@ -306,7 +306,7 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 
 Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu:
 
-- **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits or the feature is turned off; up to 10,000 characters each
+- **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
 - **No passwords**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded
 - **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
 - The menu can clear the history; no permission needed
@@ -369,7 +369,7 @@ Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings
 
 Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
 
-- **When it quits**: 0.6 s after a window closes, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open. Finder and hidden apps are never quit
+- **When it quits**: 0.6 s after a window closes and again 1 s later, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open. Finder and hidden apps are never quit
 - **Exceptions**: add apps that should keep running without windows, such as a music app playing in the background
 - **Power**: it only listens for window changes of the frontmost app, with no polling
 - **Permission**: needs Accessibility; nothing is observed while the feature is off

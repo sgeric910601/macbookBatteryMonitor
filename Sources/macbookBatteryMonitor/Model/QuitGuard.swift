@@ -57,7 +57,8 @@ struct QuitGuard {
             if isRepeat, swallowedDown.contains(keyCode) { return .swallow }
             // 真正又按了一次：之前漏掉的放開不再算數
             if !isRepeat { swallowedDown.remove(keyCode) }
-            if command, !otherModifiers, let kind = kind(of: keyCode) {
+            // frontApp 為 0：沒有要保護的 App（例如最前面是我們自己），照常放行
+            if command, !otherModifiers, frontApp > 0, let kind = kind(of: keyCode) {
                 // 按住中的自動重複或又按一次：維持原本的計時
                 if let holding, holding.kind == kind { return .swallow }
                 // 沒在按住時的自動重複（例如功能剛打開時已經按著）：不管

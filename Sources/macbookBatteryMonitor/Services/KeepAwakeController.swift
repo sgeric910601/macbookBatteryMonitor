@@ -66,9 +66,11 @@ final class KeepAwakeController {
             if IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
                                            "macbookBatteryMonitor keep awake while apps run" as CFString, &id) == kIOReturnSuccess {
                 autoAssertion = id
-            }
-            autoTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-                MainActor.assumeIsolated { KeepAwakeController.shared.updateAuto() }
+                // 只在成功時才開計時器；失敗時下次 App 開關或接上電源再試
+                autoTimer?.invalidate()
+                autoTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                    MainActor.assumeIsolated { KeepAwakeController.shared.updateAuto() }
+                }
             }
         } else if !hold, let id = autoAssertion {
             IOPMAssertionRelease(id)

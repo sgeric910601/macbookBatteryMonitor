@@ -129,4 +129,13 @@ struct QuitGuardTests {
         XCTAssertEqual(guardian.handle(down(48, switcher: true)), .pass)
         XCTAssertTrue(guardian.holding == nil)
     }
+
+    /// 沒有要保護的 App（最前面是我們自己時傳 0）：⌘Q／⌘W 照常放行，不開始計時
+    func testNoFrontAppPassesThrough() {
+        var guardian = QuitGuard(holdQuit: true, holdClose: true, duration: 1)
+        XCTAssertEqual(guardian.handle(down(q, app: 0)), .pass)
+        XCTAssertEqual(guardian.handle(down(w, app: 0)), .pass)
+        XCTAssertTrue(guardian.holding == nil)
+        XCTAssertEqual(guardian.handle(.keyUp(keyCode: q)), .pass)
+    }
 }

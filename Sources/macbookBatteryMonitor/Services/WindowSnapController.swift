@@ -10,7 +10,8 @@ final class WindowSnapController {
     static let shared = WindowSnapController()
     nonisolated static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "windowSnap")
 
-    private(set) var isRunning = false
+    /// 權限被撤銷或系統讓攔截失效時也會反映出來
+    var isRunning: Bool { port.map { CFMachPortIsValid($0) && CGEvent.tapIsEnabled(tap: $0) } ?? false }
     private var port: CFMachPort?
     private var watchdog: Timer?
 
@@ -42,14 +43,24 @@ final class WindowSnapController {
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
-        isRunning = true
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             MainActor.assumeIsolated {
-                if let port = WindowSnapController.shared.port, !CGEvent.tapIsEnabled(tap: port) { CGEvent.tapEnable(tap: port, enable: true) }
+                WindowSnapController.shared.keepAlive()
             }
         }
         Self.log.notice("開始監聽視窗拖曳")
         return true
+    }
+
+    /// 系統暫停攔截時重新打開；失效（例如權限被撤銷又給回）時重建
+    private func keepAlive() {
+        guard let port else { return }
+        if !CFMachPortIsValid(port) {
+            stop()
+            apply(enabled: true)
+        } else if !CGEvent.tapIsEnabled(tap: port) {
+            CGEvent.tapEnable(tap: port, enable: true)
+        }
     }
 
     private func stop() {
@@ -60,7 +71,6 @@ final class WindowSnapController {
             CFMachPortInvalidate(port)
         }
         port = nil
-        isRunning = false
         drag = nil
         preview?.orderOut(nil)
     }

@@ -1,7 +1,7 @@
 import AppKit
 
 /// 剪貼簿歷史（整理在 ClipboardHistory）。macOS 沒有剪貼簿改變的通知，只能定時看變更次數：
-/// 啟用時每 0.75 秒讀一個整數，有變才讀內容；停用時停掉計時器並清空。內容只放在記憶體
+/// 啟用時每 0.75 秒讀一個整數，有變才讀內容；停用、鎖定螢幕、睡眠時清空。內容只放在記憶體
 @MainActor
 final class ClipboardHistoryController {
     static let shared = ClipboardHistoryController()
@@ -9,6 +9,7 @@ final class ClipboardHistoryController {
     private(set) var history = ClipboardHistory()
     private var timer: Timer?
     private var lastChange = NSPasteboard.general.changeCount
+    private var clearObservers: [(NotificationCenter, NSObjectProtocol)] = []
 
     var isRunning: Bool { timer != nil }
 
@@ -17,9 +18,19 @@ final class ClipboardHistoryController {
             timer?.invalidate()
             timer = nil
             history.clear()
+            for (center, observer) in clearObservers { center.removeObserver(observer) }
+            clearObservers = []
             return
         }
         guard timer == nil else { return }
+        // 離開座位（鎖定螢幕）或睡眠時清空，別人打開選單看不到之前複製的內容
+        let clear: @Sendable (Notification) -> Void = { _ in MainActor.assumeIsolated { ClipboardHistoryController.shared.clear() } }
+        let distributed = DistributedNotificationCenter.default()
+        let workspace = NSWorkspace.shared.notificationCenter
+        clearObservers = [
+            (distributed, distributed.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main, using: clear)),
+            (workspace, workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main, using: clear)),
+        ]
         lastChange = NSPasteboard.general.changeCount
         let timer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { _ in
             MainActor.assumeIsolated { ClipboardHistoryController.shared.check() }

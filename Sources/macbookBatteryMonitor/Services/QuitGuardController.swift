@@ -67,7 +67,9 @@ final class QuitGuardController {
     }
 
     private func updateFrontApp() {
-        tap.setFrontApp(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)
+        // 我們自己的視窗不攔：要問自己「輔助使用」會等到逾時，而且主執行緒正在等
+        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        tap.setFrontApp(front == getpid() ? 0 : front)
     }
 
     private func began(_ kind: QuitGuard.Kind, app: pid_t) {
@@ -115,7 +117,10 @@ final class QuitGuardController {
 
     private static func focusedWindow(of app: pid_t) -> AXUIElement? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(AXUIElementCreateApplication(app), kAXFocusedWindowAttribute as CFString, &value) == .success,
+        let element = AXUIElementCreateApplication(app)
+        // 在主執行緒上問，App 沒回應時最多等 0.1 秒（預設要等好幾秒）
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
         return (value as! AXUIElement)
     }

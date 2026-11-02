@@ -10,7 +10,8 @@ final class DockClickController {
     nonisolated static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "dockClick")
 
     var mode = DockClick.Mode.minimize
-    private(set) var isRunning = false
+    /// 權限被撤銷或系統讓攔截失效時也會反映出來
+    var isRunning: Bool { port.map { CFMachPortIsValid($0) && CGEvent.tapIsEnabled(tap: $0) } ?? false }
 
     private var port: CFMachPort?
     private var watchdog: Timer?
@@ -41,15 +42,25 @@ final class DockClickController {
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
-        isRunning = true
         // 系統可能暫停攔截：每 5 秒檢查一次
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             MainActor.assumeIsolated {
-                if let port = DockClickController.shared.port, !CGEvent.tapIsEnabled(tap: port) { CGEvent.tapEnable(tap: port, enable: true) }
+                DockClickController.shared.keepAlive()
             }
         }
         Self.log.notice("開始監聽 Dock 點擊")
         return true
+    }
+
+    /// 系統暫停攔截時重新打開；失效（例如權限被撤銷又給回）時重建
+    private func keepAlive() {
+        guard let port else { return }
+        if !CFMachPortIsValid(port) {
+            stop()
+            apply(enabled: true)
+        } else if !CGEvent.tapIsEnabled(tap: port) {
+            CGEvent.tapEnable(tap: port, enable: true)
+        }
     }
 
     private func stop() {
@@ -60,18 +71,18 @@ final class DockClickController {
             CFMachPortInvalidate(port)
         }
         port = nil
-        isRunning = false
         press = nil
         minimizedByUs = [:]
     }
 
-    fileprivate func handle(_ type: CGEventType, location: CGPoint) {
+    fileprivate func handle(_ type: CGEventType, location: CGPoint, modified: Bool) {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let port { CGEvent.tapEnable(tap: port, enable: true) }
         case .leftMouseDown:
             press = nil
-            guard Self.nearScreenEdge(location) else { return }
+            // ⌘ 點（在 Finder 顯示）、⌥ 點（隱藏其他）等 Dock 自己的操作不插手
+            guard !modified, Self.nearScreenEdge(location) else { return }
             let front = NSWorkspace.shared.frontmostApplication
             let clicked = Self.dockApp(at: location)
             // 只有點到最前面那個 App 時才需要知道它有沒有開著的視窗
@@ -181,6 +192,7 @@ final class DockClickController {
 
 private func dockClickCallback(proxy _: CGEventTapProxy, type: CGEventType, event: CGEvent, userInfo _: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
     let location = event.location
-    MainActor.assumeIsolated { DockClickController.shared.handle(type, location: location) }
+    let modified = !event.flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift]).isEmpty
+    MainActor.assumeIsolated { DockClickController.shared.handle(type, location: location, modified: modified) }
     return Unmanaged.passUnretained(event)
 }

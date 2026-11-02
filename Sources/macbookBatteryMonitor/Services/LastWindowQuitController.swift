@@ -65,6 +65,8 @@ final class LastWindowQuitController {
         var created: AXObserver?
         guard AXObserverCreate(pid, lastWindowCallback, &created) == .success, let created else { return }
         let element = AXUIElementCreateApplication(pid)
+        // 在主執行緒上註冊：App 沒回應時每次最多等 0.2 秒（預設要等好幾秒）
+        AXUIElementSetMessagingTimeout(element, 0.2)
         // 關掉視窗的通知有些 App 不會從 App 物件送出；焦點視窗改變（關掉後焦點移走）也觸發同一個檢查，多檢查一次沒有副作用
         for name in [kAXWindowCreatedNotification, kAXUIElementDestroyedNotification, kAXFocusedWindowChangedNotification] {
             AXObserverAddNotification(created, element, name as CFString, nil)

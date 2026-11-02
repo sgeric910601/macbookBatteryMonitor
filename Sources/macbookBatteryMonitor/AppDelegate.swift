@@ -135,7 +135,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
         applyQuickMenu()
-        ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory))
         settings.onMouseButtonsChange = { [weak self] in self?.applyMouseButtons(prompt: true) }
         applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
@@ -287,7 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .quickMenu: applyQuickMenu()
         // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
         case .portManager: break
-        case .clipboardHistory: ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory))
+        case .clipboardHistory: applyQuickMenu()
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {
@@ -333,6 +332,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         QuickMenuController.shared.apply(enabled: settings.isInstalled(.quickMenu), settings: settings) { [weak self] section in
             self?.showSettings(section)
         }
+        // 剪貼簿歷史只在快捷選單裡看得到、清得掉，沒開快捷選單時不記錄
+        ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory) && settings.isInstalled(.quickMenu))
     }
 
     /// 滑鼠側鍵。需要「輔助使用」：剛設定時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
@@ -629,6 +630,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func powerSourceChanged() {
         powerTransitionTask?.cancel()
         refresh()
+        // 低電量時沒有自動防止休眠；接上電源後要重新判斷，不用等 App 開關
+        KeepAwakeController.shared.updateAuto()
         powerTransitionTask = Task { [weak self] in
             for delay in [1, 2, 3] {
                 do { try await Task.sleep(for: .seconds(delay)) } catch { return }

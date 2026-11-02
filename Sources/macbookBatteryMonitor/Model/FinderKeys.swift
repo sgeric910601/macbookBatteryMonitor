@@ -13,6 +13,8 @@ struct FinderKeys {
     private(set) var pendingCut = false
     /// 剪下時拷貝完成後的剪貼簿變更次數；之後不一樣就代表又複製了別的
     private var cutPasteboard: Int?
+    /// 按 ⌘X 當下的剪貼簿變更次數；拷貝後沒變就代表沒拷貝到東西（例如沒選取），不能剪下
+    private var cutStart: Int?
 
     /// pasteboardChange：目前剪貼簿的變更次數（NSPasteboard.changeCount）
     mutating func keyDown(keyCode: Int, command: Bool, otherModifiers: Bool, finderFront: Bool, editingText: Bool, pasteboardChange: Int) -> Action {
@@ -21,13 +23,15 @@ struct FinderKeys {
         case (Self.xKey, true):
             pendingCut = true
             cutPasteboard = nil
+            cutStart = pasteboardChange
             return .remap(keyCode: Self.cKey, option: false)
         case (Self.cKey, true):
             pendingCut = false
             return .pass
         case (Self.vKey, true):
             defer { pendingCut = false }
-            guard pendingCut, cutPasteboard == nil || cutPasteboard == pasteboardChange else { return .pass }
+            // 剪貼簿從按 ⌘X 之後沒變過：⌘C 沒拷貝到東西，貼上的會是之前複製的檔案，不能搬
+            guard pendingCut, pasteboardChange != cutStart, cutPasteboard == nil || cutPasteboard == pasteboardChange else { return .pass }
             return .remap(keyCode: Self.vKey, option: true)
         case (Self.f2Key, false):
             return .remap(keyCode: Self.returnKey, option: false)
@@ -38,6 +42,11 @@ struct FinderKeys {
 
     /// 剪下用的 ⌘C 做完後，記下當時的剪貼簿變更次數
     mutating func copied(pasteboardChange: Int) {
-        if pendingCut { cutPasteboard = pasteboardChange }
+        guard pendingCut else { return }
+        if pasteboardChange == cutStart {
+            pendingCut = false
+        } else {
+            cutPasteboard = pasteboardChange
+        }
     }
 }

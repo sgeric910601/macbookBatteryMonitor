@@ -31,6 +31,19 @@ struct FinderKeysTests {
         XCTAssertEqual(press(&again, v, pasteboard: 3), .pass)
     }
 
+    /// ⌘X 沒拷貝到東西（例如沒選取）：剪貼簿還是之前複製的檔案，接著的 ⌘V 照常拷貝，不會把之前的檔案搬走
+    func testCutWithoutCopyDoesNotMove() {
+        var keys = FinderKeys()
+        _ = press(&keys, x, pasteboard: 5)
+        // 0.3 秒內就按 ⌘V，剪貼簿也沒變
+        XCTAssertEqual(press(&keys, v, pasteboard: 5), .pass)
+        var later = FinderKeys()
+        _ = press(&later, x, pasteboard: 5)
+        later.copied(pasteboardChange: 5)
+        XCTAssertTrue(!later.pendingCut)
+        XCTAssertEqual(press(&later, v, pasteboard: 5), .pass)
+    }
+
     /// F2 在 Finder 裡變成 Return（重新命名）
     func testF2Renames() {
         var keys = FinderKeys()

@@ -35,11 +35,22 @@ final class MouseButtonsController {
         self.port = port
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             MainActor.assumeIsolated {
-                if let port = MouseButtonsController.shared.port, !CGEvent.tapIsEnabled(tap: port) { CGEvent.tapEnable(tap: port, enable: true) }
+                MouseButtonsController.shared.keepAlive()
             }
         }
         Self.log.notice("開始攔截滑鼠側鍵")
         return true
+    }
+
+    /// 系統暫停攔截時重新打開；失效（例如權限被撤銷又給回）時重建
+    private func keepAlive() {
+        guard let port else { return }
+        if !CFMachPortIsValid(port) {
+            stop()
+            apply(buttons)
+        } else if !CGEvent.tapIsEnabled(tap: port) {
+            CGEvent.tapEnable(tap: port, enable: true)
+        }
     }
 
     private func stop() {
@@ -57,7 +68,9 @@ final class MouseButtonsController {
         let number = event.getIntegerValueField(.mouseEventButtonNumber)
         switch type {
         case .otherMouseDown:
-            guard let action = buttons.action(forButton: Int(number)), let shortcut = action.shortcut else { return false }
+            // 按著修飾鍵時照原本的按鍵放行（其他 App 可能有自己的組合）
+            guard event.flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift]).isEmpty,
+                  let action = buttons.action(forButton: Int(number)), let shortcut = action.shortcut else { return false }
             // 「上一頁、下一頁」送給最前面的 App：游標下不是它的視窗時放行原本的按鍵；Mission Control 不分 App
             if action != .missionControl, !Self.pointerOverFrontApp(event.location) { return false }
             swallowed.insert(number)

@@ -639,6 +639,7 @@ private struct NetworkPanel: View {
                     MonitorChart(points: network.history.points, a: ("下載", .green), b: ("上傳", .orange), showsLegend: false)
                 }
             }
+            ConnectionStatusCard(status: NetworkStatusMonitor.shared)
             Card {
                 VStack(alignment: .leading, spacing: 6) {
                     CardTitle("開機以來（目前的網路介面）", systemImage: "clock.arrow.circlepath")
@@ -650,6 +651,28 @@ private struct NetworkPanel: View {
                 SpeedTestCard(test: network.speedTest)
             }
         }
+    }
+}
+
+/// 連線狀態：VPN、低數據模式、按流量計費。面板打開時才監看，不連到外部伺服器
+private struct ConnectionStatusCard: View {
+    let status: NetworkStatusMonitor
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 6) {
+                CardTitle("連線狀態", systemImage: "lock.shield")
+                InfoRow("VPN", status.vpnInterfaces.isEmpty ? "沒有連線" : "已連線（\(status.vpnInterfaces.joined(separator: "、"))）",
+                        tint: status.vpnInterfaces.isEmpty ? nil : .green)
+                ForEach(status.notes, id: \.self) { note in
+                    Label(note, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .onAppear { status.start() }
+        .onDisappear { status.stop() }
     }
 }
 

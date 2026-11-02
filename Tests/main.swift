@@ -297,3 +297,8 @@ audio.testOutputMenu()
 audio.testMutePlan()
 audio.testAccessibilityNeeds()
 print("3 audio device tests passed")
+
+let networkStatus = NetworkStatusTests()
+networkStatus.testDetectsVPN()
+networkStatus.testSummary()
+print("2 network status tests passed")

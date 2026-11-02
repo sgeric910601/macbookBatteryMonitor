@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 等使用者允許「輔助使用」：允許了就開始分開設定捲動方向
     private var scrollTrustTimer: Timer?
     private var quitGuardTrustTimer: Timer?
+    private var mouseButtonsTrustTimer: Timer?
     private var lastWindowTrustTimer: Timer?
     private var shiftTrustTimer: Timer?
     /// 更新頻率慢於每秒時，下一次更新前 1 秒先讀變壓器輸入（見 BatteryReader.recordAdapterInput）
@@ -130,6 +131,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
+        settings.onMouseButtonsChange = { [weak self] in self?.applyMouseButtons(prompt: true) }
+        applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
         applyLastWindowQuit(prompt: false)
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
@@ -262,6 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
         case .lastWindowQuit, .dockClick: applyLastWindowQuit(prompt: true)
+        case .mouseButtons: applyMouseButtons(prompt: true)
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {
@@ -289,6 +293,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         lastWindowTrustTimer = repeating(every: 2) { delegate in
             guard ScrollDirection.trusted else { return }
             delegate.applyLastWindowQuit(prompt: false)
+        }
+    }
+
+    /// 滑鼠側鍵。需要「輔助使用」：剛設定時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    private func applyMouseButtons(prompt: Bool) {
+        let installed = settings.isInstalled(.mouseButtons)
+        let buttons = MouseButtons(back: installed ? settings.mouseBackButton : .none, forward: installed ? settings.mouseForwardButton : .none)
+        let running = MouseButtonsController.shared.apply(buttons)
+        ui.mouseButtonsRunning = buttons.isActive && MouseButtonsController.shared.isRunning
+        mouseButtonsTrustTimer?.invalidate()
+        mouseButtonsTrustTimer = nil
+        guard buttons.isActive, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        mouseButtonsTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyMouseButtons(prompt: false)
         }
     }
 

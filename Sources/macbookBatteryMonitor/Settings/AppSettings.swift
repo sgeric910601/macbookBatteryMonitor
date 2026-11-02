@@ -59,7 +59,7 @@ final class AppSettings {
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
-            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.updateInterval: .int,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.mouseBackButton: .string, Keys.mouseForwardButton: .string, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
@@ -138,6 +138,15 @@ final class AppSettings {
         }
     }
     @ObservationIgnored var onLastWindowQuitChange: (() -> Void)?
+
+    /// 滑鼠第 4、5 鍵的動作
+    var mouseBackButton: MouseButtons.Action {
+        didSet { defaults.set(mouseBackButton.rawValue, forKey: Keys.mouseBackButton); onMouseButtonsChange?() }
+    }
+    var mouseForwardButton: MouseButtons.Action {
+        didSet { defaults.set(mouseForwardButton.rawValue, forKey: Keys.mouseForwardButton); onMouseButtonsChange?() }
+    }
+    @ObservationIgnored var onMouseButtonsChange: (() -> Void)?
 
     /// 鍵盤清潔模式的時間（秒）
     var keyboardCleaningSeconds: Int {
@@ -455,6 +464,8 @@ final class AppSettings {
         static let lastWindowQuitExcluded = "lastWindowQuitExcluded"
         static let dockClickMode = "dockClickMode"
         static let keyboardCleaningSeconds = "keyboardCleaningSeconds"
+        static let mouseBackButton = "mouseBackButton"
+        static let mouseForwardButton = "mouseForwardButton"
         static let quitGuardClose = "quitGuardClose"
         static let quitGuardDuration = "quitGuardDuration"
         static let bluetoothTurnedOffForSleep = "bluetoothTurnedOffForSleep"
@@ -579,6 +590,8 @@ final class AppSettings {
         powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
         bluetoothOffDuringSleep = defaults.bool(forKey: Keys.bluetoothOffDuringSleep)
         quitGuardQuit = defaults.bool(forKey: Keys.quitGuardQuit)
+        mouseBackButton = MouseButtons.Action(stored: defaults.string(forKey: Keys.mouseBackButton))
+        mouseForwardButton = MouseButtons.Action(stored: defaults.string(forKey: Keys.mouseForwardButton))
         keyboardCleaningSeconds = KeyboardCleaning.validDuration(defaults.integer(forKey: Keys.keyboardCleaningSeconds))
         dockClickMode = DockClick.Mode(rawValue: defaults.string(forKey: Keys.dockClickMode) ?? "") ?? .minimize
         // 只收合法的識別碼、最多 SwitcherSettings.maxExcludedApps 個（匯入的設定也走這裡）

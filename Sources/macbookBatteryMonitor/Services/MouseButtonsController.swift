@@ -1,0 +1,98 @@
+import AppKit
+import OSLog
+
+/// 滑鼠側鍵（判斷在 MouseButtons）。只攔「其他按鈕」（左右鍵不在範圍），而且只接手設定了動作的第 4、5 鍵：
+/// 按下時送出對應的快捷鍵、放開也攔下；其他按鈕照常交給 App。沒設定任何動作時不攔截。需要「輔助使用」權限
+@MainActor
+final class MouseButtonsController {
+    static let shared = MouseButtonsController()
+    nonisolated static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "mouseButtons")
+    /// 自己送出的快捷鍵帶這個標記（看得到的話直接放行）
+    private static let postedMark: Int64 = 0x4D42_5554_544E // "MBUTTN"
+
+    private var buttons = MouseButtons(back: .none, forward: .none)
+    private var port: CFMachPort?
+    private var watchdog: Timer?
+    /// 按下時被接手的按鈕：放開時也要攔下
+    private var swallowed = Set<Int64>()
+
+    var isRunning: Bool { port.map { CFMachPortIsValid($0) && CGEvent.tapIsEnabled(tap: $0) } ?? false }
+
+    @discardableResult
+    func apply(_ new: MouseButtons) -> Bool {
+        buttons = new
+        guard new.isActive else {
+            stop()
+            return true
+        }
+        guard AXIsProcessTrusted() else { return false }
+        guard port == nil else { return isRunning }
+        let mask: CGEventMask = (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.otherMouseUp.rawValue)
+        guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                           eventsOfInterest: mask, callback: mouseButtonsCallback, userInfo: nil) else { return false }
+        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+        CGEvent.tapEnable(tap: port, enable: true)
+        self.port = port
+        watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                if let port = MouseButtonsController.shared.port, !CGEvent.tapIsEnabled(tap: port) { CGEvent.tapEnable(tap: port, enable: true) }
+            }
+        }
+        Self.log.notice("開始攔截滑鼠側鍵")
+        return true
+    }
+
+    private func stop() {
+        watchdog?.invalidate()
+        watchdog = nil
+        if let port {
+            CGEvent.tapEnable(tap: port, enable: false)
+            CFMachPortInvalidate(port)
+        }
+        port = nil
+        swallowed = []
+    }
+
+    fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
+        let number = event.getIntegerValueField(.mouseEventButtonNumber)
+        switch type {
+        case .otherMouseDown:
+            guard let action = buttons.action(forButton: Int(number)), let shortcut = action.shortcut else { return false }
+            swallowed.insert(number)
+            Self.post(shortcut)
+            return true
+        case .otherMouseUp:
+            return swallowed.remove(number) != nil
+        default:
+            return false
+        }
+    }
+
+    fileprivate func reenable() {
+        if let port { CGEvent.tapEnable(tap: port, enable: true) }
+    }
+
+    /// 送給最前面的 App，和按鍵盤一樣
+    private static func post(_ shortcut: MouseButtons.Shortcut) {
+        let source = CGEventSource(stateID: .privateState)
+        var flags = CGEventFlags()
+        if shortcut.command { flags.insert(.maskCommand) }
+        if shortcut.control { flags.insert(.maskControl) }
+        for down in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(shortcut.keyCode), keyDown: down) else { continue }
+            event.flags = flags
+            event.setIntegerValueField(.eventSourceUserData, value: postedMark)
+            event.post(tap: .cgSessionEventTap)
+        }
+    }
+}
+
+private func mouseButtonsCallback(proxy _: CGEventTapProxy, type: CGEventType, event: CGEvent, userInfo _: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+    MainActor.assumeIsolated {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            MouseButtonsController.shared.reenable()
+            return Unmanaged.passUnretained(event)
+        }
+        return MouseButtonsController.shared.handle(type, event) ? nil : Unmanaged.passUnretained(event)
+    }
+}

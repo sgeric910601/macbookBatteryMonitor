@@ -12,6 +12,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case lastWindowQuit
     case dockClick
     case keyboardCleaning
+    case mouseButtons
 
     var id: String { rawValue }
 
@@ -26,6 +27,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .lastWindowQuit: return "關閉最後視窗時結束 App"
         case .dockClick: return "點 Dock 圖示縮到 Dock"
         case .keyboardCleaning: return "鍵盤清潔模式"
+        case .mouseButtons: return "滑鼠側鍵"
         }
     }
 
@@ -38,6 +40,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .lastWindowQuit: return "xmark.app"
         case .dockClick: return "dock.arrow.down.rectangle"
         case .keyboardCleaning: return "sparkles"
+        case .mouseButtons: return "computermouse"
         }
     }
 
@@ -51,6 +54,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .lastWindowQuit: return "視窗與 Dock"
         case .dockClick: return "視窗與 Dock"
         case .keyboardCleaning: return "滑鼠與鍵盤"
+        case .mouseButtons: return "滑鼠與鍵盤"
         }
     }
 
@@ -64,6 +68,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .lastWindowQuit: return "監聽視窗"
         case .dockClick: return "監聽滑鼠點擊"
         case .keyboardCleaning: return "清潔時攔截鍵盤"
+        case .mouseButtons: return "監聽滑鼠側鍵"
         }
     }
 
@@ -76,6 +81,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .lastWindowQuit: return "App 最後一個視窗關掉時自動結束它，可以設定例外"
         case .dockClick: return "點目前 App 的 Dock 圖示，把它的視窗縮到 Dock 或隱藏，再點一次叫回來"
         case .keyboardCleaning: return "暫時停用鍵盤，方便擦鍵盤；時間到或點「結束清潔」就恢復"
+        case .mouseButtons: return "多按鍵滑鼠的第 4、5 鍵換成上一頁、下一頁或 Mission Control"
         }
     }
 

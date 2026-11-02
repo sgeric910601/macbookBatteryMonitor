@@ -411,6 +411,40 @@ struct SettingsView: View {
                 .settingsSection(.input, shown: section)
             }
 
+            if settings.isInstalled(.mouseButtons) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("滑鼠側鍵", systemImage: "computermouse")
+                        Picker("第 4 鍵（後退）", selection: binding(\.mouseBackButton)) {
+                            ForEach(MouseButtons.Action.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .fixedSize()
+                        Picker("第 5 鍵（前進）", selection: binding(\.mouseForwardButton)) {
+                            ForEach(MouseButtons.Action.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .fixedSize()
+                        Text("多按鍵滑鼠拇指那兩顆。「上一頁、下一頁」送出 ⌘[、⌘]，Safari、Finder 等大部分 App 都能用；設成「不處理」的按鍵照常交給 App。左鍵、右鍵、中鍵不會被碰到。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if settings.mouseBackButton != .none || settings.mouseForwardButton != .none {
+                            if ui.mouseButtonsRunning {
+                                Label("運作中", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else if !ui.scrollTrusted {
+                                Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
+
             if settings.isInstalled(.keyboardCleaning) {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {

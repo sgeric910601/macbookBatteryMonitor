@@ -221,6 +221,7 @@ macOS's "natural scrolling" is one setting for both mouse and trackpad: if you l
 
 - **"滑鼠滾輪反向"** (reverse mouse wheel): reverses regular mouse wheels and Magic Mouse
 - **"觸控板反向"** (reverse trackpad): reverses only the trackpad
+- **"滑鼠滾輪每格"** (lines per wheel notch): "照系統加速" (system acceleration) by default; "固定 1／3／5 行" (fixed 1/3/5 lines) makes every notch of a regular mouse wheel scroll exactly that many lines, however fast you spin it. The trackpad and Magic Mouse are not affected, and it works together with reversing
 - **"左右捲動也反向"** (reverse horizontal scrolling too): on by default, reversing vertical and horizontal scrolling together; turn it off to reverse only vertical scrolling
 - **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad, including the momentum after lifting your fingers; everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Turning the wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum
 - **No bouncing back in web pages**: reversed trackpad and Magic Mouse scrolls are replaced with newly created events, so the raw deltas web pages use for momentum are reversed too

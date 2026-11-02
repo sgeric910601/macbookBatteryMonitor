@@ -348,11 +348,15 @@ struct SettingsView: View {
                         SwitchRow("觸控板反向", isOn: binding(\.scrollReverseTrackpad))
                         Toggle("左右捲動也反向", isOn: binding(\.scrollReverseHorizontal))
                             .disabled(!settings.scrollReverseMouse && !settings.scrollReverseTrackpad)
+                        Picker("滑鼠滾輪每格", selection: binding(\.scrollLinearLines)) {
+                            ForEach(ScrollLinear.choices, id: \.self) { Text($0 == 0 ? "照系統加速" : "固定 \($0) 行").tag($0) }
+                        }
+                        .fixedSize()
                         Text("macOS 的「自然捲動」是滑鼠和觸控板一起變；這裡可以只反轉其中一種，例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向。兩指在觸控板上捲動算觸控板，其他（包括 Magic Mouse）算滑鼠。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        if settings.scrollReverseMouse || settings.scrollReverseTrackpad {
+                        if settings.scrollReverseMouse || settings.scrollReverseTrackpad || settings.scrollLinearLines > 0 {
                             if ui.scrollRunning {
                                 Label("運作中", systemImage: "checkmark.circle.fill")
                                     .font(.caption)

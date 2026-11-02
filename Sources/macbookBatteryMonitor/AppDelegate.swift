@@ -314,8 +314,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let installed = settings.isInstalled(.scrollDirection)
         let mouse = installed && settings.scrollReverseMouse
         let trackpad = installed && settings.scrollReverseTrackpad
-        let wanted = mouse || trackpad
-        let running = ScrollDirection.shared.apply(reverseMouse: mouse, reverseTrackpad: trackpad, reverseHorizontal: settings.scrollReverseHorizontal)
+        let linear = installed ? settings.scrollLinearLines : 0
+        let wanted = mouse || trackpad || linear > 0
+        let running = ScrollDirection.shared.apply(reverseMouse: mouse, reverseTrackpad: trackpad,
+                                                   reverseHorizontal: settings.scrollReverseHorizontal, linearLines: linear)
         scrollTrustTimer?.invalidate()
         scrollTrustTimer = nil
         guard wanted, !running else { return }

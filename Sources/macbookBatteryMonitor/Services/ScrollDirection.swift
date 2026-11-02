@@ -26,13 +26,14 @@ final class ScrollDirection {
 
     /// 依設定開始或停止攔截；需要攔截但沒有權限時回傳 false
     @discardableResult
-    func apply(reverseMouse: Bool, reverseTrackpad: Bool, reverseHorizontal: Bool = true) -> Bool {
+    func apply(reverseMouse: Bool, reverseTrackpad: Bool, reverseHorizontal: Bool = true, linearLines: Int = 0) -> Bool {
         // 開發用：`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，
         // 每個捲動事件的判斷與改寫前後的值會寫進系統記錄
         tap.configure(.init(reverseMouse: reverseMouse, reverseTrackpad: reverseTrackpad, reverseHorizontal: reverseHorizontal,
+                            linearLines: ScrollLinear.valid(linearLines),
                             debug: UserDefaults.standard.bool(forKey: "scrollDebug"),
                             rebuild: UserDefaults.standard.object(forKey: "scrollRebuild") as? Bool ?? true))
-        wanted = reverseMouse || reverseTrackpad
+        wanted = reverseMouse || reverseTrackpad || ScrollLinear.valid(linearLines) > 0
         guard wanted else {
             watchdog?.invalidate()
             watchdog = nil
@@ -104,6 +105,8 @@ final class ScrollTap: @unchecked Sendable {
         var reverseTrackpad = false
         /// 左右捲動也反向；關掉時只反轉上下
         var reverseHorizontal = true
+        /// 一般滾輪每格固定捲幾行，0 是關閉（見 ScrollLinear）
+        var linearLines = 0
         var debug = false
         /// 連續捲動（觸控板、Magic Mouse）改用新造的事件取代原本的；開發時可以用 scrollRebuild 關掉，比較兩種做法
         var rebuild = true
@@ -223,6 +226,10 @@ final class ScrollTap: @unchecked Sendable {
         guard type == .scrollWheel else { return event }
         currentIsTrackpad = classify(event, now: now)
         if config.debug { logScroll(event, label: "收到") }
+        // 線性捲動只處理一般滾輪，先把捲動量固定，再照設定反向
+        if config.linearLines > 0, event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0 {
+            Self.makeLinear(event, lines: config.linearLines)
+        }
         guard currentIsTrackpad ? config.reverseTrackpad : config.reverseMouse else { return event }
         let horizontal = config.reverseHorizontal
         if config.rebuild, event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
@@ -278,6 +285,20 @@ final class ScrollTap: @unchecked Sendable {
         let doubles = fields.map { event.getDoubleValueField($0) }
         for (field, value) in zip(integerDeltaFields, integers) { event.setIntegerValueField(field, value: Int64(factor(field, reverseHorizontal)) * value) }
         for (field, value) in zip(fields, doubles) { event.setDoubleValueField(field, value: factor(field, reverseHorizontal) * value) }
+    }
+
+    /// 一般滾輪每格固定捲 lines 行：只取系統給的方向（已經加速過的行數），上下、左右各自處理
+    static func makeLinear(_ event: CGEvent, lines: Int) {
+        let axes: [(CGEventField, CGEventField, CGEventField)] = [
+            (.scrollWheelEventDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventPointDeltaAxis1),
+            (.scrollWheelEventDeltaAxis2, .scrollWheelEventFixedPtDeltaAxis2, .scrollWheelEventPointDeltaAxis2),
+        ]
+        for (lineField, fixedField, pointField) in axes {
+            let delta = ScrollLinear.adjust(lines: event.getIntegerValueField(lineField), lineSetting: lines)
+            event.setIntegerValueField(lineField, value: delta.lines)
+            event.setDoubleValueField(fixedField, value: delta.fixed)
+            event.setIntegerValueField(pointField, value: delta.points)
+        }
     }
 
     /// 這個欄位要乘的數：上下一律 -1，左右看設定（見 ScrollAxes）
@@ -374,6 +395,28 @@ extension ScrollDirection {
                 + raw.filter { ScrollAxes.axis(ofField: Int($0.rawValue)) == .horizontal }.map { out.getDoubleValueField($0) }
             let ok = vertical.allSatisfy { $0 < 0 } && horizontal.allSatisfy { $0 > 0 }
             print("selftest-scroll: 只反轉上下（\(continuous ? "觸控板" : "一般滾輪")）：\(ok ? "上下反向、左右不變" : "異常（上下 \(vertical)、左右 \(horizontal)）")")
+        }
+        // 線性捲動：系統加速過的一格（7 行、140 點）變成固定 3 行；搭配反向時方向相反；觸控板不處理
+        for reverse in [false, true] {
+            tap.configure(.init(reverseMouse: reverse, reverseTrackpad: false, linearLines: 3))
+            tap.resetTouchesForTest()
+            guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: 7, wheel2: 0, wheel3: 0) else { continue }
+            event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 0)
+            event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 140)
+            let out = tap.handle(.scrollWheel, event)
+            let got = (out.getIntegerValueField(.scrollWheelEventDeltaAxis1), out.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1),
+                       out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1))
+            let sign: Int64 = reverse ? -1 : 1
+            let ok = got.0 == 3 * sign && got.1 == Double(3 * sign) && got.2 == 30 * sign
+            print("selftest-scroll: 線性捲動 3 行（\(reverse ? "加反向" : "不反向")）：\(ok ? "正確" : "異常（\(got)）")")
+        }
+        tap.configure(.init(reverseMouse: false, reverseTrackpad: false, linearLines: 3))
+        tap.markTouchesForTest()
+        if let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 25, wheel2: 0, wheel3: 0) {
+            event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+            let out = tap.handle(.scrollWheel, event)
+            print("selftest-scroll: 線性捲動不動觸控板：\(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 25 ? "正確" : "異常")")
         }
         // 攔截執行緒：開始、檢查、停止都正常（需要「輔助使用」權限，沒有時只印出狀態）
         if ScrollDirection.trusted {

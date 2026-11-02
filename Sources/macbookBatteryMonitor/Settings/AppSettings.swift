@@ -64,7 +64,7 @@ final class AppSettings {
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
             Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
-            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.windowSwitcher: .bool,
+            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.scrollLinearLines: .int, Keys.windowSwitcher: .bool,
             Keys.switcher: .dictionary, Keys.capsLockNoDelay: .bool, Keys.shiftHalfWidth: .bool,
             Keys.chargingTargetPercent: .int, Keys.chargingHoldPercent: .int, Keys.chargingSleepStrategy: .string,
         ]
@@ -286,6 +286,13 @@ final class AppSettings {
             if scrollReverseHorizontal != oldValue { onScrollDirectionChange?() }
         }
     }
+    /// 線性捲動：一般滾輪每格固定捲幾行，0 是關閉（見 ScrollLinear）
+    var scrollLinearLines: Int {
+        didSet {
+            defaults.set(scrollLinearLines, forKey: Keys.scrollLinearLines)
+            if scrollLinearLines != oldValue { onScrollDirectionChange?() }
+        }
+    }
     var scrollReverseTrackpad: Bool {
         didSet {
             defaults.set(scrollReverseTrackpad, forKey: Keys.scrollReverseTrackpad)
@@ -463,6 +470,7 @@ final class AppSettings {
         static let scrollReverseMouse = "scrollReverseMouse"
         static let scrollReverseTrackpad = "scrollReverseTrackpad"
         static let scrollReverseHorizontal = "scrollReverseHorizontal"
+        static let scrollLinearLines = "scrollLinearLines"
         static let windowSwitcher = "windowSwitcher"
         static let switcher = "windowSwitcherSettings"
         static let capsLockNoDelay = "capsLockNoDelay"
@@ -599,6 +607,7 @@ final class AppSettings {
         scrollReverseMouse = defaults.bool(forKey: Keys.scrollReverseMouse)
         scrollReverseTrackpad = defaults.bool(forKey: Keys.scrollReverseTrackpad)
         scrollReverseHorizontal = defaults.object(forKey: Keys.scrollReverseHorizontal) as? Bool ?? true
+        scrollLinearLines = ScrollLinear.valid(defaults.integer(forKey: Keys.scrollLinearLines))
         windowSwitcher = defaults.bool(forKey: Keys.windowSwitcher)
         switcher = SwitcherSettings(stored: defaults.dictionary(forKey: Keys.switcher) ?? [:])
         capsLockNoDelay = defaults.bool(forKey: Keys.capsLockNoDelay)

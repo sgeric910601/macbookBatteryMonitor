@@ -41,4 +41,16 @@ struct SmoothScrollTests {
         XCTAssertEqual(dx, -50)
         XCTAssertEqual(dy, 0)
     }
+
+    /// 別的程式送出異常大的捲動量：夾在合理範圍內，不會溢位讓 App 當掉
+    func testClampsExtremeDeltas() {
+        var smooth = SmoothScroll()
+        smooth.add(dx: 0, dy: Double(Int64.max))
+        smooth.add(dx: 0, dy: 9e18)
+        smooth.add(dx: -.infinity, dy: .nan)
+        var total = 0.0
+        var steps = 0
+        while let step = smooth.step() { total += step.dy; steps += 1 }
+        XCTAssertTrue(total <= Double(SmoothScroll.maxPending) && steps < 200)
+    }
 }

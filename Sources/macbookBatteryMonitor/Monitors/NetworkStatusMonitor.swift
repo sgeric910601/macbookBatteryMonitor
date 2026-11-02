@@ -11,8 +11,11 @@ final class NetworkStatusMonitor {
     private(set) var vpnInterfaces: [String] = []
     private(set) var notes: [String] = []
     @ObservationIgnored private var monitor: NWPathMonitor?
+    /// 正在顯示的卡片數：面板關掉又馬上打開時，舊卡片晚到的 onDisappear 不會把新卡片的監看停掉
+    @ObservationIgnored private var viewers = 0
 
     func start() {
+        viewers += 1
         guard monitor == nil else { return }
         let monitor = NWPathMonitor()
         monitor.pathUpdateHandler = { path in
@@ -26,6 +29,8 @@ final class NetworkStatusMonitor {
     }
 
     func stop() {
+        viewers = max(0, viewers - 1)
+        guard viewers == 0 else { return }
         monitor?.cancel()
         monitor = nil
     }

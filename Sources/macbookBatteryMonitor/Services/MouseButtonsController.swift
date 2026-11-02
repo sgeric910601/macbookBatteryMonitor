@@ -58,6 +58,8 @@ final class MouseButtonsController {
         switch type {
         case .otherMouseDown:
             guard let action = buttons.action(forButton: Int(number)), let shortcut = action.shortcut else { return false }
+            // 「上一頁、下一頁」送給最前面的 App：游標下不是它的視窗時放行原本的按鍵；Mission Control 不分 App
+            if action != .missionControl, !Self.pointerOverFrontApp(event.location) { return false }
             swallowed.insert(number)
             Self.post(shortcut)
             return true
@@ -70,6 +72,17 @@ final class MouseButtonsController {
 
     fileprivate func reenable() {
         if let port { CGEvent.tapEnable(tap: port, enable: true) }
+    }
+
+    private static func pointerOverFrontApp(_ point: CGPoint) -> Bool {
+        guard let front = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return false }
+        let windows = list.compactMap { info -> MouseButtons.Window? in
+            guard let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+                  let bounds = (info[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0) }) else { return nil }
+            return MouseButtons.Window(pid: pid, layer: (info[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0, bounds: bounds)
+        }
+        return MouseButtons.pointerOverFrontApp(point, windows: windows, front: front)
     }
 
     /// 送給最前面的 App，和按鍵盤一樣

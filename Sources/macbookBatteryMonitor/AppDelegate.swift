@@ -296,8 +296,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let wanted = lastWindow || dock || green || snap
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
         DockClickController.shared.mode = settings.dockClickMode
-        let running = LastWindowQuitController.shared.apply(enabled: lastWindow) && DockClickController.shared.apply(enabled: dock)
-            && WindowMaximizeController.shared.apply(enabled: green) && WindowSnapController.shared.apply(enabled: snap)
+        // 每一個都要呼叫到（不能用 && 短路）：前面一個沒權限失敗時，後面該停的也要停
+        let results = [LastWindowQuitController.shared.apply(enabled: lastWindow), DockClickController.shared.apply(enabled: dock),
+                       WindowMaximizeController.shared.apply(enabled: green), WindowSnapController.shared.apply(enabled: snap)]
+        let running = results.allSatisfy { $0 }
         ui.windowSnapRunning = snap && WindowSnapController.shared.isRunning
         ui.greenButtonRunning = green && WindowMaximizeController.shared.isRunning
         ui.lastWindowQuitRunning = lastWindow && LastWindowQuitController.shared.isRunning
@@ -644,7 +646,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.setProcessSampling(active: false)
         monitors.setSleeping(true)
         store.history.save()
-        if settings.bluetoothOffDuringSleep, BluetoothPower.isAvailable {
+        // 只在有內建鍵盤的 Mac（有電池的筆電）關：桌上型 Mac 的藍牙鍵鼠閒置時會自己斷線，偵測不到就關掉，醒來只剩電源鍵
+        if settings.bluetoothOffDuringSleep, BluetoothPower.isAvailable, BatteryReader.hasBattery {
             applyBluetooth(bluetoothSleep.willSleep(enabled: true, poweredOn: BluetoothPower.isOn,
                                                    wakeInputConnected: BluetoothPower.wakeInputConnected()))
         }

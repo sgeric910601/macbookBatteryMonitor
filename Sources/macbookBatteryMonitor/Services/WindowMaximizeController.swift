@@ -2,15 +2,22 @@ import AppKit
 import ApplicationServices
 import OSLog
 
-/// 綠色按鈕改成放大（計算在 WindowMaximize）。左鍵按下時問「輔助使用」點到的是什麼，是視窗的全螢幕（綠色）按鈕才接手：
+/// 綠色按鈕改成放大（計算在 WindowMaximize）。左鍵按下時問最前面那個 App 點到的是什麼，是視窗的全螢幕（綠色）按鈕才接手：
 /// 攔下按下與放開，把視窗放大到填滿螢幕的可用範圍，再按一次還原。按著 Option 時照系統原本的行為。
-/// 查詢在自己的執行緒上做，最多等 15 毫秒，來不及就當作不是綠色按鈕、照常放行，不會拖慢點擊。需要「輔助使用」權限
+/// 查詢在自己的執行緒上做，最多等 15 毫秒，來不及就當作不是綠色按鈕、照常放行，不會拖慢點擊。
+/// 只問最前面的 App：等待上限要設在那個 App 的物件上；設在系統層級的物件上會變成整個 App 所有查詢的預設上限。
+/// 點背景視窗的綠色按鈕照系統原本的行為。需要「輔助使用」權限
 @MainActor
 final class WindowMaximizeController {
     static let shared = WindowMaximizeController()
     nonisolated static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "windowMaximize")
 
     private let tap = WindowMaximizeTap()
+    private var activationObserver: NSObjectProtocol?
+
+    private func updateFrontApp() {
+        tap.setFrontApp(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)
+    }
     private var memory = WindowMaximize()
     private var watchdog: Timer?
 
@@ -22,9 +29,17 @@ final class WindowMaximizeController {
             watchdog?.invalidate()
             watchdog = nil
             tap.stop()
+            if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+            activationObserver = nil
             return true
         }
         guard AXIsProcessTrusted() else { return false }
+        if activationObserver == nil {
+            activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+            ) { _ in MainActor.assumeIsolated { WindowMaximizeController.shared.updateFrontApp() } }
+        }
+        updateFrontApp()
         if tap.onButton == nil {
             // 只設定一次：攔截執行緒讀的時候不會讀到改到一半的值
             tap.onButton = { button in
@@ -102,12 +117,21 @@ final class WindowMaximizeTap: @unchecked Sendable {
     private var runLoop: CFRunLoop?
     /// 攔下了按下、放開也要攔下（只在攔截執行緒使用）
     private var swallowingUp = false
-    private let systemWide: AXUIElement = {
-        let element = AXUIElementCreateSystemWide()
-        // 等點到的 App 回答最多 15 毫秒，來不及就當作不是綠色按鈕
-        AXUIElementSetMessagingTimeout(element, 0.015)
-        return element
-    }()
+    /// 最前面的 App 與它的「輔助使用」物件（等待上限 15 毫秒，只設在這個物件上）；只在攔截執行緒讀，換 App 時在鎖裡換
+    private var frontApp: (pid: pid_t, element: AXUIElement)?
+
+    func setFrontApp(_ pid: pid_t) {
+        locked {
+            guard frontApp?.pid != pid else { return }
+            guard pid > 0, pid != getpid() else {
+                frontApp = nil
+                return
+            }
+            let element = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(element, 0.015)
+            frontApp = (pid, element)
+        }
+    }
     /// 只在攔截還沒啟動時設定
     var onButton: ((AXUIElement) -> Void)?
 
@@ -188,7 +212,8 @@ final class WindowMaximizeTap: @unchecked Sendable {
                   let onButton else { return pass }
             let point = event.location
             var element: AXUIElement?
-            guard AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element) == .success, let element else { return pass }
+            guard let app = locked({ frontApp?.element }),
+                  AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) == .success, let element else { return pass }
             var subrole: AnyObject?
             guard AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole) == .success,
                   subrole as? String == kAXFullScreenButtonSubrole as String else { return pass }

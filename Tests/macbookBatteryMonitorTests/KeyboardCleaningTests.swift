@@ -45,4 +45,16 @@ struct KeyboardCleaningTests {
         idle.keyPressed(now: now)
         XCTAssertTrue(!idle.isActive)
     }
+
+    /// 按住不放（自動重複，例如鍵卡住或貓趴在鍵盤上）不重設倒數；不論怎麼按，最多 5 分鐘一定恢復
+    func testRepeatsAndHardLimit() {
+        var cleaning = KeyboardCleaning()
+        cleaning.start(seconds: 30, now: now)
+        cleaning.keyPressed(now: now.addingTimeInterval(20), isRepeat: true)
+        XCTAssertTrue(cleaning.isExpired(now: now.addingTimeInterval(30)))
+        var busy = KeyboardCleaning()
+        busy.start(seconds: 120, now: now)
+        for second in stride(from: 0, through: 400, by: 10) { busy.keyPressed(now: now.addingTimeInterval(Double(second)), isRepeat: false) }
+        XCTAssertTrue(busy.isExpired(now: now.addingTimeInterval(KeyboardCleaning.hardLimit)))
+    }
 }

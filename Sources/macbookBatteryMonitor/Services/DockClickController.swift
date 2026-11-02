@@ -114,15 +114,25 @@ final class DockClickController {
 
     // MARK: - 讀取
 
+    /// Dock 在螢幕的哪一邊（系統設定 → 桌面與 Dock 的「位置」），只檢查那一邊，其他點擊不去讀 Dock
+    private static func dockEdge() -> String {
+        UserDefaults(suiteName: "com.apple.dock")?.string(forKey: "orientation") ?? "bottom"
+    }
+
     /// 事件座標是左上角為原點的全域座標，和「輔助使用」一樣
     private static func nearScreenEdge(_ point: CGPoint) -> Bool {
+        let edge = dockEdge()
         guard let primary = NSScreen.screens.first else { return false }
         let height = primary.frame.height
         return NSScreen.screens.contains { screen in
             // NSScreen 是左下角為原點，換成左上角為原點
             let frame = CGRect(x: screen.frame.minX, y: height - screen.frame.maxY, width: screen.frame.width, height: screen.frame.height)
             guard frame.contains(point) else { return false }
-            return point.y >= frame.maxY - edgeBand || point.x <= frame.minX + edgeBand || point.x >= frame.maxX - edgeBand
+            switch edge {
+            case "left": return point.x <= frame.minX + edgeBand
+            case "right": return point.x >= frame.maxX - edgeBand
+            default: return point.y >= frame.maxY - edgeBand
+            }
         }
     }
 

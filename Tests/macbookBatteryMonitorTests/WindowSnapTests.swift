@@ -35,10 +35,12 @@ struct WindowSnapTests {
         XCTAssertTrue(!WindowSnap.isWindowDrag(from: start, to: CGRect(x: 100, y: 100, width: 700, height: 400)))
     }
 
-    /// 系統內建的「拖到邊緣排版」：明確關掉才由我們吸附；沒設定過時是系統預設的開
+    /// 系統內建的「拖到邊緣排版」（macOS 15 起）：明確關掉才由我們吸附；沒設定過時是系統預設的開。
+    /// macOS 14 沒有這個功能，一律由我們吸附
     func testRespectsSystemTiling() {
-        XCTAssertTrue(WindowSnap.systemTilingOff(stored: 0))
-        XCTAssertTrue(!WindowSnap.systemTilingOff(stored: 1))
-        XCTAssertTrue(!WindowSnap.systemTilingOff(stored: nil))
+        XCTAssertTrue(WindowSnap.systemTilingOff(stored: 0, systemHasTiling: true))
+        XCTAssertTrue(!WindowSnap.systemTilingOff(stored: 1, systemHasTiling: true))
+        XCTAssertTrue(!WindowSnap.systemTilingOff(stored: nil, systemHasTiling: true))
+        XCTAssertTrue(WindowSnap.systemTilingOff(stored: nil, systemHasTiling: false))
     }
 }

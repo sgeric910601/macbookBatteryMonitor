@@ -297,7 +297,7 @@ final class ScrollTap: @unchecked Sendable {
             return
         }
         guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
-                                  wheel1: Int32(step.dy), wheel2: Int32(step.dx), wheel3: 0) else { return }
+                                  wheel1: Int32(clamping: Int(step.dy)), wheel2: Int32(clamping: Int(step.dx)), wheel3: 0) else { return }
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
         event.location = smoothLocation
         event.flags = smoothFlags
@@ -346,7 +346,7 @@ final class ScrollTap: @unchecked Sendable {
         let fields = fixedDeltaFields + rawDeltaFields.prefix(2)
         let integers = integerDeltaFields.map { event.getIntegerValueField($0) }
         let doubles = fields.map { event.getDoubleValueField($0) }
-        for (field, value) in zip(integerDeltaFields, integers) { event.setIntegerValueField(field, value: Int64(factor(field, reverseHorizontal)) * value) }
+        for (field, value) in zip(integerDeltaFields, integers) { event.setIntegerValueField(field, value: Self.scaled(value, by: factor(field, reverseHorizontal))) }
         for (field, value) in zip(fields, doubles) { event.setDoubleValueField(field, value: factor(field, reverseHorizontal) * value) }
     }
 
@@ -377,6 +377,11 @@ final class ScrollTap: @unchecked Sendable {
         event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: points)
     }
 
+    /// 整數欄位乘上 ±1；Int64.min 反向會溢位，夾成 Int64.max
+    private static func scaled(_ value: Int64, by factor: Double) -> Int64 {
+        factor < 0 ? (value == .min ? .max : -value) : value
+    }
+
     /// 這個欄位要乘的數：上下一律 -1，左右看設定（見 ScrollAxes）
     private static func factor(_ field: CGEventField, _ reverseHorizontal: Bool) -> Double {
         ScrollAxes.axis(ofField: Int(field.rawValue)).map { ScrollAxes.multiplier($0, reverseHorizontal: reverseHorizontal) } ?? 1
@@ -393,7 +398,7 @@ final class ScrollTap: @unchecked Sendable {
         for field in copiedFields.prefix(5) { new.setIntegerValueField(field, value: event.getIntegerValueField(field)) }
         let integers = integerDeltaFields.map { event.getIntegerValueField($0) }
         let doubles = (fixedDeltaFields + rawDeltaFields).map { event.getDoubleValueField($0) }
-        for (field, value) in zip(integerDeltaFields, integers) { new.setIntegerValueField(field, value: Int64(factor(field, reverseHorizontal)) * value) }
+        for (field, value) in zip(integerDeltaFields, integers) { new.setIntegerValueField(field, value: Self.scaled(value, by: factor(field, reverseHorizontal))) }
         for (field, value) in zip(fixedDeltaFields + rawDeltaFields, doubles) { new.setDoubleValueField(field, value: factor(field, reverseHorizontal) * value) }
         return new
     }

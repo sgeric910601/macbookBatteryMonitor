@@ -39,6 +39,7 @@ enum WindowSnap {
         start.origin != now.origin && abs(start.width - now.width) < 1 && abs(start.height - now.height) < 1
     }
 
-    /// 系統內建的「拖到螢幕邊緣排版」明確關掉時才由我們吸附；沒設定過是系統預設的開
-    static func systemTilingOff(stored: Int?) -> Bool { stored == 0 }
+    /// 系統內建的「拖到螢幕邊緣排版」明確關掉時才由我們吸附；沒設定過是系統預設的開。
+    /// systemHasTiling：系統有這個功能（macOS 15 起）；macOS 14 沒有，一律由我們吸附
+    static func systemTilingOff(stored: Int?, systemHasTiling: Bool) -> Bool { !systemHasTiling || stored == 0 }
 }

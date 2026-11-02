@@ -8,10 +8,13 @@ struct KeyboardCleaning {
 
     static let durations: [Int] = [30, 60, 120]
     static let defaultDuration = 60
+    /// 不論怎麼按，從開始算最多這麼久一定恢復（鍵卡住、貓趴在鍵盤上時不會一直停用）
+    static let hardLimit: TimeInterval = 300
 
     private(set) var until: Date?
     /// 停手多久後恢復（秒）
     private var idleSeconds: TimeInterval = 0
+    private var startedAt: Date?
 
     var isActive: Bool { until != nil }
 
@@ -19,16 +22,21 @@ struct KeyboardCleaning {
 
     mutating func start(seconds: Int, now: Date) {
         idleSeconds = TimeInterval(seconds)
+        startedAt = now
         until = now.addingTimeInterval(idleSeconds)
     }
 
-    /// 清潔中按到鍵：重新倒數，停手滿設定的秒數才恢復
-    mutating func keyPressed(now: Date) {
-        guard isActive else { return }
-        until = now.addingTimeInterval(idleSeconds)
+    /// 清潔中按到鍵：重新倒數，停手滿設定的秒數才恢復。按住不放的自動重複不算（鍵卡住時不會一直重設），
+    /// 而且不會超過從開始算的 hardLimit
+    mutating func keyPressed(now: Date, isRepeat: Bool = false) {
+        guard isActive, !isRepeat, let startedAt else { return }
+        until = min(now.addingTimeInterval(idleSeconds), startedAt.addingTimeInterval(Self.hardLimit))
     }
 
-    mutating func stop() { until = nil }
+    mutating func stop() {
+        until = nil
+        startedAt = nil
+    }
 
     func blocks(_ kind: EventKind) -> Bool { isActive && kind != .pointer }
 

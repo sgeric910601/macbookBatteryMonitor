@@ -23,7 +23,13 @@ final class AudioSwitchController {
         }
         let hasSwitch = AudioDeviceReader.inputHasMuteSwitch(input)
         micSupported = AudioDevices.mutePlan(hasMuteSwitch: hasSwitch, volume: AudioDeviceReader.inputVolume(input)) != .unsupported
-        micMuted = hasSwitch ? AudioDeviceReader.inputMuted(input) == true : restoreVolume[input] != nil
+        if hasSwitch {
+            micMuted = AudioDeviceReader.inputMuted(input) == true
+        } else {
+            // 用音量代替靜音時：使用者自己把音量調回來，就不再算靜音
+            if restoreVolume[input] != nil, (AudioDeviceReader.inputVolume(input) ?? 0) > 0 { restoreVolume[input] = nil }
+            micMuted = restoreVolume[input] != nil
+        }
     }
 
     func select(_ id: UInt32) {

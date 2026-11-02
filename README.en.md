@@ -27,7 +27,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Login items**: lists the apps, agents and daemons that start at login, shows what each one is and where it comes from, and lets you clear the user-level config files an uninstalled app left behind; system-level items are view-only
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
 - **Keep awake**: the cup at the bottom right of the panel keeps the Mac awake for 30 minutes, 1 hour, 2 hours or until turned off, optionally with the display on too, and shows the time left. It stops by itself on battery at 10% or below. Uses the public power management API; quitting the app releases it
-- **Bluetooth off during sleep**: turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, so they can still wake the Mac. Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
+- **Bluetooth off during sleep** (laptops only; on a desktop Mac idle Bluetooth keyboards and mice disconnect by themselves, so turning Bluetooth off would leave only the power button to wake it): turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, so they can still wake the Mac. Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
 - **No Xcode needed**: the Command Line Tools are enough to build it
@@ -136,18 +136,21 @@ The bell to the right of each device sets its low-battery notification: off, or 
 
 Click the gear at the bottom right of the panel, or "設定…" (Settings…) in the menu bar icon's right-click menu. While it's open the app shows up in the Dock and ⌘Tab, so you can find it again after visiting System Settings; ⌘W closes it. The sections on the left:
 
-| Section | Contents |
-|---|---|
-| 一般 (General) | App icon color, notification thresholds, launch at login |
-| 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, Bluetooth off during sleep, system monitor master switch and each monitor, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
-| 充電 (Charging) | Charge limit slider, smart charging |
-| 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
-| 周邊設備 (Peripherals) | Each device's low-battery notification |
-| 滑鼠與觸控板 (Mouse & trackpad) | Separate scroll directions |
-| 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
-| 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
-| 更新 (Update) | One-click update, automatic checks and new-version notifications |
+| Group | Section | Contents |
+|---|---|---|
+| 基本 (Basic) | 一般 (General) | App icon color, notification thresholds, launch at login, settings backup (export, import) |
+| | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
+| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
+| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
+| | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
+| 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
+| | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
+| | 周邊設備 (Peripherals) | Each device's low-battery notification |
+| 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is added) |
+| | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
+| | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, quit when the last window closes, click a Dock icon to minimize |
+| | 功能管理 (Feature management) | Add or remove extension features (see "[Extension features](#extension-features)") |
+| 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
 Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens Update, and the gear in a monitor panel opens Monitoring & power saving.
 
@@ -216,6 +219,25 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 - **Where it sits**: "浮在視窗上方" (above windows) or "放在桌布上" (on the wallpaper, at the desktop icon level, so windows cover it). It shows on every desktop but not in full-screen apps
 - The bubble is a separate window that ignores the mouse and hugs the pet (below it when there's no room above), so it never blocks what's underneath
 
+## Extension features
+
+Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you press "加入" (add) in Settings → 功能管理 (feature management), and can be removed again:
+
+- **Not added means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; removing only changes whether it is added, so its settings are still there when you add it back
+- **Nothing is added on a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher needs no permission
+- **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay added
+- **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
+- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping
+
+## Settings backup and permissions
+
+- **Settings backup**: Settings → 一般 → "設定備份" (settings backup) exports the settings to a file you can import on another Mac or after reinstalling. Only known settings with the right types are read and the file size is limited; admin CPU sampling, precise wake (turn them on again on the new Mac), your own photo and the peripherals' low-battery thresholds are not included. Imported settings take effect after the app reopens
+- **Permissions**: Settings → 權限 (permissions) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which added features use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
+
+## Monitor alerts
+
+"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load, critical memory pressure and low free disk space, each on its own. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+
 ## Mouse and trackpad scroll directions
 
 macOS's "natural scrolling" is one setting for both mouse and trackpad: if you like natural scrolling on the trackpad, the mouse wheel flips too. Settings → Mouse & trackpad separates them:
@@ -269,13 +291,14 @@ Add "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker b
 Add "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:
 
 - **Only those two, only when set**: a button left at "不處理" (do nothing), and the left, right and middle buttons, go to apps as usual
+- **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is removed or both buttons do nothing
 
 ## Keyboard cleaning mode
 
 Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
 
-- **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
+- **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown (held-down autorepeat does not), it always ends after at most 5 minutes, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 

@@ -66,12 +66,12 @@ final class KeyboardCleaningController {
         if let port, !CGEvent.tapIsEnabled(tap: port) { CGEvent.tapEnable(tap: port, enable: true) }
     }
 
-    fileprivate func blocks(_ type: CGEventType) -> Bool {
+    fileprivate func blocks(_ type: CGEventType, isRepeat: Bool) -> Bool {
         let kind: KeyboardCleaning.EventKind
         switch type {
         case .keyDown:
             kind = .keyDown
-            if state.isActive { state.keyPressed(now: Date()) }
+            if state.isActive { state.keyPressed(now: Date(), isRepeat: isRepeat) }
         case .keyUp: kind = .keyUp
         case .flagsChanged: kind = .flagsChanged
         default: kind = type.rawValue == Self.systemDefinedType ? .systemKey : .pointer
@@ -140,6 +140,7 @@ private func cleaningCallback(proxy _: CGEventTapProxy, type: CGEventType, event
             KeyboardCleaningController.shared.reenable()
             return Unmanaged.passUnretained(event)
         }
-        return KeyboardCleaningController.shared.blocks(type) ? nil : Unmanaged.passUnretained(event)
+        let isRepeat = type == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        return KeyboardCleaningController.shared.blocks(type, isRepeat: isRepeat) ? nil : Unmanaged.passUnretained(event)
     }
 }

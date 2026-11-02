@@ -94,7 +94,7 @@ struct SettingsView: View {
                     Text(powerSavingNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    if BluetoothPower.isAvailable {
+                    if BluetoothPower.isAvailable, hasBattery {
                         Divider().padding(.vertical, 2)
                         SwitchRow("睡眠時關閉藍牙", isOn: binding(\.bluetoothOffDuringSleep))
                         Text("Mac 睡眠時關掉藍牙，醒來後再打開；你自己關掉的藍牙醒來後維持關閉。連著藍牙鍵盤、滑鼠或觸控板時不關，免得用它們叫不醒 Mac。睡眠期間所有藍牙連線都會中斷，醒來後藍牙耳機等裝置要重新連上。")

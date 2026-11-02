@@ -23,6 +23,8 @@ final class WindowSnapController {
         var target: CGRect?
     }
     private var drag: Drag?
+    /// 系統內建的拖到邊緣排版是 macOS 15 才有的
+    private static let systemHasTiling = ProcessInfo.processInfo.isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: 15, minorVersion: 0, patchVersion: 0))
     private var preview: NSPanel?
 
     @discardableResult
@@ -72,7 +74,7 @@ final class WindowSnapController {
         case .leftMouseDown:
             // 系統內建的吸附開著時完全不動作
             let stored = UserDefaults(suiteName: "com.apple.WindowManager")?.object(forKey: "EnableTilingByEdgeDrag") as? Int
-            drag = WindowSnap.systemTilingOff(stored: stored) ? Drag() : nil
+            drag = WindowSnap.systemTilingOff(stored: stored, systemHasTiling: Self.systemHasTiling) ? Drag() : nil
         case .leftMouseDragged:
             guard var current = drag else { return }
             let now = CACurrentMediaTime()

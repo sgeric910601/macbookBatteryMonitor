@@ -18,6 +18,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case windowSnap
     case finderKeys
     case quickMenu
+    case portManager
 
     var id: String { rawValue }
 
@@ -38,6 +39,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .windowSnap: return "視窗吸附"
         case .finderKeys: return "Finder 加強"
         case .quickMenu: return "貓咪快捷選單"
+        case .portManager: return "Port 管理與結束程式"
         }
     }
 
@@ -56,6 +58,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .windowSnap: return "rectangle.split.2x1"
         case .finderKeys: return "folder"
         case .quickMenu: return "cat"
+        case .portManager: return "point.3.connected.trianglepath.dotted"
         }
     }
 
@@ -75,6 +78,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .windowSnap: return "視窗與 Dock"
         case .finderKeys: return "視窗與 Dock"
         case .quickMenu: return "選單列"
+        case .portManager: return "系統監控"
         }
     }
 
@@ -94,6 +98,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .windowSnap: return "監聽滑鼠拖曳"
         case .finderKeys: return "監聽鍵盤"
         case .quickMenu: return "不需要權限"
+        case .portManager: return "不需要權限"
         }
     }
 
@@ -112,13 +117,14 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .windowSnap: return "把視窗拖到螢幕邊緣或角落，放開後排成半邊、填滿或四分之一"
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
         case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、音訊、麥克風、鍵盤清潔與擴充功能開關"
+        case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
         }
     }
 
     /// 需要「輔助使用」權限（權限頁依這個列出用到的功能）
     var needsAccessibility: Bool {
         switch self {
-        case .audioSwitch, .quickMenu: return false
+        case .audioSwitch, .quickMenu, .portManager: return false
         default: return true
         }
     }

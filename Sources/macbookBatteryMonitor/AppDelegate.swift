@@ -284,6 +284,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 只在面板上多一個按鈕，加入或移除時面板自己會更新
         case .audioSwitch: break
         case .quickMenu: applyQuickMenu()
+        // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
+        case .portManager: break
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {

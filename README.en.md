@@ -302,6 +302,15 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 
+## Ports and quitting processes
+
+Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings → 功能管理 and:
+
+- **Listening ports**: the network panel lists the TCP ports your own processes listen on, the program and whether it is local only; read when the panel opens or on refresh (with the built-in `lsof`, fixed arguments, no shell)
+- **Quit a process**: "結束" (quit) next to a port asks first, then asks the process to exit (SIGTERM); right before sending it re-checks the PID's owner and name, so a reused PID is never hit
+- **Quit an app**: right-click an app in the CPU or memory list to quit it like ⌘Q; apps still ask about unsaved documents
+- **Limits**: only your own account's processes are shown or can be quit, never system processes; no permission needed
+
 ## Cat quick menu
 
 Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar with:

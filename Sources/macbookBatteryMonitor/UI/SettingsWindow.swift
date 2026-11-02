@@ -112,7 +112,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .scrollDirection, .inputMethod, .quitGuard, .keyboardCleaning, .mouseButtons: return .input
         case .windowSwitcher: return .windowSwitcher
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
-        case .audioSwitch: return nil
+        case .audioSwitch, .quickMenu: return nil
         }
     }
 

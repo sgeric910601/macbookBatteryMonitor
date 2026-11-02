@@ -302,6 +302,17 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 
+## Cat quick menu
+
+Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar with:
+
+- **Keep awake**: pick a duration, stop, or keep the display on too; the title shows the time left while active
+- **Audio output** and **mute microphone**
+- **Start keyboard cleaning** (when keyboard cleaning mode is on)
+- **Extension features**: turn each one on or off directly
+- **Settings…** and **Quit**
+- The menu reads the current state only when it opens and does nothing otherwise; no permission needed
+
 ## Finder shortcuts
 
 Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:

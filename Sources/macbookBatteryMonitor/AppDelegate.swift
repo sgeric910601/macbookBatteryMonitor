@@ -134,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
+        applyQuickMenu()
         settings.onMouseButtonsChange = { [weak self] in self?.applyMouseButtons(prompt: true) }
         applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
@@ -282,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .mouseButtons: applyMouseButtons(prompt: true)
         // 只在面板上多一個按鈕，加入或移除時面板自己會更新
         case .audioSwitch: break
+        case .quickMenu: applyQuickMenu()
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {
@@ -319,6 +321,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         lastWindowTrustTimer = repeating(every: 2) { delegate in
             guard ScrollDirection.trusted else { return }
             delegate.applyLastWindowQuit(prompt: false)
+        }
+    }
+
+    /// 選單列的貓咪快捷選單
+    private func applyQuickMenu() {
+        QuickMenuController.shared.apply(enabled: settings.isInstalled(.quickMenu), settings: settings) { [weak self] section in
+            self?.showSettings(section)
         }
     }
 

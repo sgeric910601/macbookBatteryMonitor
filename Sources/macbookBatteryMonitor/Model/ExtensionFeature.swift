@@ -17,6 +17,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case greenButton
     case windowSnap
     case finderKeys
+    case quickMenu
 
     var id: String { rawValue }
 
@@ -36,6 +37,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "綠色按鈕放大"
         case .windowSnap: return "視窗吸附"
         case .finderKeys: return "Finder 加強"
+        case .quickMenu: return "貓咪快捷選單"
         }
     }
 
@@ -53,6 +55,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "arrow.up.left.and.arrow.down.right"
         case .windowSnap: return "rectangle.split.2x1"
         case .finderKeys: return "folder"
+        case .quickMenu: return "cat"
         }
     }
 
@@ -71,6 +74,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "視窗與 Dock"
         case .windowSnap: return "視窗與 Dock"
         case .finderKeys: return "視窗與 Dock"
+        case .quickMenu: return "選單列"
         }
     }
 
@@ -89,6 +93,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "監聽滑鼠點擊"
         case .windowSnap: return "監聽滑鼠拖曳"
         case .finderKeys: return "監聽鍵盤"
+        case .quickMenu: return "不需要權限"
         }
     }
 
@@ -106,13 +111,14 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "點視窗的綠色按鈕改成放大到填滿螢幕（不進全螢幕），再按一次還原"
         case .windowSnap: return "把視窗拖到螢幕邊緣或角落，放開後排成半邊、填滿或四分之一"
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
+        case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、音訊、麥克風、鍵盤清潔與擴充功能開關"
         }
     }
 
     /// 需要「輔助使用」權限（權限頁依這個列出用到的功能）
     var needsAccessibility: Bool {
         switch self {
-        case .audioSwitch: return false
+        case .audioSwitch, .quickMenu: return false
         default: return true
         }
     }

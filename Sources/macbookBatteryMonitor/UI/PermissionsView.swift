@@ -36,7 +36,7 @@ struct PermissionsView: View {
                     Text(permission.title)
                     statusLabel(users.isEmpty ? nil : statuses[permission])
                 }
-                Text(users.isEmpty ? "目前沒有加入需要它的功能" : "用到的功能：" + users.joined(separator: "、"))
+                Text(users.isEmpty ? "目前沒有啟用需要它的功能" : "用到的功能：" + users.joined(separator: "、"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

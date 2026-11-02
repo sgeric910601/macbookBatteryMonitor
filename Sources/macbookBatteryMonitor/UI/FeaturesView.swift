@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// 側邊欄「擴充功能 → 功能管理」：依分組列出擴充功能，按鈕加入或移除。
-/// 用按鈕不用開關：開關留給功能自己的「打開／關閉」，兩者才不會混在一起
+/// 側邊欄「擴充功能 → 功能管理」：依分組列出擴充功能，用開關啟用或停用。
+/// 停用不是解除安裝：功能停止運作、從側邊欄拿掉，設定都保留，再啟用就回來
 struct FeatureManagerView: View {
     let settings: AppSettings
 
@@ -12,10 +12,10 @@ struct FeatureManagerView: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
-                Text("只加入會用到的功能。移除的功能會停止，並從側邊欄拿掉；原本的設定都會保留，重新加入就回來。")
+                Text("只啟用會用到的功能。停用的功能完全不運作（不攔截按鍵或滑鼠、不監聽視窗），也從側邊欄拿掉；原本的設定都會保留，再啟用就回來。這裡的開關決定功能要不要出現，功能裡面的細項在它自己的設定頁調整。")
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
-                Text("已加入 \(settings.installedFeatures.count)／\(ExtensionFeature.allCases.count) 項")
+                Text("已啟用 \(settings.installedFeatures.count)／\(ExtensionFeature.allCases.count) 項")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -34,14 +34,13 @@ struct FeatureManagerView: View {
                 }
             }
         }
-        Text("擴充功能需要「輔助使用」權限，用到時才會詢問（加入時功能自己的開關原本就開著，會在加入時詢問）。移除「中文輸入法」後，已經套用的 Caps Lock 不延遲要重新開機才恢復。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
+        Text("大部分擴充功能需要「輔助使用」權限，用到時才會詢問（功能自己的開關原本就開著時，會在啟用時詢問）。停用「中文輸入法」後，已經套用的 Caps Lock 不延遲要重新開機才恢復。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func row(_ feature: ExtensionFeature) -> some View {
-        let installed = settings.isInstalled(feature)
         return HStack(spacing: 12) {
             Image(systemName: feature.symbol)
                 .font(.system(size: 15, weight: .medium))
@@ -65,8 +64,10 @@ struct FeatureManagerView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button(installed ? "移除" : "加入") { settings.setInstalled(feature, !installed) }
-                .accessibilityLabel("\(installed ? "移除" : "加入")\(feature.title)")
+            Toggle("啟用", isOn: Binding(get: { settings.isInstalled(feature) }, set: { settings.setInstalled(feature, $0) }))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .accessibilityLabel("啟用\(feature.title)")
         }
     }
 }

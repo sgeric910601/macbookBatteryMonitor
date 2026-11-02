@@ -146,10 +146,10 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
 | | 周邊設備 (Peripherals) | Each device's low-battery notification |
-| 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is added) |
+| 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
 | | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
 | | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, quit when the last window closes, click a Dock icon to minimize |
-| | 功能管理 (Feature management) | Add or remove extension features (see "[Extension features](#extension-features)") |
+| | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
 | 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
 Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens Update, and the gear in a monitor panel opens Monitoring & power saving.
@@ -221,18 +221,18 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 
 ## Extension features
 
-Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you press "加入" (add) in Settings → 功能管理 (feature management), and can be removed again:
+Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you turn it on in Settings → 功能管理 (feature management), and can be turned off again:
 
-- **Not added means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; removing only changes whether it is added, so its settings are still there when you add it back
-- **Nothing is added on a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher needs no permission
-- **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay added
+- **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
+- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher needs no permission
+- **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
 - **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
 - Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping
 
 ## Settings backup and permissions
 
 - **Settings backup**: Settings → 一般 → "設定備份" (settings backup) exports the settings to a file you can import on another Mac or after reinstalling. Only known settings with the right types are read and the file size is limited; admin CPU sampling, precise wake (turn them on again on the new Mac), your own photo and the peripherals' low-battery thresholds are not included. Imported settings take effect after the app reopens
-- **Permissions**: Settings → 權限 (permissions) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which added features use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
+- **Permissions**: Settings → 權限 (permissions) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which features that are on use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
 
 ## Monitor alerts
 
@@ -280,7 +280,7 @@ The system integration uses private macOS functions, all loaded at run time and 
 
 ## Audio switcher
 
-Add "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
+Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
 
 - **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch
 - **Mute microphone**: uses the device's mute switch, or sets the input volume to 0 and restores it when unmuted if there is no switch. The button shows a crossed-out microphone while muted
@@ -288,15 +288,15 @@ Add "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker b
 
 ## Mouse side buttons
 
-Add "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:
+Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:
 
 - **Only those two, only when set**: a button left at "不處理" (do nothing), and the left, right and middle buttons, go to apps as usual
 - **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor
-- **Permission**: needs Accessibility; nothing is intercepted while the feature is removed or both buttons do nothing
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is off or both buttons do nothing
 
 ## Keyboard cleaning mode
 
-Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
+Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
 
 - **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown (held-down autorepeat does not), it always ends after at most 5 minutes, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
@@ -304,44 +304,44 @@ Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, 
 
 ## Window snapping
 
-Add "視窗吸附" (window snapping) in Settings → 功能管理 and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
+Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
 
 - **Preview first**: a preview frame appears at the edge and the window is arranged only on release; dragging away cancels. The bottom edge does not snap (the Dock is often there)
 - **Only window drags**: it checks whether the frontmost window moves with the drag, so selecting text, dragging files or resizing never snaps
 - **No fight with the system**: when "Drag windows to screen edges to tile" in System Settings → Desktop & Dock is on, the system handles it and this does nothing
-- **Nothing is intercepted**: it only listens to the mouse; needs Accessibility, and nothing is observed while the feature is removed
+- **Nothing is intercepted**: it only listens to the mouse; needs Accessibility, and nothing is observed while the feature is off
 
 ## Green button maximizes
 
-Add "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the screen's usable area instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size:
+Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the screen's usable area instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size:
 
 - **Option-click**: keeps the system behaviour
 - **Clicks stay fast**: each left mouse down asks Accessibility what is under the pointer, on its own thread and waiting at most 15 ms; if that is too slow, that one click enters full screen as usual
-- **Permission**: needs Accessibility; nothing is intercepted while the feature is removed
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is off
 
 ## Click a Dock icon to minimize
 
-Add "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
+Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
 
 - **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a click, not a drag. Clicking another app switches to it as usual; windows you minimized yourself are not restored
 - **Nothing is intercepted**: it only listens to the mouse, so Dock clicks, drags and right-clicks work as usual; Dock icon positions are read only for clicks near a screen edge
-- **Permission**: needs Accessibility; nothing is observed while the feature is removed
+- **Permission**: needs Accessibility; nothing is observed while the feature is off
 
 ## Quit an app when its last window closes
 
-Add "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
+Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
 
 - **When it quits**: 0.6 s after a window closes, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open. Finder and hidden apps are never quit
 - **Exceptions**: add apps that should keep running without windows, such as a music app playing in the background
 - **Power**: it only listens for window changes of the frontmost app, with no polling
-- **Permission**: needs Accessibility; nothing is observed while the feature is removed
+- **Permission**: needs Accessibility; nothing is observed while the feature is off
 
 ## Hold ⌘Q / ⌘W
 
-Add "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
+Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
 
 - **How it works**: on key down it remembers the frontmost app and shows a progress ring in the middle of the screen. Only when the hold completes does it send ⌘Q / ⌘W directly to that app, not to whatever is frontmost at that moment. Releasing early, switching to another app or pressing another key cancels, so a window behind can never be closed by mistake. Before sending ⌘W it also checks that the app's focused window has not changed; in browsers ⌘W still closes the tab as usual
-- **Permission**: needs Accessibility; with the feature removed or both switches off no keys are intercepted. Secure input (password fields) is never touched, and no keys are logged
+- **Permission**: needs Accessibility; with the feature off or both switches off no keys are intercepted. Secure input (password fields) is never touched, and no keys are logged
 
 ## Chinese input methods
 

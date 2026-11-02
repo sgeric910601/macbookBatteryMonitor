@@ -100,7 +100,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .input: return "捲動、滑鼠側鍵、中文輸入法、防誤觸與鍵盤清潔"
         case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
         case .windows: return "視窗吸附、綠色按鈕放大、關閉最後視窗、Dock 點擊"
-        case .features: return "加入或移除擴充功能"
+        case .features: return "啟用或停用擴充功能"
         case .update: return "版本、自動檢查與一鍵更新"
         }
     }

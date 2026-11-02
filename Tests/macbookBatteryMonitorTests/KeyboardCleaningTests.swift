@@ -31,4 +31,18 @@ struct KeyboardCleaningTests {
         XCTAssertEqual(KeyboardCleaning.validDuration(5), 60)
         XCTAssertEqual(KeyboardCleaning.validDuration(9999), 60)
     }
+
+    /// 擦的時候按到鍵就重新倒數：只有停手滿設定的秒數才恢復，不會擦到一半鍵盤就有作用
+    func testKeyPressRestartsCountdown() {
+        var cleaning = KeyboardCleaning()
+        cleaning.start(seconds: 30, now: now)
+        cleaning.keyPressed(now: now.addingTimeInterval(25))
+        XCTAssertTrue(!cleaning.isExpired(now: now.addingTimeInterval(40)))
+        XCTAssertEqual(cleaning.remainingSeconds(now: now.addingTimeInterval(25)), 30)
+        XCTAssertTrue(cleaning.isExpired(now: now.addingTimeInterval(55)))
+        // 沒在清潔時按鍵不會開始
+        var idle = KeyboardCleaning()
+        idle.keyPressed(now: now)
+        XCTAssertTrue(!idle.isActive)
+    }
 }

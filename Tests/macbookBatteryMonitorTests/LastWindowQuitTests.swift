@@ -4,8 +4,9 @@ struct LastWindowQuitTests {
     private let app: Int32 = 42
 
     private func check(_ logic: LastWindowQuit, server: Int = 0, ax: Int = 0, bundleID: String? = "com.example.Editor",
-                       excluded: Set<String> = [], hidden: Bool = false) -> Bool {
-        logic.shouldQuit(pid: app, bundleID: bundleID, serverWindows: server, axWindows: ax, excluded: excluded, isHidden: hidden)
+                       excluded: Set<String> = [], hidden: Bool = false, regular: Bool = true) -> Bool {
+        logic.shouldQuit(pid: app, bundleID: bundleID, serverWindows: server, axWindows: ax, excluded: excluded, isHidden: hidden,
+                         isRegularApp: regular)
     }
 
     /// 原本有視窗、關掉最後一個（兩邊都說沒有視窗了）：結束
@@ -47,5 +48,15 @@ struct LastWindowQuitTests {
         logic.saw(pid: app, windows: 1)
         logic.forget(pid: app)
         XCTAssertTrue(!check(logic))
+    }
+
+    /// 通話與虛擬機器一律不結束（接聽來電時電話 App 被結束會掛斷）；背景 App（例如 Raycast 的設定視窗）也不結束
+    func testNeverQuitsCallsVirtualMachinesOrBackgroundApps() {
+        var logic = LastWindowQuit()
+        logic.saw(pid: app, windows: 1)
+        for id in ["com.apple.FaceTime", "com.apple.mobilephone", "com.parallels.desktop.console", "com.vmware.fusion", "com.utmapp.UTM"] {
+            XCTAssertTrue(!check(logic, bundleID: id))
+        }
+        XCTAssertTrue(!check(logic, regular: false))
     }
 }

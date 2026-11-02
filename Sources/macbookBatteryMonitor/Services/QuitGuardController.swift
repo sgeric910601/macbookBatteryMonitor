@@ -300,7 +300,8 @@ final class QuitGuardTap: @unchecked Sendable {
             input = .keyDown(keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)), command: flags.contains(.maskCommand),
                              otherModifiers: !flags.intersection([.maskShift, .maskControl, .maskAlternate]).isEmpty,
                              isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0,
-                             time: CACurrentMediaTime(), frontApp: locked { frontApp })
+                             time: CACurrentMediaTime(), frontApp: locked { frontApp },
+                             switcherOpen: InputTap.shared.activeHold() != nil)
         case .keyUp:
             input = .keyUp(keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)))
         case .flagsChanged where !flags.contains(.maskCommand):

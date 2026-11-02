@@ -451,7 +451,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         CardTitle("鍵盤清潔模式", systemImage: "sparkles")
                         HStack {
-                            Picker("停用", selection: binding(\.keyboardCleaningSeconds)) {
+                            Picker("停手多久後恢復", selection: binding(\.keyboardCleaningSeconds)) {
                                 ForEach(KeyboardCleaning.durations, id: \.self) { Text("\($0) 秒").tag($0) }
                             }
                             .fixedSize()
@@ -461,7 +461,7 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                        Text("暫時停用整個鍵盤，包括功能列的亮度、音量鍵；滑鼠與觸控板照常，點畫面中央的「結束清潔」或時間到就恢復。Touch ID 指紋照常可以用，但它也是電源鍵，按下去 Mac 一樣會鎖定或睡眠，長按會強制關機，擦的時候輕一點。")
+                        Text("暫時停用整個鍵盤，包括功能列的亮度、音量鍵；滑鼠與觸控板照常；擦的時候按到鍵會重新倒數，停手滿設定的秒數或點畫面中央的「結束清潔」就恢復。Touch ID 指紋照常可以用，但它也是電源鍵，按下去 Mac 一樣會鎖定或睡眠，長按會強制關機，擦的時候輕一點。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

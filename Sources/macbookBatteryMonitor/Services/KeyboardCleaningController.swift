@@ -69,7 +69,9 @@ final class KeyboardCleaningController {
     fileprivate func blocks(_ type: CGEventType) -> Bool {
         let kind: KeyboardCleaning.EventKind
         switch type {
-        case .keyDown: kind = .keyDown
+        case .keyDown:
+            kind = .keyDown
+            if state.isActive { state.keyPressed(now: Date()) }
         case .keyUp: kind = .keyUp
         case .flagsChanged: kind = .flagsChanged
         default: kind = type.rawValue == Self.systemDefinedType ? .systemKey : .pointer
@@ -119,7 +121,7 @@ private struct CleaningView: View {
         VStack(spacing: 12) {
             Image(systemName: "keyboard").font(.system(size: 34, weight: .semibold))
             Text("鍵盤清潔中").font(.title3.weight(.semibold))
-            Text("鍵盤已暫時停用，\(status.remaining) 秒後自動恢復").font(.callout).foregroundStyle(.secondary)
+            Text("鍵盤已暫時停用，停手 \(status.remaining) 秒後自動恢復").font(.callout).foregroundStyle(.secondary)
             if status.secureInputWarning {
                 Text("有 App 開著「安全輸入」，部分按鍵可能還是會送出").font(.caption).foregroundStyle(.orange)
             }

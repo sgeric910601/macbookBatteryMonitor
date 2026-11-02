@@ -12,7 +12,8 @@ struct QuitGuard {
     }
 
     enum Event {
-        case keyDown(keyCode: Int, command: Bool, otherModifiers: Bool, isRepeat: Bool, time: Double, frontApp: Int32)
+        /// switcherOpen：視窗切換器正開著（這時 Q／W 是切換器的動作）
+        case keyDown(keyCode: Int, command: Bool, otherModifiers: Bool, isRepeat: Bool, time: Double, frontApp: Int32, switcherOpen: Bool = false)
         case keyUp(keyCode: Int)
         case commandReleased
     }
@@ -46,7 +47,12 @@ struct QuitGuard {
 
     mutating func handle(_ event: Event) -> Action {
         switch event {
-        case let .keyDown(keyCode, command, otherModifiers, isRepeat, time, frontApp):
+        case let .keyDown(keyCode, command, otherModifiers, isRepeat, time, frontApp, switcherOpen):
+            // 切換器開著：Q／W 交給切換器（結束或關閉選到的那個），按住中的也取消
+            if switcherOpen {
+                holding = nil
+                return .pass
+            }
             // 攔下過、還沒放開的鍵自動重複送出：一律攔下。按住結束或取消後還按著時放行，會連續關分頁或結束換過去的 App
             if isRepeat, swallowedDown.contains(keyCode) { return .swallow }
             // 真正又按了一次：之前漏掉的放開不再算數

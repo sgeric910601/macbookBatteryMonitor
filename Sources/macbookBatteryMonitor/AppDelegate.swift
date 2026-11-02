@@ -33,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 等使用者允許「輔助使用」：允許了就開始分開設定捲動方向
     private var scrollTrustTimer: Timer?
     private var quitGuardTrustTimer: Timer?
+    /// 這個使用者的工作階段在前景。快速切換使用者後留在背景的攔截，會讓前景使用者的每個輸入都要等它逾時，
+    /// 所以切到背景時停掉所有按鍵與滑鼠攔截，切回來再依設定開始
+    private var sessionActive = true
     private var mouseButtonsTrustTimer: Timer?
     private var lastWindowTrustTimer: Timer?
     private var shiftTrustTimer: Timer?
@@ -168,6 +171,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(sessionResigned), name: NSWorkspace.sessionDidResignActiveNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(sessionBecameActive), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil
+        )
         KeepAwakeController.shared.battery = { [weak self] in
             guard let s = self?.store.snapshot else { return (nil, false) }
             return (s.percent, !s.externalConnected)
@@ -281,7 +290,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 「視窗與 Dock」的擴充功能：關閉最後視窗時結束 App、點 Dock 圖示縮到 Dock。
     /// 需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyLastWindowQuit(prompt: Bool) {
-        let lastWindow = settings.isInstalled(.lastWindowQuit), dock = settings.isInstalled(.dockClick)
+        let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
         let wanted = lastWindow || dock
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
         DockClickController.shared.mode = settings.dockClickMode
@@ -300,7 +309,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// 滑鼠側鍵。需要「輔助使用」：剛設定時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyMouseButtons(prompt: Bool) {
-        let installed = settings.isInstalled(.mouseButtons)
+        let installed = sessionActive && settings.isInstalled(.mouseButtons)
         let buttons = MouseButtons(back: installed ? settings.mouseBackButton : .none, forward: installed ? settings.mouseForwardButton : .none)
         let running = MouseButtonsController.shared.apply(buttons)
         ui.mouseButtonsRunning = buttons.isActive && MouseButtonsController.shared.isRunning
@@ -316,7 +325,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// ⌘Q／⌘W 防誤觸。需要「輔助使用」：剛加入或打開時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyQuitGuard(prompt: Bool) {
-        let installed = settings.isInstalled(.quitGuard)
+        let installed = sessionActive && settings.isInstalled(.quitGuard)
         let quit = installed && settings.quitGuardQuit, close = installed && settings.quitGuardClose
         let running = QuitGuardController.shared.apply(quit: quit, close: close, duration: settings.quitGuardDuration)
         ui.quitGuardRunning = (quit || close) && QuitGuardController.shared.isRunning
@@ -333,7 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
     /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
     private func applyScrollDirection(prompt: Bool) {
-        let installed = settings.isInstalled(.scrollDirection)
+        let installed = sessionActive && settings.isInstalled(.scrollDirection)
         let mouse = installed && settings.scrollReverseMouse
         let trackpad = installed && settings.scrollReverseTrackpad
         let linear = installed ? settings.scrollLinearLines : 0
@@ -358,7 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let options = settings.switcher
         InputTap.shared.setSwitcher(shortcuts: options.profiles.map(\.shortcut), vimKeys: options.vimKeys, releaseCommits: !options.keepOpenAfterRelease)
         WindowSwitcher.shared.configure(options)
-        let wanted = settings.windowSwitcher && settings.isInstalled(.windowSwitcher)
+        let wanted = sessionActive && settings.windowSwitcher && settings.isInstalled(.windowSwitcher)
         InputController.shared.apply(keys: wanted)
         if prompt, wanted, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
     }
@@ -370,7 +379,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func applyShiftHalfWidth(prompt: Bool) {
-        let wanted = settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
+        let wanted = sessionActive && settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
         let running = InputSourceFix.shared.applyShift(wanted)
         ui.shiftRunning = wanted && InputSourceFix.shared.isRunning
         ui.scrollTrusted = ScrollDirection.trusted
@@ -599,6 +608,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 refresh()
             }
         }
+    }
+
+    @objc private func sessionResigned() {
+        sessionActive = false
+        KeyboardCleaningController.shared.stop()
+        applyInputFeatures()
+    }
+
+    @objc private func sessionBecameActive() {
+        sessionActive = true
+        applyInputFeatures()
+    }
+
+    /// 依設定（與工作階段是否在前景）重新開始或停止所有按鍵與滑鼠攔截
+    private func applyInputFeatures() {
+        applyScrollDirection(prompt: false)
+        applyWindowSwitcher(prompt: false)
+        applyShiftHalfWidth(prompt: false)
+        applyQuitGuard(prompt: false)
+        applyLastWindowQuit(prompt: false)
+        applyMouseButtons(prompt: false)
     }
 
     @objc private func willSleep() {

@@ -272,9 +272,9 @@ Add "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set t
 
 ## Keyboard cleaning mode
 
-Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off for 30, 60 or 120 seconds:
+Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
 
-- **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; click "結束清潔" (stop cleaning) in the middle of the screen or wait for the timer. The keyboard always comes back if the app quits
+- **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 

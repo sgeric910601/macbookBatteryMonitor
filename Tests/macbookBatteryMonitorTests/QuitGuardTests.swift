@@ -4,8 +4,9 @@ struct QuitGuardTests {
     private let q = 12, w = 13, a = 0
     private let start = 100.0
 
-    private func down(_ code: Int, cmd: Bool = true, other: Bool = false, repeat r: Bool = false, at time: Double? = nil, app: Int32 = 1) -> QuitGuard.Event {
-        .keyDown(keyCode: code, command: cmd, otherModifiers: other, isRepeat: r, time: time ?? start, frontApp: app)
+    private func down(_ code: Int, cmd: Bool = true, other: Bool = false, repeat r: Bool = false, at time: Double? = nil, app: Int32 = 1,
+                      switcher: Bool = false) -> QuitGuard.Event {
+        .keyDown(keyCode: code, command: cmd, otherModifiers: other, isRepeat: r, time: time ?? start, frontApp: app, switcherOpen: switcher)
     }
 
     /// 按住 ⌘Q 滿時間才結束一開始的 App；按下的那一下和自動重複都攔下
@@ -115,5 +116,17 @@ struct QuitGuardTests {
         guardian.cancelHold()
         XCTAssertEqual(guardian.handle(down(q, cmd: false, at: start + 5)), .pass)
         XCTAssertEqual(guardian.handle(.keyUp(keyCode: q)), .pass)
+    }
+
+    /// 視窗切換器開著時按 Q／W 是切換器的動作（結束或關閉選到的那個），不攔：否則按滿時間會結束最前面的 App，結束錯 App
+    func testLeavesSwitcherKeysAlone() {
+        var guardian = QuitGuard(holdQuit: true, holdClose: true, duration: 1)
+        XCTAssertEqual(guardian.handle(down(q, switcher: true)), .pass)
+        XCTAssertTrue(guardian.holding == nil)
+        XCTAssertEqual(guardian.handle(.keyUp(keyCode: q)), .pass)
+        // 按住途中打開了切換器：取消這次按住
+        _ = guardian.handle(down(w))
+        XCTAssertEqual(guardian.handle(down(48, switcher: true)), .pass)
+        XCTAssertTrue(guardian.holding == nil)
     }
 }

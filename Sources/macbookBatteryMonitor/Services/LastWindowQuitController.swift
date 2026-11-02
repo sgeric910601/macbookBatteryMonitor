@@ -20,6 +20,7 @@ final class LastWindowQuitController {
     private var observedPID: pid_t = 0
     private var pendingCheck: DispatchWorkItem?
     private static let settleDelay: TimeInterval = 0.6
+    private static let confirmDelay: TimeInterval = 1.0
 
     @discardableResult
     func apply(enabled: Bool) -> Bool {
@@ -89,17 +90,24 @@ final class LastWindowQuitController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.settleDelay, execute: work)
     }
 
-    private func check(_ pid: pid_t) {
+    /// confirming：第一次判斷沒有視窗後 1 秒的再確認。兩次都沒有視窗才結束：切換全螢幕途中系統會短暫回報沒有視窗
+    private func check(_ pid: pid_t, confirming: Bool = false) {
         guard isRunning, let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
         let counts = Self.windowCounts(pid)
-        if logic.shouldQuit(pid: pid, bundleID: app.bundleIdentifier, serverWindows: counts.server, axWindows: counts.ax,
-                            excluded: excluded, isHidden: app.isHidden) {
-            Self.log.notice("最後一個視窗關閉，結束 \(app.bundleIdentifier ?? "?", privacy: .public)")
-            logic.forget(pid: pid)
-            app.terminate()
-        } else {
+        guard logic.shouldQuit(pid: pid, bundleID: app.bundleIdentifier, serverWindows: counts.server, axWindows: counts.ax,
+                               excluded: excluded, isHidden: app.isHidden, isRegularApp: app.activationPolicy == .regular) else {
             logic.saw(pid: pid, windows: max(counts.server, counts.ax))
+            return
         }
+        guard confirming else {
+            let work = DispatchWorkItem { MainActor.assumeIsolated { LastWindowQuitController.shared.check(pid, confirming: true) } }
+            pendingCheck = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.confirmDelay, execute: work)
+            return
+        }
+        Self.log.notice("最後一個視窗關閉，結束 \(app.bundleIdentifier ?? "?", privacy: .public)")
+        logic.forget(pid: pid)
+        app.terminate()
     }
 
     /// 兩邊各算一次視窗數。WindowServer 跨所有 Space、包括縮到 Dock 的，只算真的視窗；

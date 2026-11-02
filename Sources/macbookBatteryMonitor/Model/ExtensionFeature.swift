@@ -123,7 +123,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
         case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、音訊、麥克風、鍵盤清潔與擴充功能開關"
         case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
-        case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
+        case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼工具標成機密的內容），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
         }
     }
 

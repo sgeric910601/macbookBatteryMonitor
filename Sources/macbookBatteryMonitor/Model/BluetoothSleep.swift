@@ -1,5 +1,7 @@
 /// 睡眠時關閉藍牙、醒來打開。只開回自己關掉的：使用者自己關的藍牙醒來後維持關閉。
-/// 連著藍牙鍵盤、滑鼠或觸控板時不關，否則醒來時用它們叫不醒 Mac（桌上型 Mac 只剩電源鍵）。
+/// 連著藍牙鍵盤、滑鼠或觸控板時不關，否則醒來時用它們叫不醒 Mac（桌上型 Mac 只剩電源鍵）；
+/// 闔上螢幕（接外接螢幕使用）時也不關：內建鍵盤用不到，閒置後斷線的藍牙鍵鼠偵測不到。
+/// 醒來送出打開後要確認真的打開了才清掉標記，沒打開就再試。
 /// 只做判斷，實際開關在 BluetoothPower
 struct BluetoothSleep {
     enum Action: Equatable { case none, powerOff, powerOn }
@@ -9,20 +11,27 @@ struct BluetoothSleep {
 
     init(turnedOff: Bool) { self.turnedOff = turnedOff }
 
-    mutating func willSleep(enabled: Bool, poweredOn: Bool, wakeInputConnected: Bool) -> Action {
-        guard enabled, poweredOn, !wakeInputConnected, !turnedOff else { return .none }
+    mutating func willSleep(enabled: Bool, poweredOn: Bool, wakeInputConnected: Bool, lidClosed: Bool = false) -> Action {
+        guard enabled, poweredOn, !wakeInputConnected, !lidClosed, !turnedOff else { return .none }
         turnedOff = true
         return .powerOff
     }
 
-    mutating func didWake() -> Action {
+    /// 醒來：要打開，但標記等 confirm 確認打開了才清
+    func didWake() -> Action { turnedOff ? .powerOn : .none }
+
+    /// 送出打開後確認一次：打開了就清掉標記；還沒打開回傳 .powerOn 再試
+    mutating func confirm(poweredOn: Bool) -> Action {
         guard turnedOff else { return .none }
-        turnedOff = false
+        if poweredOn {
+            turnedOff = false
+            return .none
+        }
         return .powerOn
     }
 
     /// 啟動時：上次睡眠關掉的藍牙還沒等到醒來就結束了
-    mutating func didLaunch() -> Action { didWake() }
+    func didLaunch() -> Action { didWake() }
 
     /// 喚醒 Mac 用得到的藍牙輸入裝置：Generic Desktop 的滑鼠（2）、鍵盤（6），以及觸控板等 Digitizer（0x0D）。
     /// 傳輸方式 Bluetooth、Bluetooth Low Energy，以及 Apple 配件的 BT- 開頭（例如 BT-AACP）都算，寧可多算也不要叫不醒 Mac

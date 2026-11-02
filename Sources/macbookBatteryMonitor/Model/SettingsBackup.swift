@@ -26,7 +26,8 @@ enum SettingsBackup {
             throw ReadError.unreadable
         }
         guard root["format"] as? String == format, let settings = root["settings"] as? [String: Any] else { throw ReadError.notOurs }
-        guard let fileVersion = integer(root["version"]), fileVersion <= version else { throw ReadError.newerVersion }
+        guard let fileVersion = integer(root["version"]), fileVersion >= 1 else { throw ReadError.notOurs }
+        guard fileVersion <= version else { throw ReadError.newerVersion }
         var accepted: [String: Any] = [:]
         for (key, value) in settings {
             if let kind = schema[key], let clean = normalized(value, kind) { accepted[key] = clean }

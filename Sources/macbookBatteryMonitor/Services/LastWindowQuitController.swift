@@ -28,14 +28,20 @@ final class LastWindowQuitController {
             stop()
             return true
         }
-        guard AXIsProcessTrusted() else { return false }
+        // 權限被收回：舊的攔截已經收不到事件，停掉；重新允許後 AppDelegate 的定時檢查會再呼叫這裡重新開始
+        guard AXIsProcessTrusted() else {
+            stop()
+            return false
+        }
         guard !isRunning else { return true }
         isRunning = true
         let center = NSWorkspace.shared.notificationCenter
         tokens = [
-            center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
-                let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-                MainActor.assumeIsolated { if let app { LastWindowQuitController.shared.observe(app) } }
+            // 用現在真正最前面的 App：連續切換時，晚到的通知可能是已經不在最前面的 App
+            center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    if let front = NSWorkspace.shared.frontmostApplication { LastWindowQuitController.shared.observe(front) }
+                }
             },
             center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { note in
                 let pid = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
@@ -57,7 +63,8 @@ final class LastWindowQuitController {
         logic = LastWindowQuit()
     }
 
-    private func observe(_ app: NSRunningApplication) {
+    /// attempt：剛啟動的 App 還不接受註冊（回傳「無法完成」），每秒重試，最多 10 次
+    private func observe(_ app: NSRunningApplication, attempt: Int = 1) {
         let pid = app.processIdentifier
         guard pid != observedPID else { return }
         detach()
@@ -68,8 +75,20 @@ final class LastWindowQuitController {
         // 在主執行緒上註冊：App 沒回應時每次最多等 0.2 秒（預設要等好幾秒）
         AXUIElementSetMessagingTimeout(element, 0.2)
         // 關掉視窗的通知有些 App 不會從 App 物件送出；焦點視窗改變（關掉後焦點移走）也觸發同一個檢查，多檢查一次沒有副作用
-        for name in [kAXWindowCreatedNotification, kAXUIElementDestroyedNotification, kAXFocusedWindowChangedNotification] {
-            AXObserverAddNotification(created, element, name as CFString, nil)
+        let results = [kAXWindowCreatedNotification, kAXUIElementDestroyedNotification, kAXFocusedWindowChangedNotification].map {
+            AXObserverAddNotification(created, element, $0 as CFString, nil)
+        }
+        guard results.contains(.success) else {
+            guard attempt < 10 else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                MainActor.assumeIsolated {
+                    let controller = LastWindowQuitController.shared
+                    guard controller.isRunning, controller.observedPID == 0, !app.isTerminated,
+                          NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { return }
+                    controller.observe(app, attempt: attempt + 1)
+                }
+            }
+            return
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .commonModes)
         observer = created
@@ -97,8 +116,10 @@ final class LastWindowQuitController {
     private func check(_ pid: pid_t, confirming: Bool = false) {
         guard isRunning, let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
         let counts = Self.windowCounts(pid)
+        let runningFor = app.isFinishedLaunching ? app.launchDate.map { Date().timeIntervalSince($0) } : nil
         guard logic.shouldQuit(pid: pid, bundleID: app.bundleIdentifier, serverWindows: counts.server, axWindows: counts.ax,
-                               excluded: excluded, isHidden: app.isHidden, isRegularApp: app.activationPolicy == .regular) else {
+                               excluded: excluded, isHidden: app.isHidden, isRegularApp: app.activationPolicy == .regular,
+                               runningFor: runningFor) else {
             logic.saw(pid: pid, windows: max(counts.server, counts.ax))
             return
         }
@@ -118,15 +139,15 @@ final class LastWindowQuitController {
     private static func windowCounts(_ pid: pid_t) -> (server: Int, ax: Int) {
         let displays = SkyLight.displays()
         let current = Set(displays.compactMap(\.current))
-        let server = SkyLight.windows(in: displays.flatMap(\.spaces), ownedBy: [pid])
-            .filter { WindowCandidacy.of($0, visibleSpaces: current) == .listed }.count
+        // 私有查詢失敗（例如 macOS 更新後）時當作還有視窗：「輔助使用」只看得到目前 Space，不能單靠它
+        let server = SkyLight.windowsIfAvailable(in: displays.flatMap(\.spaces), ownedBy: [pid])?
+            .filter { WindowCandidacy.of($0, visibleSpaces: current) == .listed }.count ?? 1
         let element = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(element, 0.5)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value) == .success,
               let windows = value as? [AXUIElement] else { return (server, 1) }
-        // 查不到任何 Space（私有查詢不能用）時不能相信 0
-        return (displays.isEmpty ? 1 : server, windows.count)
+        return (server, windows.count)
     }
 }
 

@@ -4,9 +4,9 @@ struct LastWindowQuitTests {
     private let app: Int32 = 42
 
     private func check(_ logic: LastWindowQuit, server: Int = 0, ax: Int = 0, bundleID: String? = "com.example.Editor",
-                       excluded: Set<String> = [], hidden: Bool = false, regular: Bool = true) -> Bool {
+                       excluded: Set<String> = [], hidden: Bool = false, regular: Bool = true, runningFor: Double? = 60) -> Bool {
         logic.shouldQuit(pid: app, bundleID: bundleID, serverWindows: server, axWindows: ax, excluded: excluded, isHidden: hidden,
-                         isRegularApp: regular)
+                         isRegularApp: regular, runningFor: runningFor)
     }
 
     /// 原本有視窗、關掉最後一個（兩邊都說沒有視窗了）：結束
@@ -54,9 +54,18 @@ struct LastWindowQuitTests {
     func testNeverQuitsCallsVirtualMachinesOrBackgroundApps() {
         var logic = LastWindowQuit()
         logic.saw(pid: app, windows: 1)
-        for id in ["com.apple.FaceTime", "com.apple.mobilephone", "com.parallels.desktop.console", "com.vmware.fusion", "com.utmapp.UTM"] {
+        for id in ["com.apple.FaceTime", "com.apple.mobilephone", "us.zoom.xos", "com.microsoft.teams2", "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.parallels.desktop.console", "com.vmware.fusion", "com.utmapp.UTM"] {
             XCTAssertTrue(!check(logic, bundleID: id))
         }
         XCTAssertTrue(!check(logic, regular: false))
+    }
+
+    /// 還沒啟動完成、或剛啟動不久（啟動畫面關掉、主視窗還沒出現）：不結束
+    func testNeverQuitsAppsStillLaunching() {
+        var logic = LastWindowQuit()
+        logic.saw(pid: app, windows: 1)
+        XCTAssertTrue(!check(logic, runningFor: nil))
+        XCTAssertTrue(!check(logic, runningFor: 3))
+        XCTAssertTrue(check(logic, runningFor: LastWindowQuit.minimumRunTime))
     }
 }

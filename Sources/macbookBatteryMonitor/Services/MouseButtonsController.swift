@@ -25,7 +25,13 @@ final class MouseButtonsController {
             stop()
             return true
         }
-        guard AXIsProcessTrusted() else { return false }
+        // 權限被收回：舊的攔截已經收不到事件，停掉；重新允許後 AppDelegate 的定時檢查會再呼叫這裡重新開始
+        guard AXIsProcessTrusted() else {
+            stop()
+            return false
+        }
+        // 作廢的攔截（重建失敗留下的）先清掉再重建
+        if let port, !CFMachPortIsValid(port) { stop() }
         guard port == nil else { return isRunning }
         let mask: CGEventMask = (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.otherMouseUp.rawValue)
         guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,

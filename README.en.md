@@ -27,7 +27,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Login items**: lists the apps, agents and daemons that start at login, shows what each one is and where it comes from, and lets you clear the user-level config files an uninstalled app left behind; system-level items are view-only
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
 - **Keep awake**: the cup at the bottom right of the panel keeps the Mac awake for 30 minutes, 1 hour, 2 hours or until turned off, optionally with the display on too, and shows the time left. It stops by itself on battery at 10% or below. You can also list apps in Settings → 監控與省電 that keep the system awake while any of them runs (the display still sleeps), released when they all quit; it only listens for apps launching and quitting, with no polling. Uses the public power management API; quitting the app releases it
-- **Bluetooth off during sleep** (laptops only; on a desktop Mac idle Bluetooth keyboards and mice disconnect by themselves, so turning Bluetooth off would leave only the power button to wake it): turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, so they can still wake the Mac. Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
+- **Bluetooth off during sleep** (laptops only; on a desktop Mac idle Bluetooth keyboards and mice disconnect by themselves, so turning Bluetooth off would leave only the power button to wake it): turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, and in clamshell mode (lid closed, running on an external display; simply closing the lid to sleep still turns it off), so the Mac can still be woken. After waking it checks that Bluetooth really came back on and retries if not (up to 5 times, then again on the next wake or launch). Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
 - **No Xcode needed**: the Command Line Tools are enough to build it
@@ -226,17 +226,18 @@ Battery, charging, system monitors, the charging companion and peripherals are b
 - **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
 - **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports and clipboard history need no permission
 - **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
+- **Not extension features, always there**: the keep-awake button in the panel, the connection status (VPN, Low Data Mode) in the network panel, the connected-devices list on the peripherals page, and the permissions page and settings backup in Settings. None needs a permission, and each reads only while its panel or page is open
 - **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
 - Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history
 
 ## Settings backup and permissions
 
-- **Settings backup**: Settings → 一般 → "設定備份" (settings backup) exports the settings to a file you can import on another Mac or after reinstalling. Only known settings with the right types are read and the file size is limited; admin CPU sampling, precise wake (turn them on again on the new Mac), your own photo and the peripherals' low-battery thresholds are not included. Imported settings take effect after the app reopens
+- **Settings backup**: Settings → 一般 → "設定備份" (settings backup) exports the settings to a file you can import on another Mac or after reinstalling. Only known settings with the right types are read and the file size is limited; admin CPU sampling, precise wake (turn them on again on the new Mac), your own photo and the peripherals' low-battery thresholds are not included. If importing would turn on anything that is off now (extension features, Bluetooth off during sleep, keeping awake for chosen apps), it lists those first and asks you to confirm. Imported settings take effect after the app reopens
 - **Permissions**: Settings → 權限 (permissions) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which features that are on use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
 
 ## Monitor alerts
 
-"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk, each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
 
 ## Mouse and trackpad scroll directions
 
@@ -244,8 +245,8 @@ macOS's "natural scrolling" is one setting for both mouse and trackpad: if you l
 
 - **"滑鼠滾輪反向"** (reverse mouse wheel): reverses regular mouse wheels and Magic Mouse
 - **"觸控板反向"** (reverse trackpad): reverses only the trackpad
-- **"滑鼠滾輪每格"** (lines per wheel notch): "照系統加速" (system acceleration) by default; "固定 1／3／5 行" (fixed 1/3/5 lines) makes every notch of a regular mouse wheel scroll exactly that many lines, however fast you spin it. The trackpad and Magic Mouse are not affected, and it works together with reversing
-- **"滑鼠滾輪平滑捲動"** (smooth mouse wheel scrolling): off by default; when on, each notch of a regular mouse wheel glides over about 0.15 s, fast then slow, instead of jumping, like a trackpad. Turning the other way mid-glide switches direction at once, and the frame timer only runs while gliding. The trackpad and Magic Mouse are not affected, and it works with the options above
+- **"滑鼠滾輪每格"** (lines per wheel notch): "照系統加速" (system acceleration) by default; "固定 1／3／5 行" (fixed 1/3/5 lines) makes every notch of a regular mouse wheel scroll exactly that many lines, however fast you spin it (a slow scroll that carries only fractional lines or pixels counts as one notch). The trackpad and Magic Mouse are not affected, and it works together with reversing
+- **"滑鼠滾輪平滑捲動"** (smooth mouse wheel scrolling): off by default; when on, each notch of a regular mouse wheel glides over about 0.15 s, fast then slow, instead of jumping, like a trackpad. Turning the other way mid-glide switches direction at once, and the frame timer only runs while gliding. The trackpad and Magic Mouse are not affected, and it works with the options above. Scrolls with lines but no pixel amount (from remote desktop or virtual machine apps) are passed on unchanged
 - **"滾輪改成左右捲動"** (wheel scrolls sideways): off by default; choose "按住 Shift／Option／Control" (hold Shift/Option/Control) and a regular mouse wheel scrolls horizontally while that key is held, even in apps without that built in. The key is removed from the event afterwards so apps that turn Shift+wheel sideways themselves do not turn it back. The trackpad is not affected
 - **"左右捲動也反向"** (reverse horizontal scrolling too): on by default, reversing vertical and horizontal scrolling together; turn it off to reverse only vertical scrolling
 - **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad, including the momentum after lifting your fingers; everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Turning the wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum
@@ -283,7 +284,7 @@ The system integration uses private macOS functions, all loaded at run time and 
 Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
 
 - **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch
-- **Mute microphone**: uses the device's mute switch, or sets the input volume to 0 and restores it when unmuted if there is no switch. The button shows a crossed-out microphone while muted
+- **Mute microphone**: uses the device's mute switch, or, if there is no switch, the menu says "輸入音量調到 0" (set input volume to 0) and the volume is restored when unmuted or when the app quits. A meeting app's automatic gain may turn it back up, so use the meeting app's own mute for such devices. The button shows a crossed-out microphone while muted
 - **Permission**: uses the public Core Audio API and needs no permission; devices are read only when the menu opens
 
 ## Mouse side buttons
@@ -307,7 +308,7 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu:
 
 - **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
-- **No passwords**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded
+- **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
 - **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
 - The menu can clear the history; no permission needed
 
@@ -316,7 +317,7 @@ Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu,
 Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings → 功能管理 and:
 
 - **Listening ports**: the network panel lists the TCP ports your own processes listen on, the program and whether it is local only; read when the panel opens or on refresh (with the built-in `lsof`, fixed arguments, no shell)
-- **Quit a process**: "結束" (quit) next to a port asks first, then asks the process to exit (SIGTERM); right before sending it re-checks the PID's owner and name, so a reused PID is never hit
+- **Quit a process**: "結束" (quit) next to a port asks first, then asks the process to exit (SIGTERM); right before sending it re-checks the PID's owner, name and start time, so a reused PID is never hit, even by a program with the same name (such as `node`); you are told if it cannot be quit
 - **Quit an app**: right-click an app in the CPU or memory list to quit it like ⌘Q; apps still ask about unsaved documents
 - **Limits**: only your own account's processes are shown or can be quit, never system processes; no permission needed
 
@@ -337,14 +338,15 @@ Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
 
 - **⌘X to cut, ⌘V to move**: select files in Finder, press ⌘X, then ⌘V in another folder to move them (Finder's ⌥⌘V "Move Item Here"). If something else is copied after cutting, ⌘V pastes the clipboard as usual and never moves the files by mistake
 - **F2 to rename**: press F2 on a selected file to rename it (same as Return)
-- **Only in Finder, never while typing**: when Finder is not frontmost, or while renaming or typing in the search field, ⌘X, ⌘V and F2 behave as usual
+- **Only in Finder, never while typing**: when Finder is not frontmost, or while renaming or typing in the search field, ⌘X, ⌘V and F2 behave as usual; if Finder does not answer where the focus is, it counts as typing
+- **Keyboard layouts**: works on the US positions of X, C and V, and only when those keys really type X, C and V (ABC, US, Zhuyin, Pinyin, German and French layouts do); layouts such as Dvorak are left alone
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is off
 
 ## Window snapping
 
 Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
 
-- **Preview first**: a preview frame appears at the edge and the window is arranged only on release; dragging away cancels. The bottom edge does not snap (the Dock is often there)
+- **Preview first**: a preview frame appears at the edge and the window is arranged only on release; dragging away cancels. The bottom edge does not snap (the Dock is often there), nor does an edge where another display joins (the window is being moved across)
 - **Only window drags**: it checks whether the frontmost window moves with the drag, so selecting text, dragging files or resizing never snaps
 - **No fight with the system**: when "Drag windows to screen edges to tile" in System Settings → Desktop & Dock is on, the system handles it and this does nothing
 - **Nothing is intercepted**: it only listens to the mouse; needs Accessibility, and nothing is observed while the feature is off
@@ -353,7 +355,8 @@ Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and draggi
 
 Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the screen's usable area instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size:
 
-- **Option-click**: keeps the system behaviour
+- **Full screen**: with the feature on, the green button no longer enters full screen. Option-click is the system's own "Zoom", not full screen either. Use Window → Full Screen or ⌃⌘F instead
+- **Windows already in full screen, windows that cannot be resized**: keep the system behaviour (leave full screen; nothing happens when the button is disabled)
 - **Clicks stay fast**: each left mouse down asks Accessibility what is under the pointer, on its own thread and waiting at most 15 ms; if that is too slow, that one click enters full screen as usual
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is off
 
@@ -361,7 +364,7 @@ Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管�
 
 Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
 
-- **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a click, not a drag. Clicking another app switches to it as usual; windows you minimized yourself are not restored
+- **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a single click, not a drag. Clicking another app switches to it as usual, and double-clicking a background app's icon only switches to it; windows you minimized yourself are not restored; this app's own icon (while Settings is open) is ignored
 - **Nothing is intercepted**: it only listens to the mouse, so Dock clicks, drags and right-clicks work as usual; Dock icon positions are read only for clicks near a screen edge
 - **Permission**: needs Accessibility; nothing is observed while the feature is off
 
@@ -369,7 +372,8 @@ Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings
 
 Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
 
-- **When it quits**: 0.6 s after a window closes and again 1 s later, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open. Finder and hidden apps are never quit
+- **When it quits**: 0.6 s after a window closes and again 1 s later, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open, and if the WindowServer query fails (for example after a macOS update breaks the private call) the app counts as having windows. An app is quit only after it has finished launching and has run for at least 10 seconds (apps with a splash screen may show their main window seconds later). Finder and hidden apps are never quit
+- **Never quit**: call and meeting apps (FaceTime, Phone, Zoom, Microsoft Teams, Slack, Discord, Webex, Skype, LINE; they may have no window during a call, and quitting would hang up) and virtual machines (Parallels, VMware Fusion, UTM). Add other call apps to the exception list yourself
 - **Exceptions**: add apps that should keep running without windows, such as a music app playing in the background
 - **Power**: it only listens for window changes of the frontmost app, with no polling
 - **Permission**: needs Accessibility; nothing is observed while the feature is off
@@ -379,6 +383,7 @@ Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in 
 Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
 
 - **How it works**: on key down it remembers the frontmost app and shows a progress ring in the middle of the screen. Only when the hold completes does it send ⌘Q / ⌘W directly to that app, not to whatever is frontmost at that moment. Releasing early, switching to another app or pressing another key cancels, so a window behind can never be closed by mistake. Before sending ⌘W it also checks that the app's focused window has not changed; in browsers ⌘W still closes the tab as usual
+- **Keyboard layouts**: works on the US positions of Q and W, and only when those keys really type Q and W (ABC, US, Zhuyin, Pinyin and German layouts do). French AZERTY, Dvorak and other layouts with the letters elsewhere are not protected; keys go through as usual and no other shortcut (such as ⌘A or ⌘Z on AZERTY) is held back by mistake
 - **Permission**: needs Accessibility; with the feature off or both switches off no keys are intercepted. Secure input (password fields) is never touched, and no keys are logged
 
 ## Chinese input methods

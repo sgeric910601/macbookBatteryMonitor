@@ -107,6 +107,8 @@ enum DiskReader {
         var deviceNode: String = ""
         var fileSystem: String = ""
         var connection: String = ""
+        /// 「可用」已經加上校正過的可清出空間；啟動後第一次校正完成前是 false，可用空間偏少
+        var calibrated = true
     }
 
     /// 開機磁碟的裝置協定（"Apple Fabric"…）；只問一次 DiskArbitration。只在主執行緒讀寫
@@ -160,7 +162,8 @@ enum DiskReader {
         }
         return Volume(name: purgeable?.name ?? "Macintosh HD", total: total, available: min(total, free + extra),
                       deviceNode: deviceNode, fileSystem: fileSystem,
-                      connection: ExternalDisk.isValidDeviceNode(deviceNode) ? connection(forDevice: String(deviceNode.dropFirst("/dev/".count))) : "")
+                      connection: ExternalDisk.isValidDeviceNode(deviceNode) ? connection(forDevice: String(deviceNode.dropFirst("/dev/".count))) : "",
+                      calibrated: purgeable != nil)
     }
 
     private static let arbitration = DASessionCreate(kCFAllocatorDefault)

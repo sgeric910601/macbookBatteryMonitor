@@ -70,28 +70,35 @@ final class QuickMenuController: NSObject, NSMenuDelegate {
         awakeItem.submenu = awakeMenu
         menu.addItem(awakeItem)
 
-        // 音訊輸出與麥克風
-        let audio = AudioSwitchController.shared
-        audio.refresh()
-        let outputItem = NSMenuItem(title: "音訊輸出", action: nil, keyEquivalent: "")
-        outputItem.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: nil)
-        let outputMenu = NSMenu()
-        for output in audio.outputs {
-            let id = output.id
-            outputMenu.addItem(action(output.name, checked: output.isCurrent) { AudioSwitchController.shared.select(id) })
-        }
-        outputItem.submenu = outputMenu
-        menu.addItem(outputItem)
-        if audio.micSupported {
-            let mic = action(audio.micMuted ? "取消麥克風靜音" : "麥克風靜音") { AudioSwitchController.shared.toggleMic() }
-            mic.image = NSImage(systemSymbolName: audio.micMuted ? "mic.slash" : "mic", accessibilityDescription: nil)
-            menu.addItem(mic)
+        // 音訊輸出與麥克風（啟用了「音訊切換」才有）
+        if settings.isInstalled(.audioSwitch) {
+            let audio = AudioSwitchController.shared
+            audio.refresh()
+            let outputItem = NSMenuItem(title: "音訊輸出", action: nil, keyEquivalent: "")
+            outputItem.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: nil)
+            let outputMenu = NSMenu()
+            for output in audio.outputs {
+                let id = output.id
+                outputMenu.addItem(action(output.name, checked: output.isCurrent) { AudioSwitchController.shared.select(id) })
+            }
+            outputItem.submenu = outputMenu
+            menu.addItem(outputItem)
+            if audio.micSupported {
+                let mic = action(audio.micTitle) { AudioSwitchController.shared.toggleMic() }
+                mic.image = NSImage(systemSymbolName: audio.micMuted ? "mic.slash" : "mic", accessibilityDescription: nil)
+                menu.addItem(mic)
+            }
         }
 
         // 鍵盤清潔（啟用了才有）
         if settings.isInstalled(.keyboardCleaning) {
             let seconds = settings.keyboardCleaningSeconds
-            let clean = action("開始鍵盤清潔") { _ = KeyboardCleaningController.shared.start(seconds: seconds) }
+            let clean = action("開始鍵盤清潔") { [weak self] in
+                // 沒有「輔助使用」權限：跳出系統的詢問，並打開設定的權限頁，不要什麼都沒發生
+                guard !KeyboardCleaningController.shared.start(seconds: seconds) else { return }
+                ScrollDirection.requestTrust()
+                self?.openSettings?(.permissions)
+            }
             clean.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)
             menu.addItem(clean)
         }

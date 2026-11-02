@@ -52,6 +52,8 @@ struct SettingsBackupTests {
         }
         XCTAssertEqual(error(file(["flag": true], format: "something-else")), .notOurs)
         XCTAssertEqual(error(file(["flag": true], version: SettingsBackup.version + 1)), .newerVersion)
+        XCTAssertEqual(error(file(["flag": true], version: 0)), .notOurs)
+        XCTAssertEqual(error(file(["flag": true], version: -3)), .notOurs)
         XCTAssertEqual(error(Data("not a plist".utf8)), .unreadable)
         XCTAssertEqual(error(Data(count: SettingsBackup.maxSize + 1)), .tooLarge)
     }

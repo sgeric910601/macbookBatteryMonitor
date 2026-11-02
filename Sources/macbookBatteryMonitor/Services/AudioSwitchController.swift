@@ -11,7 +11,9 @@ final class AudioSwitchController {
     private(set) var outputs: [AudioDevices.MenuItem] = []
     private(set) var micMuted = false
     private(set) var micSupported = false
-    /// 用音量代替靜音時，取消後要還原的音量（只在這次執行中記得）
+    /// 目前的輸入裝置沒有靜音開關，「靜音」其實是把輸入音量調到 0（會議軟體的自動音量可能調回來）
+    private(set) var micUsesVolume = false
+    /// 用音量代替靜音時，取消後要還原的音量（只在這次執行中記得；App 結束時一律還原，不會一直停在 0）
     @ObservationIgnored private var restoreVolume: [AudioDeviceID: Float] = [:]
 
     func refresh() {
@@ -23,6 +25,7 @@ final class AudioSwitchController {
         }
         let hasSwitch = AudioDeviceReader.inputHasMuteSwitch(input)
         micSupported = AudioDevices.mutePlan(hasMuteSwitch: hasSwitch, volume: AudioDeviceReader.inputVolume(input)) != .unsupported
+        micUsesVolume = !hasSwitch
         if hasSwitch {
             micMuted = AudioDeviceReader.inputMuted(input) == true
         } else {
@@ -30,6 +33,18 @@ final class AudioSwitchController {
             if restoreVolume[input] != nil, (AudioDeviceReader.inputVolume(input) ?? 0) > 0 { restoreVolume[input] = nil }
             micMuted = restoreVolume[input] != nil
         }
+    }
+
+    /// 選單上的文字：沒有靜音開關時照實說是調音量
+    var micTitle: String {
+        if micUsesVolume { return micMuted ? "還原輸入音量" : "輸入音量調到 0" }
+        return micMuted ? "取消麥克風靜音" : "麥克風靜音"
+    }
+
+    /// App 結束前把調到 0 的輸入音量還原
+    func restoreInputVolumes() {
+        for (input, volume) in restoreVolume { AudioDeviceReader.setInputVolume(input, volume) }
+        restoreVolume = [:]
     }
 
     func select(_ id: UInt32) {

@@ -18,6 +18,18 @@ struct WindowSnapTests {
         XCTAssertEqual(WindowSnap.zone(at: CGPoint(x: 900, y: 1168), screen: screen), nil)
     }
 
+    /// 右邊接著另一個螢幕、上面也有一個：相接的那段邊不吸附（要拖過去），沒接到的那段照常
+    func testSkipsEdgesSharedWithAnotherScreen() {
+        let rightScreen = CGRect(x: 1800, y: 200, width: 1920, height: 1080)
+        let aboveScreen = CGRect(x: 0, y: -1080, width: 900, height: 1080)
+        let others = [rightScreen, aboveScreen]
+        XCTAssertEqual(WindowSnap.zone(at: CGPoint(x: 1799, y: 500), screen: screen, others: others), nil)
+        XCTAssertEqual(WindowSnap.zone(at: CGPoint(x: 1799, y: 100), screen: screen, others: others), .right)
+        XCTAssertEqual(WindowSnap.zone(at: CGPoint(x: 400, y: 2), screen: screen, others: others), nil)
+        XCTAssertEqual(WindowSnap.zone(at: CGPoint(x: 1200, y: 2), screen: screen, others: others), .top)
+        XCTAssertEqual(WindowSnap.zone(at: CGPoint(x: 0, y: 500), screen: screen, others: others), .left)
+    }
+
     /// 每個位置對應的排版：半邊、填滿、四分之一，都在可用範圍內
     func testTargets() {
         XCTAssertEqual(WindowSnap.target(.left, visible: visible), CGRect(x: 0, y: 39, width: 900, height: 1130))

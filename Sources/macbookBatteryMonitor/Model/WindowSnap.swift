@@ -10,10 +10,13 @@ enum WindowSnap {
     /// 角落：離上下緣這麼近又碰到左右邊時算角落
     static let corner: CGFloat = 60
 
-    /// 底部邊緣不吸附：Dock 常在那裡，拖到底部多半只是要放開
-    static func zone(at point: CGPoint, screen: CGRect) -> Zone? {
-        let left = point.x <= screen.minX + edge, right = point.x >= screen.maxX - 1 - edge
-        let top = point.y <= screen.minY + edge
+    /// 底部邊緣不吸附：Dock 常在那裡，拖到底部多半只是要放開。
+    /// others：其他螢幕的範圍；和另一個螢幕相接的那一段邊不算邊緣（視窗要拖過去）
+    static func zone(at point: CGPoint, screen: CGRect, others: [CGRect] = []) -> Zone? {
+        func open(_ outside: CGPoint) -> Bool { !others.contains { $0.contains(outside) } }
+        let left = point.x <= screen.minX + edge && open(CGPoint(x: screen.minX - 1, y: point.y))
+        let right = point.x >= screen.maxX - 1 - edge && open(CGPoint(x: screen.maxX, y: point.y))
+        let top = point.y <= screen.minY + edge && open(CGPoint(x: point.x, y: screen.minY - 1))
         let nearTop = point.y <= screen.minY + corner, nearBottom = point.y >= screen.maxY - corner
         if left { return nearTop ? .topLeft : nearBottom ? .bottomLeft : .left }
         if right { return nearTop ? .topRight : nearBottom ? .bottomRight : .right }

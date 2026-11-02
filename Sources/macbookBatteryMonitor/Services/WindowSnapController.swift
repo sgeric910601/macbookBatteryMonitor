@@ -34,7 +34,13 @@ final class WindowSnapController {
             stop()
             return true
         }
-        guard AXIsProcessTrusted() else { return false }
+        // 權限被收回：舊的攔截已經收不到事件，停掉；重新允許後 AppDelegate 的定時檢查會再呼叫這裡重新開始
+        guard AXIsProcessTrusted() else {
+            stop()
+            return false
+        }
+        // 作廢的攔截（重建失敗留下的）先清掉再重建
+        if let port, !CFMachPortIsValid(port) { stop() }
         guard port == nil else { return isRunning }
         let mask: CGEventMask = (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.leftMouseDragged.rawValue)
             | (1 << CGEventType.leftMouseUp.rawValue)
@@ -99,7 +105,7 @@ final class WindowSnapController {
                 current.moving = Self.frame(of: window).map { WindowSnap.isWindowDrag(from: start, to: $0) } ?? false
             }
             if current.moving, let screen = Self.screen(containing: location) {
-                let zone = WindowSnap.zone(at: location, screen: screen.full)
+                let zone = WindowSnap.zone(at: location, screen: screen.full, others: screen.others)
                 if zone != current.zone {
                     current.zone = zone
                     current.target = zone.map { WindowSnap.target($0, visible: screen.visible) }
@@ -186,12 +192,14 @@ final class WindowSnapController {
         if let value = AXValueCreate(.cgSize, &extent) { AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, value) }
     }
 
-    /// 滑鼠所在的螢幕：整個範圍與可用範圍，都換成左上角為原點的全域座標
-    private static func screen(containing point: CGPoint) -> (full: CGRect, visible: CGRect)? {
+    /// 滑鼠所在的螢幕：整個範圍、可用範圍與其他螢幕的範圍，都換成左上角為原點的全域座標
+    private static func screen(containing point: CGPoint) -> (full: CGRect, visible: CGRect, others: [CGRect])? {
         guard let primary = NSScreen.screens.first else { return nil }
         let height = primary.frame.height
         func flip(_ r: CGRect) -> CGRect { CGRect(x: r.minX, y: height - r.maxY, width: r.width, height: r.height) }
-        return NSScreen.screens.map { (flip($0.frame), flip($0.visibleFrame)) }.first { $0.0.contains(point) }
+        let screens = NSScreen.screens.map { (full: flip($0.frame), visible: flip($0.visibleFrame)) }
+        guard let current = screens.first(where: { $0.full.contains(point) }) else { return nil }
+        return (current.full, current.visible, screens.map(\.full).filter { $0 != current.full })
     }
 }
 

@@ -20,15 +20,16 @@ final class FinderKeysController {
 
     @discardableResult
     func apply(enabled: Bool) -> Bool {
-        guard enabled else {
+        // 沒有權限（包括被收回）時也停掉；重新允許後 AppDelegate 的定時檢查會再呼叫這裡重新開始
+        guard enabled, AXIsProcessTrusted() else {
             watchdog?.invalidate()
             watchdog = nil
             tap.stop()
             if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
             activationObserver = nil
-            return true
+            return !enabled
         }
-        guard AXIsProcessTrusted() else { return false }
+        KeyboardLetters.shared.start()
         if activationObserver == nil {
             activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -36,6 +37,8 @@ final class FinderKeysController {
         }
         updateFrontApp()
         if !tap.isRunning {
+            // 被暫停或作廢的攔截先清掉再重建
+            tap.stop()
             let started = tap.start()
             Self.log.notice("Finder 加強：\(started ? "開始" : "失敗", privacy: .public)")
         }
@@ -142,8 +145,14 @@ final class FinderKeysTap: @unchecked Sendable {
     /// Finder 現在有焦點的元件是可以打字的欄位（改檔名、搜尋框、路徑列）
     private static func editingText(_ finder: AXUIElement) -> Bool {
         var focused: AnyObject?
-        guard AXUIElementCopyAttributeValue(finder, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-              let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
+        switch AXUIElementCopyAttributeValue(finder, kAXFocusedUIElementAttribute as CFString, &focused) {
+        case .success: break
+        // 沒有焦點元件：不是在打字
+        case .noValue: return false
+        // 查詢失敗或逾時：當作在打字，寧可不改寫也不要在改檔名時把 ⌘X、F2 改掉
+        default: return true
+        }
+        guard let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
         var role: AnyObject?
         AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXRoleAttribute as CFString, &role)
         return [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField"].contains(role as? String ?? "")
@@ -160,13 +169,19 @@ final class FinderKeysTap: @unchecked Sendable {
         }
         if event.getIntegerValueField(.eventSourceUserData) == Self.postedMark { return pass }
         let code = event.getIntegerValueField(.keyboardEventKeycode)
+        if type == .keyDown, event.getIntegerValueField(.keyboardEventAutorepeat) != 0, remapped[code] != nil {
+            // 按住 ⌘X 的自動重複：已經改寫過了，再送一次會重設剪下的狀態
+            return nil
+        }
         if type == .keyUp {
             // 放開跟著按下時的改寫：攔下原本的放開、送出改寫後的放開
             guard let mapped = remapped.removeValue(forKey: code) else { return pass }
             Self.post(mapped.keyCode, down: false, flags: mapped.flags, option: mapped.option)
             return nil
         }
-        guard Self.watchedKeys.contains(code), !IsSecureEventInputEnabled(), let finder = locked({ finder }) else { return pass }
+        // 鍵碼是 US 的位置：字母不在那個位置的配置（Dvorak 等）不改寫
+        guard Self.watchedKeys.contains(code), KeyLayout.usKeyCode(Int(code), character: KeyboardLetters.shared.letter(at: Int(code))) != nil,
+              !IsSecureEventInputEnabled(), let finder = locked({ finder }) else { return pass }
         let flags = event.flags
         let editing = Self.editingText(finder)
         let action = locked {

@@ -9,6 +9,10 @@ final class ClipboardHistoryController {
     private(set) var history = ClipboardHistory()
     private var timer: Timer?
     private var lastChange = NSPasteboard.general.changeCount
+    /// 背景正在讀內容；讀完前不開始下一次
+    private var reading = false
+    /// 每次清空加一：讀到一半時鎖定螢幕或睡眠，讀完的內容不能在清空之後才加進去
+    private var generation = 0
     private var clearObservers: [(NotificationCenter, NSObjectProtocol)] = []
 
     var isRunning: Bool { timer != nil }
@@ -17,7 +21,7 @@ final class ClipboardHistoryController {
         guard enabled else {
             timer?.invalidate()
             timer = nil
-            history.clear()
+            clear()
             for (center, observer) in clearObservers { center.removeObserver(observer) }
             clearObservers = []
             return
@@ -41,11 +45,26 @@ final class ClipboardHistoryController {
     }
 
     private func check() {
-        let pasteboard = NSPasteboard.general
-        guard pasteboard.changeCount != lastChange else { return }
-        lastChange = pasteboard.changeCount
-        let types = (pasteboard.types ?? []).map(\.rawValue)
-        guard ClipboardHistory.shouldRecord(types: types), let text = pasteboard.string(forType: .string) else { return }
+        let change = NSPasteboard.general.changeCount
+        guard change != lastChange, !reading else { return }
+        lastChange = change
+        reading = true
+        let generation = generation
+        // 內容可能很大（例如複製了整份記錄檔），在背景讀，不卡主執行緒
+        DispatchQueue.global(qos: .utility).async {
+            let pasteboard = NSPasteboard.general
+            let types = (pasteboard.types ?? []).map(\.rawValue)
+            var text = ClipboardHistory.shouldRecord(types: types) ? pasteboard.string(forType: .string).map { String($0.prefix(ClipboardHistory.maxLength)) } : nil
+            // 檢查類型和讀內容之間剪貼簿被換掉（例如密碼工具剛好寫入標成機密的內容）：這次不記，下一輪會重新檢查新的內容
+            if pasteboard.changeCount != change { text = nil }
+            DispatchQueue.main.async { MainActor.assumeIsolated { ClipboardHistoryController.shared.finishRead(text, generation: generation) } }
+        }
+    }
+
+    private func finishRead(_ text: String?, generation: Int) {
+        reading = false
+        // 讀的期間停用或清空了：不記
+        guard timer != nil, generation == self.generation, let text else { return }
         history.add(text)
     }
 
@@ -58,5 +77,8 @@ final class ClipboardHistoryController {
         lastChange = pasteboard.changeCount
     }
 
-    func clear() { history.clear() }
+    func clear() {
+        generation += 1
+        history.clear()
+    }
 }

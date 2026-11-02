@@ -144,7 +144,7 @@ private struct AudioSwitchButton: View {
             }
             if controller.micSupported {
                 Divider()
-                Button(controller.micMuted ? "取消麥克風靜音" : "麥克風靜音") { controller.toggleMic() }
+                Button(controller.micTitle) { controller.toggleMic() }
             }
         } label: {
             Image(systemName: controller.micMuted ? "mic.slash" : "speaker.wave.2")

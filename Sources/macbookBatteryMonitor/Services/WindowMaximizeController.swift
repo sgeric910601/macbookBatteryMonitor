@@ -3,7 +3,8 @@ import ApplicationServices
 import OSLog
 
 /// 綠色按鈕改成放大（計算在 WindowMaximize）。左鍵按下時問最前面那個 App 點到的是什麼，是視窗的全螢幕（綠色）按鈕才接手：
-/// 攔下按下與放開，把視窗放大到填滿螢幕的可用範圍，再按一次還原。按著 Option 時照系統原本的行為。
+/// 攔下按下與放開，把視窗放大到填滿螢幕的可用範圍，再按一次還原。全螢幕中的視窗與不能改大小的視窗照系統原本的行為（替它按下按鈕）。
+/// 按著 Option 時照系統原本的 Option 點（縮放）。
 /// 查詢在自己的執行緒上做，最多等 15 毫秒，來不及就當作不是綠色按鈕、照常放行，不會拖慢點擊。
 /// 只問最前面的 App：等待上限要設在那個 App 的物件上；設在系統層級的物件上會變成整個 App 所有查詢的預設上限。
 /// 點背景視窗的綠色按鈕照系統原本的行為。需要「輔助使用」權限
@@ -25,15 +26,15 @@ final class WindowMaximizeController {
 
     @discardableResult
     func apply(enabled: Bool) -> Bool {
-        guard enabled else {
+        // 沒有權限（包括被收回）時也停掉；重新允許後 AppDelegate 的定時檢查會再呼叫這裡重新開始
+        guard enabled, AXIsProcessTrusted() else {
             watchdog?.invalidate()
             watchdog = nil
             tap.stop()
             if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
             activationObserver = nil
-            return true
+            return !enabled
         }
-        guard AXIsProcessTrusted() else { return false }
         if activationObserver == nil {
             activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -47,6 +48,8 @@ final class WindowMaximizeController {
             }
         }
         if !tap.isRunning {
+            // 被暫停或作廢的攔截先清掉再重建
+            tap.stop()
             let started = tap.start()
             Self.log.notice("綠色按鈕放大：\(started ? "開始" : "失敗", privacy: .public)")
         }
@@ -59,7 +62,18 @@ final class WindowMaximizeController {
     }
 
     private func toggle(_ button: AXUIElement) {
-        guard let window = Self.window(of: button), let frame = Self.frame(of: window), let visible = Self.visibleFrame(containing: frame) else { return }
+        AXUIElementSetMessagingTimeout(button, 0.2)
+        // 按鈕停用（例如不能放大的視窗）：系統本來也不會有反應
+        guard Self.attribute(button, kAXEnabledAttribute) as? Bool != false, let window = Self.window(of: button) else { return }
+        AXUIElementSetMessagingTimeout(window, 0.2)
+        var sizeSettable: DarwinBoolean = false
+        // 全螢幕中（要離開全螢幕）或不能改大小的視窗：照系統原本的行為按下去
+        if Self.attribute(window, "AXFullScreen") as? Bool == true
+            || AXUIElementIsAttributeSettable(window, kAXSizeAttribute as CFString, &sizeSettable) != .success || !sizeSettable.boolValue {
+            AXUIElementPerformAction(button, kAXPressAction as CFString)
+            return
+        }
+        guard let frame = Self.frame(of: window), let visible = Self.visibleFrame(containing: frame) else { return }
         let id = AX.windowID(of: window) ?? 0
         let target = memory.toggle(window: id, frame: frame, visible: visible)
         // 先移位置再改大小，最後再對一次位置：有些 App 改大小時會自己把視窗推回原位

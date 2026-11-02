@@ -7,6 +7,9 @@ struct BluetoothSleepTests {
         XCTAssertEqual(logic.willSleep(enabled: true, poweredOn: true, wakeInputConnected: false), .powerOff)
         XCTAssertTrue(logic.turnedOff)
         XCTAssertEqual(logic.didWake(), .powerOn)
+        // 還沒確認打開前標記留著
+        XCTAssertTrue(logic.turnedOff)
+        XCTAssertEqual(logic.confirm(poweredOn: true), .none)
         XCTAssertTrue(!logic.turnedOff)
         // 再醒來一次（例如連續的喚醒通知）：不重複打開
         XCTAssertEqual(logic.didWake(), .none)
@@ -18,6 +21,8 @@ struct BluetoothSleepTests {
         XCTAssertEqual(logic.willSleep(enabled: false, poweredOn: true, wakeInputConnected: false), .none)
         XCTAssertEqual(logic.willSleep(enabled: true, poweredOn: false, wakeInputConnected: false), .none)
         XCTAssertEqual(logic.willSleep(enabled: true, poweredOn: true, wakeInputConnected: true), .none)
+        // 闔上螢幕接外接螢幕：內建鍵盤用不到，不關
+        XCTAssertEqual(logic.willSleep(enabled: true, poweredOn: true, wakeInputConnected: false, lidClosed: true), .none)
         XCTAssertEqual(logic.didWake(), .none)
     }
 
@@ -25,9 +30,19 @@ struct BluetoothSleepTests {
     func testLaunchRestoresAfterMissedWake() {
         var crashed = BluetoothSleep(turnedOff: true)
         XCTAssertEqual(crashed.didLaunch(), .powerOn)
+        XCTAssertEqual(crashed.confirm(poweredOn: true), .none)
         XCTAssertTrue(!crashed.turnedOff)
-        var normal = BluetoothSleep(turnedOff: false)
+        let normal = BluetoothSleep(turnedOff: false)
         XCTAssertEqual(normal.didLaunch(), .none)
+    }
+
+    /// 送出打開後還是關著：標記留著、再試一次
+    func testRetriesUntilPoweredOn() {
+        var logic = BluetoothSleep(turnedOff: true)
+        XCTAssertEqual(logic.confirm(poweredOn: false), .powerOn)
+        XCTAssertTrue(logic.turnedOff)
+        XCTAssertEqual(logic.confirm(poweredOn: true), .none)
+        XCTAssertEqual(logic.confirm(poweredOn: false), .none)
     }
 
     /// 喚醒 Mac 用得到的藍牙輸入裝置：鍵盤、滑鼠、觸控板。耳機、手把以外的其他裝置不算

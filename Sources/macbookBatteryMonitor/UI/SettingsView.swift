@@ -591,14 +591,24 @@ struct SettingsView: View {
         let handle = isFile ? try? FileHandle(forReadingFrom: url) : nil
         let data = (try? handle?.read(upToCount: SettingsBackup.maxSize + 1)) ?? nil
         try? handle?.close()
-        let count: Int
+        let backup: (values: [String: Any], turnsOn: [String])
         do {
-            count = try settings.importBackup(data ?? Data())
+            backup = try settings.readBackup(data ?? Data())
         } catch SettingsBackup.ReadError.newerVersion {
             return showAlert("無法匯入設定", "這個檔案是較新版本匯出的，請先更新\(AppEdition.appName)。")
         } catch {
             return showAlert("無法匯入設定", "這不是\(AppEdition.appName)匯出的設定檔，或檔案已損壞。")
         }
+        if !backup.turnsOn.isEmpty {
+            // 會打開原本關著的功能（有的需要「輔助使用」、會記錄剪貼簿）：先列出來讓使用者確認
+            let confirm = NSAlert()
+            confirm.messageText = "匯入後會打開這些功能"
+            confirm.informativeText = backup.turnsOn.map { "・\($0)" }.joined(separator: "\n")
+            confirm.addButton(withTitle: "匯入")
+            confirm.addButton(withTitle: "取消")
+            guard confirm.runModal() == .alertFirstButtonReturn else { return }
+        }
+        let count = settings.importBackup(backup.values)
         let alert = NSAlert()
         alert.messageText = "已匯入 \(count) 項設定"
         alert.informativeText = "重新開啟\(AppEdition.appName)後全部生效。"

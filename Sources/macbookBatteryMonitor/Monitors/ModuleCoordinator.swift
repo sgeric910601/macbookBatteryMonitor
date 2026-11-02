@@ -189,7 +189,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
             let rule = MonitorAlertRules.memory(usage.pressure)
             if memoryAlert.update(high: rule.high, recovered: rule.recovered, at: now) { Notifier.shared.notifyMemoryPressure() }
         }
-        if settings.alertDisk, diskActive, let volume = disk.volume {
+        // 可清出的空間還沒校正完（剛啟動）時剩餘空間偏少，先不判斷，免得誤報
+        if settings.alertDisk, diskActive, let volume = disk.volume, volume.calibrated {
             let rule = MonitorAlertRules.disk(available: volume.available)
             if diskAlert.update(high: rule.high, recovered: rule.recovered, at: now) { Notifier.shared.notifyDiskLow(available: volume.available) }
         }

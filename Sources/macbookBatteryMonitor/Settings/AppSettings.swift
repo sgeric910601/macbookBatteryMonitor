@@ -80,9 +80,29 @@ final class AppSettings {
         return try SettingsBackup.export(values, schema: Self.backupSchema)
     }
 
-    /// 寫入通過檢查的設定，回傳寫入幾項；檔案裡沒有的設定維持原樣。重新開啟 App 後全部生效
-    func importBackup(_ data: Data) throws -> Int {
+    /// 讀取並檢查設定檔，還不寫入。turnsOn：匯入後會從關閉變成打開的項目（擴充功能、睡眠時關閉藍牙、指定 App 防止休眠），
+    /// 要先讓使用者確認：其中有需要「輔助使用」或會記錄剪貼簿的功能
+    func readBackup(_ data: Data) throws -> (values: [String: Any], turnsOn: [String]) {
         let values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        var turnsOn = ExtensionFeature.allCases.filter { values[$0.installedKey] as? Bool == true && !isInstalled($0) }.map(\.title)
+        // 功能自己的開關：加入了但開關關著時，匯入一樣會讓它開始攔截按鍵或滑鼠
+        let switches: [(String, String)] = [
+            (Keys.bluetoothOffDuringSleep, "睡眠時關閉藍牙"), (Keys.windowSwitcher, "視窗切換"),
+            (Keys.capsLockNoDelay, "Caps Lock 切換中英不延遲"), (Keys.shiftHalfWidth, "按住 Shift 打半形"),
+            (Keys.quitGuardQuit, "⌘Q 防誤觸"), (Keys.quitGuardClose, "⌘W 防誤觸"),
+            (Keys.scrollReverseMouse, "滑鼠滾輪反向"), (Keys.scrollReverseTrackpad, "觸控板反向"), (Keys.scrollSmooth, "滑鼠滾輪平滑捲動"),
+        ]
+        for (key, title) in switches where values[key] as? Bool == true && !defaults.bool(forKey: key) {
+            turnsOn.append(title)
+        }
+        if let apps = values[Keys.keepAwakeApps] as? [String], !apps.isEmpty, apps != (defaults.stringArray(forKey: Keys.keepAwakeApps) ?? []) {
+            turnsOn.append("指定 App 執行時防止休眠（\(apps.count) 個 App）")
+        }
+        return (values, turnsOn)
+    }
+
+    /// 寫入 readBackup 檢查過的設定，回傳寫入幾項；檔案裡沒有的設定維持原樣。重新開啟 App 後全部生效
+    func importBackup(_ values: [String: Any]) -> Int {
         for (key, value) in values {
             // 視窗切換的設定先整理成認得的欄位再存，不把檔案裡的原始內容整包存進去
             let clean = key == Keys.switcher ? (value as? [String: Any]).map { SwitcherSettings(stored: $0).stored } ?? value : value
@@ -572,9 +592,12 @@ final class AppSettings {
             .windowSwitcher: defaults.bool(forKey: Keys.windowSwitcher),
             .inputMethod: defaults.bool(forKey: Keys.capsLockNoDelay) || defaults.bool(forKey: Keys.shiftHalfWidth),
         ]
-        for feature in ExtensionFeature.allCases
-        where feature.isInstalled(stored: defaults.object(forKey: feature.installedKey) as? Bool, switchedOn: switchedOn[feature] ?? false) {
-            installed.insert(feature)
+        for feature in ExtensionFeature.allCases {
+            let stored = defaults.object(forKey: feature.installedKey) as? Bool
+            let isInstalled = feature.isInstalled(stored: stored, switchedOn: switchedOn[feature] ?? false)
+            if isInstalled { installed.insert(feature) }
+            // 第一次推算完就存起來：之後關掉功能自己的開關（例如視窗切換）再重開 App，頁面不會因為重新推算而消失
+            if stored == nil { defaults.set(isInstalled, forKey: feature.installedKey) }
         }
         installedFeatures = installed
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)

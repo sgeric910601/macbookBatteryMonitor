@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import IOKit.hid
 import OSLog
 
@@ -24,6 +24,19 @@ enum BluetoothPower {
     static func setOn(_ on: Bool) {
         setter?(on ? 1 : 0)
         log.notice("睡眠時關閉藍牙：\(on ? "打開" : "關閉", privacy: .public)")
+    }
+
+    /// 螢幕闔上、接著外接螢幕使用（闔蓋模式）。只是闔上螢幕讓 Mac 睡眠不算：那是最常見的睡眠方式，照樣要關藍牙
+    @MainActor
+    static func lidClosedWithExternalDisplay() -> Bool {
+        let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard root != 0 else { return false }
+        defer { IOObjectRelease(root) }
+        let closed = IORegistryEntryCreateCFProperty(root, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Bool ?? false
+        let external = NSScreen.screens.contains { screen in
+            (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber).map { CGDisplayIsBuiltin($0.uint32Value) == 0 } ?? false
+        }
+        return closed && external
     }
 
     /// 連著藍牙鍵盤、滑鼠或觸控板（見 BluetoothSleep.isWakeInput）

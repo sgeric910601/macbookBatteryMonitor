@@ -15,6 +15,8 @@ final class KeyboardCleaningController {
     private var port: CFMachPort?
     private var timer: Timer?
     private var window: NSWindow?
+    /// 開始清潔前最前面的 App；結束時叫回來，焦點才會回到原本的地方
+    private var previousApp: NSRunningApplication?
     private let view = CleaningStatus()
     /// 系統事件（亮度、音量、媒體鍵）的類型，CGEventType 沒有列出
     private static let systemDefinedType: UInt32 = 14
@@ -37,9 +39,12 @@ final class KeyboardCleaningController {
         view.secureInputWarning = IsSecureEventInputEnabled()
         showWindow()
         tick()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
+        // 加到 common 模式：選單列的選單開著時也要倒數、時間到也要恢復
+        let timer = Timer(timeInterval: 0.25, repeats: true) { _ in
             MainActor.assumeIsolated { KeyboardCleaningController.shared.tick() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
         Self.log.notice("開始鍵盤清潔")
         return true
     }
@@ -55,6 +60,8 @@ final class KeyboardCleaningController {
         }
         port = nil
         window?.orderOut(nil)
+        if let previousApp, !previousApp.isTerminated { previousApp.activate() }
+        previousApp = nil
         Self.log.notice("結束鍵盤清潔")
     }
 
@@ -97,6 +104,8 @@ final class KeyboardCleaningController {
             return window
         }()
         window.center()
+        let front = NSWorkspace.shared.frontmostApplication
+        previousApp = front?.processIdentifier == getpid() ? nil : front
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }

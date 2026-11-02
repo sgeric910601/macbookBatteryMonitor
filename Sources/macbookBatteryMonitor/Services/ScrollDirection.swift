@@ -276,8 +276,11 @@ final class ScrollTap: @unchecked Sendable {
     func absorbIntoSmooth(_ event: CGEvent) -> Bool {
         guard locked({ config.smooth }), event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0,
               event.getIntegerValueField(.eventSourceUserData) != Self.smoothMark else { return false }
-        smoothScroll.add(dx: Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)),
-                         dy: Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)))
+        let dx = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2))
+        let dy = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1))
+        // 沒有像素量的事件（遠端桌面、虛擬機器只送行數）：放行原本的事件，不能吞掉又什麼都沒送
+        guard dx != 0 || dy != 0 else { return false }
+        smoothScroll.add(dx: dx, dy: dy)
         smoothLocation = event.location
         smoothFlags = event.flags
         guard smoothTimer == nil, !smoothScroll.isIdle else { return true }
@@ -357,7 +360,8 @@ final class ScrollTap: @unchecked Sendable {
             (.scrollWheelEventDeltaAxis2, .scrollWheelEventFixedPtDeltaAxis2, .scrollWheelEventPointDeltaAxis2),
         ]
         for (lineField, fixedField, pointField) in axes {
-            let delta = ScrollLinear.adjust(lines: event.getIntegerValueField(lineField), lineSetting: lines)
+            let delta = ScrollLinear.adjust(lines: event.getIntegerValueField(lineField), fixed: event.getDoubleValueField(fixedField),
+                                            points: event.getIntegerValueField(pointField), lineSetting: lines)
             event.setIntegerValueField(lineField, value: delta.lines)
             event.setDoubleValueField(fixedField, value: delta.fixed)
             event.setIntegerValueField(pointField, value: delta.points)

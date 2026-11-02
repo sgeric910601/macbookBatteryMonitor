@@ -139,6 +139,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
         applyLastWindowQuit(prompt: false)
+        // 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
+        // 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。都沒啟用時什麼都不做
+        timers.append(repeating(every: 5) { delegate in
+            let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
+            guard features.contains(where: delegate.settings.isInstalled) else { return }
+            delegate.applyQuitGuard(prompt: false)
+            delegate.applyMouseButtons(prompt: false)
+            delegate.applyLastWindowQuit(prompt: false)
+        })
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -554,6 +563,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.chargingWake.stop()
         store.history.save()
         monitors.stop()
+        AudioSwitchController.shared.restoreInputVolumes()
     }
 
     // MARK: - Refresh
@@ -673,19 +683,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 只在有內建鍵盤的 Mac（有電池的筆電）關：桌上型 Mac 的藍牙鍵鼠閒置時會自己斷線，偵測不到就關掉，醒來只剩電源鍵
         if settings.bluetoothOffDuringSleep, BluetoothPower.isAvailable, BatteryReader.hasBattery {
             applyBluetooth(bluetoothSleep.willSleep(enabled: true, poweredOn: BluetoothPower.isOn,
-                                                   wakeInputConnected: BluetoothPower.wakeInputConnected()))
+                                                   wakeInputConnected: BluetoothPower.wakeInputConnected(),
+                                                   lidClosed: BluetoothPower.lidClosedWithExternalDisplay()))
         }
     }
 
     private lazy var bluetoothSleep = BluetoothSleep(turnedOff: settings.bluetoothTurnedOffForSleep)
 
-    private func applyBluetooth(_ action: BluetoothSleep.Action) {
+    private func applyBluetooth(_ action: BluetoothSleep.Action, attempt: Int = 1) {
         // 先記下狀態再開關：開關途中 App 被結束，下次啟動仍知道要不要打開
         settings.bluetoothTurnedOffForSleep = bluetoothSleep.turnedOff
         switch action {
         case .none: return
         case .powerOff: BluetoothPower.setOn(false)
-        case .powerOn: BluetoothPower.setOn(true)
+        case .powerOn:
+            BluetoothPower.setOn(true)
+            // 剛醒來時藍牙控制器可能還沒準備好：每次送出 2 秒後確認（打開了就清掉標記），沒打開就再送，最多送 5 次；
+            // 5 次都沒打開時標記留著，下次醒來或啟動再試
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, !self.sleeping else { return }
+                    let next = self.bluetoothSleep.confirm(poweredOn: BluetoothPower.isOn)
+                    self.applyBluetooth(attempt < 5 ? next : .none, attempt: attempt + 1)
+                }
+            }
         }
     }
 

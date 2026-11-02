@@ -31,7 +31,12 @@ final class QuitGuardController {
             stop()
             return true
         }
-        guard AXIsProcessTrusted() else { return false }
+        // 權限被收回：舊的攔截已經收不到事件，停掉；重新允許後 AppDelegate 的定時檢查會再呼叫這裡重新開始
+        guard AXIsProcessTrusted() else {
+            stop()
+            return false
+        }
+        KeyboardLetters.shared.start()
         if activationObserver == nil {
             activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -45,6 +50,8 @@ final class QuitGuardController {
             }
         }
         if !tap.isRunning {
+            // 被暫停或作廢的攔截先清掉再重建
+            tap.stop()
             let started = tap.start()
             Self.log.notice("⌘Q／⌘W 防誤觸攔截：\(started ? "開始" : "失敗", privacy: .public)")
         }
@@ -299,16 +306,20 @@ final class QuitGuardTap: @unchecked Sendable {
         // 密碼欄等安全輸入：不開始新的按住；放開還是要處理，否則之前攔下的鍵狀態會卡住
         if IsSecureEventInputEnabled(), type != .keyUp { return pass }
         let flags = event.flags
+        // 鍵碼是 US 的位置：字母不在那個位置的配置（AZERTY、Dvorak）不當成 Q、W，免得保護到別的快捷鍵
+        let rawCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        let keyCode = KeyLayout.usKeyCode(rawCode, character: KeyboardLetters.shared.letter(at: rawCode)) ?? -1
         let input: QuitGuard.Event
         switch type {
         case .keyDown:
-            input = .keyDown(keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)), command: flags.contains(.maskCommand),
+            input = .keyDown(keyCode: keyCode, command: flags.contains(.maskCommand),
                              otherModifiers: !flags.intersection([.maskShift, .maskControl, .maskAlternate]).isEmpty,
                              isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0,
                              time: CACurrentMediaTime(), frontApp: locked { frontApp },
                              switcherOpen: InputTap.shared.activeHold() != nil)
         case .keyUp:
-            input = .keyUp(keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)))
+            // 放開不看字：按下時攔下的是哪個鍵碼，放開就認那個鍵碼，狀態才不會卡住
+            input = .keyUp(keyCode: rawCode)
         case .flagsChanged where !flags.contains(.maskCommand):
             input = .commandReleased
         default:

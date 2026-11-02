@@ -64,7 +64,7 @@ final class AppSettings {
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
             Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
-            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.windowSwitcher: .bool,
+            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.windowSwitcher: .bool,
             Keys.switcher: .dictionary, Keys.capsLockNoDelay: .bool, Keys.shiftHalfWidth: .bool,
             Keys.chargingTargetPercent: .int, Keys.chargingHoldPercent: .int, Keys.chargingSleepStrategy: .string,
         ]
@@ -279,6 +279,13 @@ final class AppSettings {
             if scrollReverseMouse != oldValue { onScrollDirectionChange?() }
         }
     }
+    /// 左右捲動也反向（預設打開，和以前一樣上下左右一起反）；關掉時只反轉上下
+    var scrollReverseHorizontal: Bool {
+        didSet {
+            defaults.set(scrollReverseHorizontal, forKey: Keys.scrollReverseHorizontal)
+            if scrollReverseHorizontal != oldValue { onScrollDirectionChange?() }
+        }
+    }
     var scrollReverseTrackpad: Bool {
         didSet {
             defaults.set(scrollReverseTrackpad, forKey: Keys.scrollReverseTrackpad)
@@ -455,6 +462,7 @@ final class AppSettings {
         static let desktopPetFollowCursor = "desktopPetFollowCursor"
         static let scrollReverseMouse = "scrollReverseMouse"
         static let scrollReverseTrackpad = "scrollReverseTrackpad"
+        static let scrollReverseHorizontal = "scrollReverseHorizontal"
         static let windowSwitcher = "windowSwitcher"
         static let switcher = "windowSwitcherSettings"
         static let capsLockNoDelay = "capsLockNoDelay"
@@ -590,6 +598,7 @@ final class AppSettings {
         desktopPetFollowCursor = defaults.bool(forKey: Keys.desktopPetFollowCursor)
         scrollReverseMouse = defaults.bool(forKey: Keys.scrollReverseMouse)
         scrollReverseTrackpad = defaults.bool(forKey: Keys.scrollReverseTrackpad)
+        scrollReverseHorizontal = defaults.object(forKey: Keys.scrollReverseHorizontal) as? Bool ?? true
         windowSwitcher = defaults.bool(forKey: Keys.windowSwitcher)
         switcher = SwitcherSettings(stored: defaults.dictionary(forKey: Keys.switcher) ?? [:])
         capsLockNoDelay = defaults.bool(forKey: Keys.capsLockNoDelay)

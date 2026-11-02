@@ -346,6 +346,8 @@ struct SettingsView: View {
                         CardTitle("捲動方向", systemImage: "arrow.up.arrow.down")
                         SwitchRow("滑鼠滾輪反向", isOn: binding(\.scrollReverseMouse))
                         SwitchRow("觸控板反向", isOn: binding(\.scrollReverseTrackpad))
+                        Toggle("左右捲動也反向", isOn: binding(\.scrollReverseHorizontal))
+                            .disabled(!settings.scrollReverseMouse && !settings.scrollReverseTrackpad)
                         Text("macOS 的「自然捲動」是滑鼠和觸控板一起變；這裡可以只反轉其中一種，例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向。兩指在觸控板上捲動算觸控板，其他（包括 Magic Mouse）算滑鼠。")
                             .font(.caption)
                             .foregroundStyle(.secondary)

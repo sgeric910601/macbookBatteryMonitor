@@ -221,7 +221,8 @@ macOS's "natural scrolling" is one setting for both mouse and trackpad: if you l
 
 - **"滑鼠滾輪反向"** (reverse mouse wheel): reverses regular mouse wheels and Magic Mouse
 - **"觸控板反向"** (reverse trackpad): reverses only the trackpad
-- **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad, including the momentum after lifting your fingers; everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Vertical and horizontal scrolling are reversed together. Turning the wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum
+- **"左右捲動也反向"** (reverse horizontal scrolling too): on by default, reversing vertical and horizontal scrolling together; turn it off to reverse only vertical scrolling
+- **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad, including the momentum after lifting your fingers; everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Turning the wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum
 - **No bouncing back in web pages**: reversed trackpad and Magic Mouse scrolls are replaced with newly created events, so the raw deltas web pages use for momentum are reversed too
 - **Permission**: needs Accessibility. Turning a switch on asks you to enable "電池與系統監控" in System Settings → Privacy & Security → Accessibility; it starts working within seconds, no relaunch needed, and stays allowed after updates and reinstalls
 - **Status**: the settings page shows the real state. "運作中" (working) means scroll events are being intercepted, "啟動中…" (starting) means permission is there and it starts shortly; without permission it shows an orange note and "打開輔助使用設定" (open Accessibility settings)

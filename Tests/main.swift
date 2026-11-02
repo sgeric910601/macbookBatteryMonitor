@@ -259,3 +259,8 @@ cleaning.testBlocksKeyboardOnlyWhileActive()
 cleaning.testExpires()
 cleaning.testDurations()
 print("3 keyboard cleaning tests passed")
+
+let scrollAxes = ScrollAxesTests()
+scrollAxes.testFieldAxes()
+scrollAxes.testMultiplier()
+print("2 scroll axis tests passed")

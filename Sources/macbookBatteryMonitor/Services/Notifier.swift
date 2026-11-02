@@ -100,6 +100,19 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(title: "\(device.name) 電量偏低：\(level)%", body: "已低於你設定的 \(threshold)%\(detail)，建議充電。")
     }
 
+    /// 監控警示（是否通知由 ModuleCoordinator 的 SustainedAlert 判斷）
+    func notifyCPUBusy() {
+        post(title: "CPU 持續滿載", body: "過去 5 分鐘 CPU 使用率都在 90% 以上。打開 CPU 面板可以看是哪個 App。")
+    }
+
+    func notifyMemoryPressure() {
+        post(title: "記憶體壓力嚴重", body: "macOS 正在大量壓縮記憶體、使用 Swap，可能會變慢。關掉不用的 App 可以改善。")
+    }
+
+    func notifyDiskLow(available: UInt64) {
+        post(title: "開機磁碟空間不足", body: "只剩 \(ByteFormat.size(available))。空間太少時 macOS 可能無法更新，也可能變慢。")
+    }
+
     /// 智慧充電：已在完成時間前充好，或照目前速度可能趕不上
     func notifyChargingPlan(_ event: ChargingPlanNotification, plan: ChargingPlan) {
         let time = plan.deadline.formatted(date: .omitted, time: .shortened)

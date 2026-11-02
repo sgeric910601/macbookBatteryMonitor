@@ -118,6 +118,11 @@ enum AppLocation {
         guard run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", target.path]) == 0 else {
             throw LocationError(message: "沒有權限清掉 \(target.path) 的隔離標記。請在終端機執行：xattr -dr com.apple.quarantine \"\(target.path)\"")
         }
+        try reopenAfterExit(target)
+    }
+
+    /// 等這個 App 結束後（最多 10 秒）重新打開 target；呼叫的地方接著結束 App。路徑與 pid 用參數傳入，不拼進指令
+    static func reopenAfterExit(_ target: URL) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", "i=0; while kill -0 \"$0\" 2>/dev/null && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; open \"$1\"",

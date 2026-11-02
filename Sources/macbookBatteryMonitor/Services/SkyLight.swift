@@ -92,11 +92,16 @@ enum SkyLight {
     /// 這些 Space 上、屬於 owners 這些行程的視窗，順序跟 WindowServer 給的一樣。
     /// 不會問任何 App，所以忙碌的 App 拖不慢它
     static func windows(in spaces: [UInt64], ownedBy owners: Set<pid_t>) -> [ServerWindowRecord] {
-        guard let connection, let copyWindowsInSpaces, !spaces.isEmpty else { return [] }
+        windowsIfAvailable(in: spaces, ownedBy: owners) ?? []
+    }
+
+    /// 同上，但私有查詢不能用（或一個視窗都查不到，不可能是真的）時回傳 nil，讓呼叫的人分得出「沒有視窗」和「查不到」
+    static func windowsIfAvailable(in spaces: [UInt64], ownedBy owners: Set<pid_t>) -> [ServerWindowRecord]? {
+        guard let connection, let copyWindowsInSpaces, !spaces.isEmpty else { return nil }
         var setMask: UInt64 = 0, clearMask: UInt64 = 0
         // 選項 0x7：連縮到 Dock 的視窗也列出（yabai space.c 的 include_minimized）
         guard let numbers = copyWindowsInSpaces(connection, 0, spaces as CFArray, 0x7, &setMask, &clearMask)?.takeRetainedValue() as? [NSNumber],
-              !numbers.isEmpty else { return [] }
+              !numbers.isEmpty else { return nil }
         let described = publicDescriptions()
         let flags = rawFlags(numbers)
         var kindOfSpace: [UInt64: Int32] = [:]

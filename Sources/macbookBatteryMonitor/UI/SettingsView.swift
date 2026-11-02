@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     let settings: AppSettings
@@ -93,6 +94,21 @@ struct SettingsView: View {
                     Text(powerSavingNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Divider().padding(.vertical, 2)
+                    Text("這些 App 執行中時防止休眠").font(.body)
+                    AppExceptionList(ids: binding(\.keepAwakeApps), limit: SwitcherSettings.maxExcludedApps)
+                    Text("清單裡有任何一個 App 在執行，Mac 就不會自己睡著（螢幕照常會關），全部結束就恢復，例如簡報、播放或下載時。用電池而且電量到 10% 以下時自動停止。只監聽 App 開啟與結束，不會一直檢查。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if BluetoothPower.isAvailable, hasBattery {
+                        Divider().padding(.vertical, 2)
+                        SwitchRow("睡眠時關閉藍牙", isOn: binding(\.bluetoothOffDuringSleep))
+                        Text("Mac 睡眠時關掉藍牙，醒來後再打開；你自己關掉的藍牙醒來後維持關閉。連著藍牙鍵盤、滑鼠或觸控板時不關，免得用它們叫不醒 Mac。睡眠期間所有藍牙連線都會中斷，醒來後藍牙耳機等裝置要重新連上。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             .settingsSection(.monitors, shown: section)
@@ -140,6 +156,25 @@ struct SettingsView: View {
                          : "開啟的模組在選單列各有一個圖示\(settings.memoryDiskMerged ? "（記憶體與磁碟共用一個）" : "")，\(settings.updateText)。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+            .settingsSection(.monitors, shown: section)
+
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("監控警示", systemImage: "exclamationmark.triangle")
+                    SwitchRow("CPU 持續滿載（90% 以上 5 分鐘）", isOn: binding(\.alertCPU))
+                        .disabled(!settings.isMonitorEnabled(.cpu))
+                    SwitchRow("記憶體壓力嚴重", isOn: binding(\.alertMemory))
+                        .disabled(!settings.isMonitorEnabled(.memory))
+                    SwitchRow("開機磁碟剩不到 10 GB", isOn: binding(\.alertDisk))
+                        .disabled(!settings.isMonitorEnabled(.disk))
+                    Text(settings.menuBarCombined
+                         ? "每種只通知一次，回到正常後才會再通知。合併成一個圖示時，只在展開狀態列時判斷。"
+                         : "每種只通知一次，回到正常後才會再通知。該模組在選單列有圖示時才會判斷，不另外取樣。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .settingsSection(.monitors, shown: section)
@@ -299,51 +334,146 @@ struct SettingsView: View {
 
             Card {
                 VStack(alignment: .leading, spacing: 8) {
-                    CardTitle("捲動方向", systemImage: "arrow.up.arrow.down")
-                    SwitchRow("滑鼠滾輪反向", isOn: binding(\.scrollReverseMouse))
-                    SwitchRow("觸控板反向", isOn: binding(\.scrollReverseTrackpad))
-                    Text("macOS 的「自然捲動」是滑鼠和觸控板一起變；這裡可以只反轉其中一種，例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向。兩指在觸控板上捲動算觸控板，其他（包括 Magic Mouse）算滑鼠。")
+                    CardTitle("設定備份", systemImage: "square.and.arrow.up.on.square")
+                    HStack {
+                        Button("匯出設定…") { exportSettings() }
+                        Button("匯入設定…") { importSettings() }
+                    }
+                    Text("換 Mac 或重灌時，把設定存成一個檔案帶過去。不含管理員 CPU 取樣、精準喚醒（要在新的 Mac 重新開啟）、自己的照片與周邊設備的低電量門檻。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if settings.scrollReverseMouse || settings.scrollReverseTrackpad {
-                        if ui.scrollRunning {
-                            Label("運作中", systemImage: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                        } else if ui.scrollTrusted {
-                            // 有權限、還沒開始：每 5 秒會再試一次
-                            Label("啟動中…", systemImage: "clock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。清單裡已經有它、開關也開著的話，那是 v1.7.3 以前版本的允許，先按「－」移除再加一次；之後更新都會保留。")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
-                        }
-                    }
                 }
             }
-            .settingsSection(.input, shown: section)
+            .settingsSection(.general, shown: section)
 
-            Card {
-                VStack(alignment: .leading, spacing: 8) {
-                    CardTitle("中文輸入法", systemImage: "keyboard")
-                    SwitchRow("Caps Lock 切換中英不延遲", isOn: binding(\.capsLockNoDelay))
-                    SwitchRow("按住 Shift 打半形英文與符號", isOn: binding(\.shiftHalfWidth))
-                    Text("macOS 為了防誤觸，Caps Lock 要按住一下才切換；打開後按一下就切。注音等中文輸入法按住 Shift 打字會變全形「Ａ」「！」「，」；打開後按住 Shift 時和英文鍵盤一樣全部打出半形，放開 Shift 就繼續打中文（Shift + 逗號、句號會是 < >，中文標點請改用其他方式打）。關掉「不延遲」後要重新開機才恢復原本的延遲。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if settings.shiftHalfWidth {
-                        if ui.shiftRunning {
-                            Label("運作中", systemImage: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                        } else if !ui.scrollTrusted {
-                            Text("「按住 Shift 打半形英文」需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+            if settings.isInstalled(.scrollDirection) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("捲動方向", systemImage: "arrow.up.arrow.down")
+                        SwitchRow("滑鼠滾輪反向", isOn: binding(\.scrollReverseMouse))
+                        SwitchRow("觸控板反向", isOn: binding(\.scrollReverseTrackpad))
+                        Toggle("左右捲動也反向", isOn: binding(\.scrollReverseHorizontal))
+                            .disabled(!settings.scrollReverseMouse && !settings.scrollReverseTrackpad)
+                        Picker("滑鼠滾輪每格", selection: binding(\.scrollLinearLines)) {
+                            ForEach(ScrollLinear.choices, id: \.self) { Text($0 == 0 ? "照系統加速" : "固定 \($0) 行").tag($0) }
+                        }
+                        .fixedSize()
+                        Toggle("滑鼠滾輪平滑捲動", isOn: binding(\.scrollSmooth))
+                        Picker("滾輪改成左右捲動", selection: binding(\.scrollHorizontalKey)) {
+                            ForEach(ScrollHorizontalKey.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .fixedSize()
+                        Text("macOS 的「自然捲動」是滑鼠和觸控板一起變；這裡可以只反轉其中一種，例如觸控板維持自然捲動、滑鼠滾輪改回傳統方向。兩指在觸控板上捲動算觸控板，其他（包括 Magic Mouse）算滑鼠。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if settings.scrollReverseMouse || settings.scrollReverseTrackpad || settings.scrollLinearLines > 0 || settings.scrollHorizontalKey != .off || settings.scrollSmooth {
+                            if ui.scrollRunning {
+                                Label("運作中", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else if ui.scrollTrusted {
+                                // 有權限、還沒開始：每 5 秒會再試一次
+                                Label("啟動中…", systemImage: "clock")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。清單裡已經有它、開關也開著的話，那是 v1.7.3 以前版本的允許，先按「－」移除再加一次；之後更新都會保留。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
+
+            if settings.isInstalled(.inputMethod) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("中文輸入法", systemImage: "keyboard")
+                        SwitchRow("Caps Lock 切換中英不延遲", isOn: binding(\.capsLockNoDelay))
+                        SwitchRow("按住 Shift 打半形英文與符號", isOn: binding(\.shiftHalfWidth))
+                        Text("macOS 為了防誤觸，Caps Lock 要按住一下才切換；打開後按一下就切。注音等中文輸入法按住 Shift 打字會變全形「Ａ」「！」「，」；打開後按住 Shift 時和英文鍵盤一樣全部打出半形，放開 Shift 就繼續打中文（Shift + 逗號、句號會是 < >，中文標點請改用其他方式打）。關掉「不延遲」後要重新開機才恢復原本的延遲。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if settings.shiftHalfWidth {
+                            if ui.shiftRunning {
+                                Label("運作中", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else if !ui.scrollTrusted {
+                                Text("「按住 Shift 打半形英文」需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
+
+            if settings.isInstalled(.mouseButtons) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("滑鼠側鍵", systemImage: "computermouse")
+                        Picker("第 4 鍵（後退）", selection: binding(\.mouseBackButton)) {
+                            ForEach(MouseButtons.Action.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .fixedSize()
+                        Picker("第 5 鍵（前進）", selection: binding(\.mouseForwardButton)) {
+                            ForEach(MouseButtons.Action.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .fixedSize()
+                        Text("多按鍵滑鼠拇指那兩顆。「上一頁、下一頁」送出 ⌘[、⌘]，Safari、Finder 等大部分 App 都能用；設成「不處理」的按鍵照常交給 App。左鍵、右鍵、中鍵不會被碰到。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if settings.mouseBackButton != .none || settings.mouseForwardButton != .none {
+                            if ui.mouseButtonsRunning {
+                                Label("運作中", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else if !ui.scrollTrusted {
+                                Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
+
+            if settings.isInstalled(.keyboardCleaning) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("鍵盤清潔模式", systemImage: "sparkles")
+                        HStack {
+                            Picker("停手多久後恢復", selection: binding(\.keyboardCleaningSeconds)) {
+                                ForEach(KeyboardCleaning.durations, id: \.self) { Text("\($0) 秒").tag($0) }
+                            }
+                            .fixedSize()
+                            Button("開始清潔") {
+                                if !KeyboardCleaningController.shared.start(seconds: settings.keyboardCleaningSeconds) {
+                                    ScrollDirection.requestTrust()
+                                }
+                            }
+                        }
+                        Text("暫時停用整個鍵盤，包括功能列的亮度、音量鍵；滑鼠與觸控板照常；擦的時候按到鍵會重新倒數，停手滿設定的秒數或點畫面中央的「結束清潔」就恢復。Touch ID 指紋照常可以用，但它也是電源鍵，按下去 Mac 一樣會鎖定或睡眠，長按會強制關機，擦的時候輕一點。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !ui.scrollTrusted {
+                            Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -351,8 +481,39 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .settingsSection(.input, shown: section)
             }
-            .settingsSection(.input, shown: section)
+
+            if settings.isInstalled(.quitGuard) {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        CardTitle("⌘Q／⌘W 防誤觸", systemImage: "hand.raised")
+                        SwitchRow("按住 ⌘Q 才結束 App", isOn: binding(\.quitGuardQuit))
+                        SwitchRow("按住 ⌘W 才關閉", isOn: binding(\.quitGuardClose))
+                        Picker("要按住", selection: binding(\.quitGuardDuration)) {
+                            ForEach(AppSettings.quitGuardDurations, id: \.self) { Text("\($0.formatted()) 秒").tag($0) }
+                        }
+                        Text("按下時記住最前面的 App，按滿時間才把 ⌘Q／⌘W 送給它；中途放開、換到別的 App 或按了別的鍵都會取消，不會關到後面的視窗。⌘W 送出前也會確認焦點視窗沒換。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if settings.quitGuardQuit || settings.quitGuardClose {
+                            if ui.quitGuardRunning {
+                                Label("運作中", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else if !ui.scrollTrusted {
+                                Text("需要允許「輔助使用」：系統設定 → 隱私權與安全性 → 輔助使用，打開「\(AppEdition.appName)」。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+                .settingsSection(.input, shown: section)
+            }
 
             UpdateCard(updater: updater, settings: settings, notificationsBlocked: ui.notificationsBlocked, ui: ui)
                 .settingsSection(.update, shown: section)
@@ -406,6 +567,62 @@ struct SettingsView: View {
 
     private func binding<T>(_ keyPath: ReferenceWritableKeyPath<AppSettings, T>) -> Binding<T> {
         Binding(get: { settings[keyPath: keyPath] }, set: { settings[keyPath: keyPath] = $0 })
+    }
+
+    private func exportSettings() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(AppEdition.appName)設定.plist"
+        panel.allowedContentTypes = [.propertyList]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try settings.exportBackup().write(to: url, options: .atomic)
+        } catch {
+            showAlert("無法匯出設定", "請換一個位置再試一次。")
+        }
+    }
+
+    private func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.propertyList]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // 只讀一般檔案，最多讀到上限多一個位元組：太大的檔案由 read 判斷，不會整個讀進記憶體
+        let isFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        let handle = isFile ? try? FileHandle(forReadingFrom: url) : nil
+        let data = (try? handle?.read(upToCount: SettingsBackup.maxSize + 1)) ?? nil
+        try? handle?.close()
+        let backup: (values: [String: Any], turnsOn: [String])
+        do {
+            backup = try settings.readBackup(data ?? Data())
+        } catch SettingsBackup.ReadError.newerVersion {
+            return showAlert("無法匯入設定", "這個檔案是較新版本匯出的，請先更新\(AppEdition.appName)。")
+        } catch {
+            return showAlert("無法匯入設定", "這不是\(AppEdition.appName)匯出的設定檔，或檔案已損壞。")
+        }
+        if !backup.turnsOn.isEmpty {
+            // 會打開原本關著的功能（有的需要「輔助使用」、會記錄剪貼簿）：先列出來讓使用者確認
+            let confirm = NSAlert()
+            confirm.messageText = "匯入後會打開這些功能"
+            confirm.informativeText = backup.turnsOn.map { "・\($0)" }.joined(separator: "\n")
+            confirm.addButton(withTitle: "匯入")
+            confirm.addButton(withTitle: "取消")
+            guard confirm.runModal() == .alertFirstButtonReturn else { return }
+        }
+        let count = settings.importBackup(backup.values)
+        let alert = NSAlert()
+        alert.messageText = "已匯入 \(count) 項設定"
+        alert.informativeText = "重新開啟\(AppEdition.appName)後全部生效。"
+        alert.addButton(withTitle: "立即重新開啟")
+        alert.addButton(withTitle: "稍後")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        if (try? AppLocation.reopenAfterExit(Bundle.main.bundleURL)) != nil { NSApp.terminate(nil) }
+    }
+
+    private func showAlert(_ title: String, _ message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.runModal()
     }
 
     private func setLoginItem(_ enabled: Bool) {

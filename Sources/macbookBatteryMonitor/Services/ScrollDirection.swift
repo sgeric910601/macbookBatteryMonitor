@@ -27,14 +27,14 @@ final class ScrollDirection {
     /// 依設定開始或停止攔截；需要攔截但沒有權限時回傳 false
     @discardableResult
     func apply(reverseMouse: Bool, reverseTrackpad: Bool, reverseHorizontal: Bool = true, linearLines: Int = 0,
-               horizontalKey: ScrollHorizontalKey = .off) -> Bool {
+               horizontalKey: ScrollHorizontalKey = .off, smooth: Bool = false) -> Bool {
         // 開發用：`defaults write com.kuan.batterymonitor scrollDebug -bool true` 後重新打開 App，
         // 每個捲動事件的判斷與改寫前後的值會寫進系統記錄
         tap.configure(.init(reverseMouse: reverseMouse, reverseTrackpad: reverseTrackpad, reverseHorizontal: reverseHorizontal,
-                            linearLines: ScrollLinear.valid(linearLines), horizontalKey: horizontalKey,
+                            linearLines: ScrollLinear.valid(linearLines), horizontalKey: horizontalKey, smooth: smooth,
                             debug: UserDefaults.standard.bool(forKey: "scrollDebug"),
                             rebuild: UserDefaults.standard.object(forKey: "scrollRebuild") as? Bool ?? true))
-        wanted = reverseMouse || reverseTrackpad || ScrollLinear.valid(linearLines) > 0 || horizontalKey != .off
+        wanted = reverseMouse || reverseTrackpad || ScrollLinear.valid(linearLines) > 0 || horizontalKey != .off || smooth
         guard wanted else {
             watchdog?.invalidate()
             watchdog = nil
@@ -110,6 +110,8 @@ final class ScrollTap: @unchecked Sendable {
         var linearLines = 0
         /// 按住這個鍵時一般滾輪改成左右捲動
         var horizontalKey = ScrollHorizontalKey.off
+        /// 一般滾輪平滑捲動（見 SmoothScroll）
+        var smooth = false
         var debug = false
         /// 連續捲動（觸控板、Magic Mouse）改用新造的事件取代原本的；開發時可以用 scrollRebuild 關掉，比較兩種做法
         var rebuild = true
@@ -131,6 +133,13 @@ final class ScrollTap: @unchecked Sendable {
     private var currentIsTrackpad = false
     /// 只在主執行緒使用
     private var lastLoggedTouches = -1
+    /// 平滑捲動：只在攔截執行緒使用（攔截與畫格計時器都在這條執行緒的 run loop 上）
+    private var smoothScroll = SmoothScroll()
+    private var smoothTimer: CFRunLoopTimer?
+    private var smoothLocation = CGPoint.zero
+    private var smoothFlags = CGEventFlags()
+    /// 平滑捲動自己送出的小事件帶這個標記，攔截時直接放行
+    static let smoothMark: Int64 = 0x534D_4F4F_5448 // "SMOOTH"
 
     private func locked<T>(_ body: () -> T) -> T {
         lock.lock()
@@ -185,7 +194,16 @@ final class ScrollTap: @unchecked Sendable {
             CGEvent.tapEnable(tap: port, enable: false)
             CFMachPortInvalidate(port)
         }
-        if let loop { CFRunLoopStop(loop) }
+        if let loop {
+            // 平滑捲動的狀態只在攔截執行緒使用：交給它自己收掉，再停下 run loop
+            CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue) { [self] in
+                if let timer = smoothTimer { CFRunLoopTimerInvalidate(timer) }
+                smoothTimer = nil
+                smoothScroll = SmoothScroll()
+                CFRunLoopStop(loop)
+            }
+            CFRunLoopWakeUp(loop)
+        }
     }
 
     func health() -> Health {
@@ -201,6 +219,8 @@ final class ScrollTap: @unchecked Sendable {
         CGEvent.tapEnable(tap: port, enable: true)
     }
 
+    /// 平滑捲動的動畫結束、計時器也停了（自我測試用）
+    var smoothIdleForTest: Bool { smoothScroll.isIdle && smoothTimer == nil }
     fileprivate func markTouchesForTest() { locked { lastTrackpadTouches = CACurrentMediaTime() } }
     fileprivate func resetTouchesForTest() { locked { lastTrackpadTouches = 0 } }
 
@@ -227,6 +247,8 @@ final class ScrollTap: @unchecked Sendable {
             return event
         }
         guard type == .scrollWheel else { return event }
+        // 平滑捲動送出的小事件：已經處理過（反向、線性、左右），直接放行
+        if event.getIntegerValueField(.eventSourceUserData) == Self.smoothMark { return event }
         currentIsTrackpad = classify(event, now: now)
         if config.debug { logScroll(event, label: "收到") }
         // 線性捲動只處理一般滾輪，先把捲動量固定，再照設定反向
@@ -248,6 +270,39 @@ final class ScrollTap: @unchecked Sendable {
         Self.reverse(event, reverseHorizontal: horizontal)
         if config.debug { logScroll(event, label: "改成") }
         return event
+    }
+
+    /// 平滑捲動：一般滾輪處理完的事件交給動畫、不送出原本的（回傳 true）。只在攔截執行緒呼叫
+    func absorbIntoSmooth(_ event: CGEvent) -> Bool {
+        guard locked({ config.smooth }), event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0,
+              event.getIntegerValueField(.eventSourceUserData) != Self.smoothMark else { return false }
+        smoothScroll.add(dx: Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)),
+                         dy: Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)))
+        smoothLocation = event.location
+        smoothFlags = event.flags
+        guard smoothTimer == nil, !smoothScroll.isIdle else { return true }
+        let timer = CFRunLoopTimerCreateWithHandler(nil, CFAbsoluteTimeGetCurrent(), 1.0 / 120, 0, 0) { [weak self] timer in
+            self?.smoothFrame(timer)
+        }
+        CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, .commonModes)
+        smoothTimer = timer
+        return true
+    }
+
+    /// 平滑捲動的一個畫格：送出這一步，動畫結束就停掉計時器（不動時不耗電）
+    private func smoothFrame(_ timer: CFRunLoopTimer?) {
+        guard let step = smoothScroll.step() else {
+            if let timer { CFRunLoopTimerInvalidate(timer) }
+            smoothTimer = nil
+            return
+        }
+        guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
+                                  wheel1: Int32(step.dy), wheel2: Int32(step.dx), wheel3: 0) else { return }
+        event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        event.location = smoothLocation
+        event.flags = smoothFlags
+        event.setIntegerValueField(.eventSourceUserData, value: Self.smoothMark)
+        event.post(tap: .cgSessionEventTap)
     }
 
     /// 判斷這個捲動事件來自觸控板還是滑鼠。
@@ -464,6 +519,33 @@ extension ScrollDirection {
             let out = tap.handle(.scrollWheel, event)
             print("selftest-scroll: Shift 轉成左右不動觸控板：\(out.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 25 && out.flags.contains(.maskShift) ? "正確" : "異常")")
         }
+        // 平滑捲動：一格 100 點被吃掉，改成很多個小事件送出，總和剛好 100、動畫結束後計時器停掉。
+        // 位置在畫面外很遠的地方，不會真的捲到任何視窗；用只監聽的攔截數送出的事件
+        tap.configure(.init(reverseMouse: false, reverseTrackpad: false, smooth: true))
+        if ScrollDirection.trusted, let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 100, wheel2: 0, wheel3: 0) {
+            event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 0)
+            event.location = CGPoint(x: -20000, y: -20000)
+            final class Count { var steps = 0; var total: Int64 = 0 }
+            let count = Count()
+            let listener = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .listenOnly,
+                                             eventsOfInterest: 1 << CGEventType.scrollWheel.rawValue, callback: { _, _, event, info in
+                if event.getIntegerValueField(.eventSourceUserData) == ScrollTap.smoothMark, let info {
+                    let count = Unmanaged<Count>.fromOpaque(info).takeUnretainedValue()
+                    count.steps += 1
+                    count.total += event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
+                }
+                return Unmanaged.passUnretained(event)
+            }, userInfo: Unmanaged.passUnretained(count).toOpaque())
+            if let listener {
+                CFRunLoopAddSource(CFRunLoopGetCurrent(), CFMachPortCreateRunLoopSource(nil, listener, 0), .commonModes)
+                CGEvent.tapEnable(tap: listener, enable: true)
+            }
+            let absorbed = tap.absorbIntoSmooth(event)
+            CFRunLoopRunInMode(.defaultMode, 0.8, false)
+            let ok = absorbed && count.total == 100 && count.steps > 5 && tap.smoothIdleForTest
+            print("selftest-scroll: 平滑捲動：\(ok ? "正確" : "異常")（吃掉原事件 \(absorbed)、送出 \(count.steps) 步、總和 \(count.total) 點、結束 \(tap.smoothIdleForTest)）")
+            if let listener { CFMachPortInvalidate(listener) }
+        }
         // 攔截執行緒：開始、檢查、停止都正常（需要「輔助使用」權限，沒有時只印出狀態）
         if ScrollDirection.trusted {
             let started = tap.start()
@@ -486,6 +568,10 @@ private func scrollTapCallback(proxy: CGEventTapProxy, type: CGEventType, event:
         return Unmanaged.passUnretained(event)
     }
     let out = tap.handle(type, event)
+    if type == .scrollWheel, tap.absorbIntoSmooth(out) {
+        // 換成新造的事件時也是我們建立的物件，不交出去就不用多保留
+        return nil
+    }
     // 換成新造的事件時，交給系統的是我們建立的物件，要多保留一次（系統用完會釋放）
     return out === event ? Unmanaged.passUnretained(event) : Unmanaged.passRetained(out)
 }

@@ -352,6 +352,7 @@ struct SettingsView: View {
                             ForEach(ScrollLinear.choices, id: \.self) { Text($0 == 0 ? "照系統加速" : "固定 \($0) 行").tag($0) }
                         }
                         .fixedSize()
+                        Toggle("滑鼠滾輪平滑捲動", isOn: binding(\.scrollSmooth))
                         Picker("滾輪改成左右捲動", selection: binding(\.scrollHorizontalKey)) {
                             ForEach(ScrollHorizontalKey.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
@@ -360,7 +361,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        if settings.scrollReverseMouse || settings.scrollReverseTrackpad || settings.scrollLinearLines > 0 || settings.scrollHorizontalKey != .off {
+                        if settings.scrollReverseMouse || settings.scrollReverseTrackpad || settings.scrollLinearLines > 0 || settings.scrollHorizontalKey != .off || settings.scrollSmooth {
                             if ui.scrollRunning {
                                 Label("運作中", systemImage: "checkmark.circle.fill")
                                     .font(.caption)

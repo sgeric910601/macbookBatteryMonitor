@@ -64,7 +64,7 @@ final class AppSettings {
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
             Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
-            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.scrollLinearLines: .int, Keys.scrollHorizontalKey: .string, Keys.windowSwitcher: .bool,
+            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.scrollLinearLines: .int, Keys.scrollHorizontalKey: .string, Keys.scrollSmooth: .bool, Keys.windowSwitcher: .bool,
             Keys.switcher: .dictionary, Keys.capsLockNoDelay: .bool, Keys.shiftHalfWidth: .bool,
             Keys.chargingTargetPercent: .int, Keys.chargingHoldPercent: .int, Keys.chargingSleepStrategy: .string,
         ]
@@ -309,6 +309,13 @@ final class AppSettings {
             if scrollHorizontalKey != oldValue { onScrollDirectionChange?() }
         }
     }
+    /// 一般滑鼠滾輪平滑捲動（見 SmoothScroll）
+    var scrollSmooth: Bool {
+        didSet {
+            defaults.set(scrollSmooth, forKey: Keys.scrollSmooth)
+            if scrollSmooth != oldValue { onScrollDirectionChange?() }
+        }
+    }
     var scrollReverseTrackpad: Bool {
         didSet {
             defaults.set(scrollReverseTrackpad, forKey: Keys.scrollReverseTrackpad)
@@ -490,6 +497,7 @@ final class AppSettings {
         static let scrollReverseHorizontal = "scrollReverseHorizontal"
         static let scrollLinearLines = "scrollLinearLines"
         static let scrollHorizontalKey = "scrollHorizontalKey"
+        static let scrollSmooth = "scrollSmooth"
         static let windowSwitcher = "windowSwitcher"
         static let switcher = "windowSwitcherSettings"
         static let capsLockNoDelay = "capsLockNoDelay"
@@ -630,6 +638,7 @@ final class AppSettings {
         scrollReverseHorizontal = defaults.object(forKey: Keys.scrollReverseHorizontal) as? Bool ?? true
         scrollLinearLines = ScrollLinear.valid(defaults.integer(forKey: Keys.scrollLinearLines))
         scrollHorizontalKey = ScrollHorizontalKey(stored: defaults.string(forKey: Keys.scrollHorizontalKey))
+        scrollSmooth = defaults.bool(forKey: Keys.scrollSmooth)
         windowSwitcher = defaults.bool(forKey: Keys.windowSwitcher)
         switcher = SwitcherSettings(stored: defaults.dictionary(forKey: Keys.switcher) ?? [:])
         capsLockNoDelay = defaults.bool(forKey: Keys.capsLockNoDelay)

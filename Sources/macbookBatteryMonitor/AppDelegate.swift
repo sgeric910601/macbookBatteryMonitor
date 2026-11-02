@@ -273,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
         case .quitGuard: applyQuitGuard(prompt: true)
-        case .lastWindowQuit, .dockClick, .greenButton: applyLastWindowQuit(prompt: true)
+        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap: applyLastWindowQuit(prompt: true)
         case .mouseButtons: applyMouseButtons(prompt: true)
         // 只在面板上多一個按鈕，加入或移除時面板自己會更新
         case .audioSwitch: break
@@ -292,11 +292,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func applyLastWindowQuit(prompt: Bool) {
         let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
         let green = sessionActive && settings.isInstalled(.greenButton)
-        let wanted = lastWindow || dock || green
+        let snap = sessionActive && settings.isInstalled(.windowSnap)
+        let wanted = lastWindow || dock || green || snap
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
         DockClickController.shared.mode = settings.dockClickMode
         let running = LastWindowQuitController.shared.apply(enabled: lastWindow) && DockClickController.shared.apply(enabled: dock)
-            && WindowMaximizeController.shared.apply(enabled: green)
+            && WindowMaximizeController.shared.apply(enabled: green) && WindowSnapController.shared.apply(enabled: snap)
+        ui.windowSnapRunning = snap && WindowSnapController.shared.isRunning
         ui.greenButtonRunning = green && WindowMaximizeController.shared.isRunning
         ui.lastWindowQuitRunning = lastWindow && LastWindowQuitController.shared.isRunning
         ui.dockClickRunning = dock && DockClickController.shared.isRunning

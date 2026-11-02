@@ -6,6 +6,18 @@ struct WindowsSettingsView: View {
     let ui: PanelState
 
     var body: some View {
+        if settings.isInstalled(.windowSnap) {
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    CardTitle("視窗吸附", systemImage: "rectangle.split.2x1")
+                    Text("把視窗拖到螢幕左右邊緣排成半邊、拖到上緣填滿、拖到四個角排成四分之一；拖到邊緣時先顯示預覽框，放開才排版，拖離邊緣就取消。只監聽滑鼠，拖曳本身照常。系統設定 → 桌面與 Dock 的「拖移視窗到螢幕邊緣以並排」開著時，交給系統處理，這裡不動作。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    status(running: ui.windowSnapRunning)
+                }
+            }
+        }
         if settings.isInstalled(.greenButton) {
             Card {
                 VStack(alignment: .leading, spacing: 8) {

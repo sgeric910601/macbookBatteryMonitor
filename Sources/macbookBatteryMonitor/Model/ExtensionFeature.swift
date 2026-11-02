@@ -15,6 +15,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case mouseButtons
     case audioSwitch
     case greenButton
+    case windowSnap
 
     var id: String { rawValue }
 
@@ -32,6 +33,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .mouseButtons: return "滑鼠側鍵"
         case .audioSwitch: return "音訊切換"
         case .greenButton: return "綠色按鈕放大"
+        case .windowSnap: return "視窗吸附"
         }
     }
 
@@ -47,6 +49,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .mouseButtons: return "computermouse"
         case .audioSwitch: return "speaker.wave.2"
         case .greenButton: return "arrow.up.left.and.arrow.down.right"
+        case .windowSnap: return "rectangle.split.2x1"
         }
     }
 
@@ -63,6 +66,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .mouseButtons: return "滑鼠與鍵盤"
         case .audioSwitch: return "聲音"
         case .greenButton: return "視窗與 Dock"
+        case .windowSnap: return "視窗與 Dock"
         }
     }
 
@@ -79,6 +83,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .mouseButtons: return "監聽滑鼠側鍵"
         case .audioSwitch: return "不需要權限"
         case .greenButton: return "監聽滑鼠點擊"
+        case .windowSnap: return "監聽滑鼠拖曳"
         }
     }
 
@@ -94,6 +99,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .mouseButtons: return "多按鍵滑鼠的第 4、5 鍵換成上一頁、下一頁或 Mission Control"
         case .audioSwitch: return "面板上切換音訊輸出裝置、一鍵把麥克風靜音"
         case .greenButton: return "點視窗的綠色按鈕改成放大到填滿螢幕（不進全螢幕），再按一次還原"
+        case .windowSnap: return "把視窗拖到螢幕邊緣或角落，放開後排成半邊、填滿或四分之一"
         }
     }
 

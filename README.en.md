@@ -279,6 +279,15 @@ Add "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, 
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
 - **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
 
+## Window snapping
+
+Add "視窗吸附" (window snapping) in Settings → 功能管理 and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
+
+- **Preview first**: a preview frame appears at the edge and the window is arranged only on release; dragging away cancels. The bottom edge does not snap (the Dock is often there)
+- **Only window drags**: it checks whether the frontmost window moves with the drag, so selecting text, dragging files or resizing never snaps
+- **No fight with the system**: when "Drag windows to screen edges to tile" in System Settings → Desktop & Dock is on, the system handles it and this does nothing
+- **Nothing is intercepted**: it only listens to the mouse; needs Accessibility, and nothing is observed while the feature is removed
+
 ## Green button maximizes
 
 Add "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the screen's usable area instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size:

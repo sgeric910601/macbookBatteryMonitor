@@ -3,7 +3,7 @@ import Foundation
 struct AppPermissionTests {
     /// 輔助使用：列出加入了的擴充功能；都沒加入時沒有用到
     func testAccessibilityFollowsAddedFeatures() {
-        XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { _ in true }), ["捲動方向", "視窗切換", "中文輸入法", "⌘Q／⌘W 防誤觸", "關閉最後視窗時結束 App", "點 Dock 圖示縮到 Dock", "鍵盤清潔模式", "滑鼠側鍵", "綠色按鈕放大"])
+        XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { _ in true }), ["捲動方向", "視窗切換", "中文輸入法", "⌘Q／⌘W 防誤觸", "關閉最後視窗時結束 App", "點 Dock 圖示縮到 Dock", "鍵盤清潔模式", "滑鼠側鍵", "綠色按鈕放大", "視窗吸附"])
         XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { $0 == .windowSwitcher }), ["視窗切換"])
         XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { _ in false }), [])
         // 螢幕錄製只有視窗切換的縮圖用到

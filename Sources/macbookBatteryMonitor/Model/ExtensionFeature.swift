@@ -13,6 +13,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case dockClick
     case keyboardCleaning
     case mouseButtons
+    case audioSwitch
 
     var id: String { rawValue }
 
@@ -28,6 +29,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .dockClick: return "點 Dock 圖示縮到 Dock"
         case .keyboardCleaning: return "鍵盤清潔模式"
         case .mouseButtons: return "滑鼠側鍵"
+        case .audioSwitch: return "音訊切換"
         }
     }
 
@@ -41,6 +43,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .dockClick: return "dock.arrow.down.rectangle"
         case .keyboardCleaning: return "sparkles"
         case .mouseButtons: return "computermouse"
+        case .audioSwitch: return "speaker.wave.2"
         }
     }
 
@@ -55,6 +58,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .dockClick: return "視窗與 Dock"
         case .keyboardCleaning: return "滑鼠與鍵盤"
         case .mouseButtons: return "滑鼠與鍵盤"
+        case .audioSwitch: return "聲音"
         }
     }
 
@@ -69,6 +73,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .dockClick: return "監聽滑鼠點擊"
         case .keyboardCleaning: return "清潔時攔截鍵盤"
         case .mouseButtons: return "監聽滑鼠側鍵"
+        case .audioSwitch: return "不需要權限"
         }
     }
 
@@ -82,6 +87,15 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .dockClick: return "點目前 App 的 Dock 圖示，把它的視窗縮到 Dock 或隱藏，再點一次叫回來"
         case .keyboardCleaning: return "暫時停用鍵盤，方便擦鍵盤；時間到或點「結束清潔」就恢復"
         case .mouseButtons: return "多按鍵滑鼠的第 4、5 鍵換成上一頁、下一頁或 Mission Control"
+        case .audioSwitch: return "面板上切換音訊輸出裝置、一鍵把麥克風靜音"
+        }
+    }
+
+    /// 需要「輔助使用」權限（權限頁依這個列出用到的功能）
+    var needsAccessibility: Bool {
+        switch self {
+        case .audioSwitch: return false
+        default: return true
         }
     }
 
@@ -94,7 +108,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         Dictionary(uniqueKeysWithValues: allCases.map { ($0.installedKey, isInstalled($0)) })
     }
 
-    /// 全新安裝第一次啟動時寫入：擴充功能都要「輔助使用」權限，一開始都不加入，免得一裝好就看到權限要求
+    /// 全新安裝第一次啟動時寫入：擴充功能一開始都不加入，免得一裝好就看到權限要求或多出按鈕
     static var freshInstallChoices: [String: Bool] {
         Dictionary(uniqueKeysWithValues: allCases.map { ($0.installedKey, false) })
     }

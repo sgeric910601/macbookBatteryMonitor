@@ -106,11 +106,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 
     /// 擴充功能所在的分類。「滑鼠、觸控板與鍵盤」放捲動方向與中文輸入法，加入其中一個就出現
-    static func section(for feature: ExtensionFeature) -> SettingsSection {
+    /// 擴充功能的設定在哪一頁；只在面板上有按鈕、沒有設定的功能（音訊切換）為 nil
+    static func section(for feature: ExtensionFeature) -> SettingsSection? {
         switch feature {
         case .scrollDirection, .inputMethod, .quitGuard, .keyboardCleaning, .mouseButtons: return .input
         case .windowSwitcher: return .windowSwitcher
         case .lastWindowQuit, .dockClick: return .windows
+        case .audioSwitch: return nil
         }
     }
 
@@ -120,7 +122,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         [
             ("基本", [.general, .display, .monitors, .startup, .permissions]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
-            ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).map(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
+            ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).compactMap(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
             ("關於", [.update]),
         ]
     }

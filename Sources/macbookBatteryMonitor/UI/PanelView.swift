@@ -109,6 +109,7 @@ struct PanelView: View {
                 .buttonStyle(.borderless)
                 .help("到設定一鍵更新")
             }
+            if settings.isInstalled(.audioSwitch) { AudioSwitchButton(controller: AudioSwitchController.shared) }
             KeepAwakeButton(controller: KeepAwakeController.shared)
             Button {
                 ui.openSettings(nil)
@@ -125,6 +126,36 @@ struct PanelView: View {
             .buttonStyle(.borderless)
             .help("結束\(AppEdition.appName)")
         }
+    }
+}
+
+/// 面板下方的音訊切換：打開時才讀裝置，列出輸出裝置（目前的打勾）與麥克風靜音
+private struct AudioSwitchButton: View {
+    let controller: AudioSwitchController
+
+    var body: some View {
+        Menu {
+            Section("輸出") {
+                ForEach(controller.outputs, id: \.id) { item in
+                    Button { controller.select(item.id) } label: {
+                        if item.isCurrent { Label(item.name, systemImage: "checkmark") } else { Text(item.name) }
+                    }
+                }
+            }
+            if controller.micSupported {
+                Divider()
+                Button(controller.micMuted ? "取消麥克風靜音" : "麥克風靜音") { controller.toggleMic() }
+            }
+        } label: {
+            Image(systemName: controller.micMuted ? "mic.slash" : "speaker.wave.2")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onAppear { controller.refresh() }
+        .simultaneousGesture(TapGesture().onEnded { controller.refresh() })
+        .help("音訊輸出與麥克風")
+        .accessibilityLabel(controller.micMuted ? "音訊切換，麥克風已靜音" : "音訊切換")
     }
 }
 

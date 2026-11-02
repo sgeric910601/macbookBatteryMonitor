@@ -33,7 +33,7 @@ enum AppPermission: CaseIterable, Identifiable {
     /// 用到這個權限的功能；空的代表目前沒有加入需要它的功能
     func users(isInstalled: (ExtensionFeature) -> Bool) -> [String] {
         switch self {
-        case .accessibility: return ExtensionFeature.allCases.filter(isInstalled).map(\.title)
+        case .accessibility: return ExtensionFeature.allCases.filter { $0.needsAccessibility && isInstalled($0) }.map(\.title)
         case .screenRecording: return isInstalled(.windowSwitcher) ? ["視窗切換的縮圖（選用）"] : []
         case .notifications: return ["電量提醒", "監控警示", "新版本通知"]
         case .bluetooth: return ["周邊設備電量"]

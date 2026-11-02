@@ -255,6 +255,14 @@ Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) 
 
 The system integration uses private macOS functions, all loaded at run time and disabled if missing; their sources are listed in [docs/design/window-server-provenance.md](docs/design/window-server-provenance.md) (Chinese).
 
+## Audio switcher
+
+Add "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
+
+- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch
+- **Mute microphone**: uses the device's mute switch, or sets the input volume to 0 and restores it when unmuted if there is no switch. The button shows a crossed-out microphone while muted
+- **Permission**: uses the public Core Audio API and needs no permission; devices are read only when the menu opens
+
 ## Mouse side buttons
 
 Add "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:

@@ -266,6 +266,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .quitGuard: applyQuitGuard(prompt: true)
         case .lastWindowQuit, .dockClick: applyLastWindowQuit(prompt: true)
         case .mouseButtons: applyMouseButtons(prompt: true)
+        // 只在面板上多一個按鈕，加入或移除時面板自己會更新
+        case .audioSwitch: break
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {

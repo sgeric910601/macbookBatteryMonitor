@@ -42,8 +42,8 @@ final class InputTap: @unchecked Sendable {
         }
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: inputTapCallback,
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: inputTapCallback,
                                                userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
                 ready.signal()
                 return
@@ -116,7 +116,7 @@ final class InputTap: @unchecked Sendable {
         // 暫停期間可能漏掉放開的事件：結束進行中的切換，免得狀態殘留
         cancelSwitching()
         DispatchQueue.main.async { MainActor.assumeIsolated { WindowSwitcher.shared.handle(.cancel) } }
-        CGEvent.tapEnable(tap: port, enable: true)
+        EventTapAccess.shared.reenable(port)
     }
 
     fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {

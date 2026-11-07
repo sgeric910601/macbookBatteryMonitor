@@ -34,8 +34,8 @@ final class MouseButtonsController {
         if let port, !CFMachPortIsValid(port) { stop() }
         guard port == nil else { return isRunning }
         let mask: CGEventMask = (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.otherMouseUp.rawValue)
-        guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                           eventsOfInterest: mask, callback: mouseButtonsCallback, userInfo: nil) else { return false }
+        guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                           mask: mask, callback: mouseButtonsCallback, userInfo: nil) else { return false }
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
@@ -58,7 +58,7 @@ final class MouseButtonsController {
             stop()
             apply(buttons)
         } else if !CGEvent.tapIsEnabled(tap: port) {
-            CGEvent.tapEnable(tap: port, enable: true)
+            EventTapAccess.shared.reenable(port)
         }
     }
 
@@ -93,7 +93,7 @@ final class MouseButtonsController {
     }
 
     fileprivate func reenable() {
-        if let port, AXIsProcessTrusted() { CGEvent.tapEnable(tap: port, enable: true) }
+        if let port, AXIsProcessTrusted() { EventTapAccess.shared.reenable(port) }
     }
 
     private static func pointerOverFrontApp(_ point: CGPoint) -> Bool {

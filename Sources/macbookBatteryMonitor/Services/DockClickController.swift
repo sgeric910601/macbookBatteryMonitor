@@ -17,14 +17,23 @@ final class DockClickController {
     private var watchdog: Timer?
     private struct Press {
         var location: CGPoint
+        /// 按下的時間（開機後秒數，和 ProcessInfo.systemUptime 同一個時鐘）
+        var time: TimeInterval
         var front: pid_t?
         var clicked: pid_t?
-        var hadVisibleWindows: Bool
-        var minimizedByUs: Bool
+        var visibleNow: Bool
+        var oursMinimizedNow: Bool
     }
     /// 我們縮下去、還沒叫回的視窗；再點一次時只叫回這些
     private var minimizedByUs: [pid_t: [AXUIElement]] = [:]
     private var press: Press?
+    /// 切換 App 的紀錄（收到通知的時間），用來找出按下那一刻最前面的 App
+    private var frontHistory: [(pid: pid_t, time: TimeInterval)] = []
+    private var activationObserver: NSObjectProtocol?
+    /// 只看最前面那個 App 的視窗被叫回（點 Dock 只對最前面的 App 動作）
+    private var windowObserver: AXObserver?
+    /// 各 App 最後一次有視窗被叫回的時間
+    private var restoredAt: [pid_t: TimeInterval] = [:]
     /// Dock 離螢幕邊緣最多這麼遠；Dock 放大效果會更高，抓寬一點
     private static let edgeBand: CGFloat = 220
 
@@ -48,6 +57,13 @@ final class DockClickController {
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
+        if let front = NSWorkspace.shared.frontmostApplication { activated(front) }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            MainActor.assumeIsolated { DockClickController.shared.activated(app) }
+        }
         // 系統可能暫停攔截：每 5 秒檢查一次
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             MainActor.assumeIsolated {
@@ -82,9 +98,42 @@ final class DockClickController {
         port = nil
         press = nil
         minimizedByUs = [:]
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+        activationObserver = nil
+        observeWindows(of: nil)
+        frontHistory = []
+        restoredAt = [:]
     }
 
-    fileprivate func handle(_ type: CGEventType, location: CGPoint, modified: Bool, clickState: Int64) {
+    /// shortcut: 記的是收到通知的時間，主執行緒很忙時會比實際切換晚；按下前一刻才切換的 App 可能被當成按下後才切換
+    private func activated(_ app: NSRunningApplication) {
+        frontHistory.append((app.processIdentifier, ProcessInfo.processInfo.systemUptime))
+        if frontHistory.count > 16 { frontHistory.removeFirst(frontHistory.count - 16) }
+        observeWindows(of: app.processIdentifier == getpid() ? nil : app.processIdentifier)
+    }
+
+    /// 改看另一個 App 的「視窗叫回」通知；nil 時停止
+    private func observeWindows(of pid: pid_t?) {
+        if let windowObserver {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(windowObserver), .commonModes)
+        }
+        windowObserver = nil
+        guard let pid else { return }
+        var observer: AXObserver?
+        guard AXObserverCreate(pid, dockWindowRestoredCallback, &observer) == .success, let observer else { return }
+        let app = AXUIElementCreateApplication(pid)
+        // 切到沒回應的 App 時不能卡住主執行緒（全域預設約 6 秒）
+        AXUIElementSetMessagingTimeout(app, 0.2)
+        guard AXObserverAddNotification(observer, app, kAXWindowDeminiaturizedNotification as CFString, nil) == .success else { return }
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        windowObserver = observer
+    }
+
+    fileprivate func windowRestored(pid: pid_t) {
+        restoredAt[pid] = ProcessInfo.processInfo.systemUptime
+    }
+
+    fileprivate func handle(_ type: CGEventType, location: CGPoint, modified: Bool, clickState: Int64, time: TimeInterval) {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let port, AXIsProcessTrusted() { CGEvent.tapEnable(tap: port, enable: true) }
@@ -93,25 +142,38 @@ final class DockClickController {
             // ⌘ 點（在 Finder 顯示）、⌥ 點（隱藏其他）等 Dock 自己的操作不插手；
             // 雙擊背景 App 的圖示時，第二下它已經在最前面，不能當成「再點一次最前面的 App」
             guard !modified, clickState <= 1, Self.nearScreenEdge(location) else { return }
-            let front = NSWorkspace.shared.frontmostApplication
+            // 回呼可能晚跑，Dock 已經切換了 App：用切換紀錄找按下那一刻的前景 App
+            let front = DockClick.frontApp(at: time, history: frontHistory)
             let clicked = Self.dockApp(at: location)
             // 只有點到最前面那個 App 時才需要知道它有沒有開著的視窗
-            let visible = clicked != nil && clicked == front?.processIdentifier && front.map(Self.hasVisibleWindows) == true
+            let visible = clicked != nil && clicked == front
+                && NSRunningApplication(processIdentifier: front ?? 0).map(Self.hasVisibleWindows) == true
             let ours = clicked.map { pid in (minimizedByUs[pid] ?? []).contains(where: Self.isMinimized) } ?? false
-            press = Press(location: location, front: front?.processIdentifier, clicked: clicked, hadVisibleWindows: visible, minimizedByUs: ours)
+            let lag = Int((ProcessInfo.processInfo.systemUptime - time) * 1000)
+            Self.log.debug("Dock 點擊：按下後 \(lag) ms 才處理，前景 \(front ?? 0)，點到 \(clicked ?? 0)")
+            press = Press(location: location, time: time, front: front, clicked: clicked, visibleNow: visible, oursMinimizedNow: ours)
         case .leftMouseUp:
             guard let press else { return }
             self.press = nil
             let distance = hypot(location.x - press.location.x, location.y - press.location.y)
-            let action = DockClick.decide(frontAppAtMouseDown: press.front, clickedApp: press.clicked,
-                                          hadVisibleWindows: press.hadVisibleWindows, dragDistance: distance, mode: mode,
-                                          minimizedByUs: press.minimizedByUs)
-            guard action != .none, let pid = press.clicked else { return }
-            // 讓 Dock 先處理完這次點擊，再收起來
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { DockClickController.shared.perform(action, pid: pid) } }
+            // 讓 Dock 先處理完這次點擊（包括把縮下去的視窗叫回、那個通知送到），再判斷、收起來
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                MainActor.assumeIsolated { DockClickController.shared.finish(press, dragDistance: distance) }
+            }
         default:
             return
         }
+    }
+
+    private func finish(_ press: Press, dragDistance: Double) {
+        // 這 0.15 秒內功能被關掉或權限被撤銷：不動作
+        guard port != nil, let pid = press.clicked else { return }
+        let state = DockClick.stateAtClick(visibleNow: press.visibleNow, oursMinimizedNow: press.oursMinimizedNow,
+                                           hasOurs: minimizedByUs[pid] != nil,
+                                           restoredAfterClick: (restoredAt[pid] ?? 0) > press.time)
+        let action = DockClick.decide(frontAppAtMouseDown: press.front, clickedApp: pid, hadVisibleWindows: state.visible,
+                                      dragDistance: dragDistance, mode: mode, minimizedByUs: state.minimizedByUs)
+        perform(action, pid: pid)
     }
 
     private func perform(_ action: DockClick.Action, pid: pid_t) {
@@ -214,6 +276,16 @@ private func dockClickCallback(proxy _: CGEventTapProxy, type: CGEventType, even
     let location = event.location
     let modified = !event.flags.intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift]).isEmpty
     let clickState = event.getIntegerValueField(.mouseEventClickState)
-    MainActor.assumeIsolated { DockClickController.shared.handle(type, location: location, modified: modified, clickState: clickState) }
+    MainActor.assumeIsolated {
+        // NSEvent 的時間是開機後秒數，和 systemUptime 同一個時鐘（CGEvent.timestamp 在 Apple 晶片上的單位不是奈秒，不直接用）
+        let time = NSEvent(cgEvent: event)?.timestamp ?? ProcessInfo.processInfo.systemUptime
+        DockClickController.shared.handle(type, location: location, modified: modified, clickState: clickState, time: time)
+    }
     return Unmanaged.passUnretained(event)
+}
+
+private func dockWindowRestoredCallback(_: AXObserver, element: AXUIElement, _: CFString, _: UnsafeMutableRawPointer?) {
+    var pid: pid_t = 0
+    guard AXUIElementGetPid(element, &pid) == .success else { return }
+    MainActor.assumeIsolated { DockClickController.shared.windowRestored(pid: pid) }
 }

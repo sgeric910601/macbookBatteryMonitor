@@ -34,4 +34,30 @@ struct DockClickTests {
         XCTAssertEqual(decide(moved: 4), .minimize)
         XCTAssertEqual(decide(moved: 6), .none)
     }
+
+    /// 回呼晚跑時 Dock 已經切到被點的 App：前景 App 要用按下那一刻以前最後一次切換（#25：點背景 App 也被縮下去）
+    func testFrontAppIsTheOneBeforeTheClick() {
+        let history: [(pid: Int32, time: Double)] = [(1, 10), (2, 20), (3, 30.5)]
+        XCTAssertEqual(DockClick.frontApp(at: 30, history: history), 2)
+        XCTAssertEqual(DockClick.frontApp(at: 30.5, history: history), 3)
+        XCTAssertEqual(DockClick.frontApp(at: 99, history: history), 3)
+        XCTAssertNil(DockClick.frontApp(at: 5, history: history))
+        // 點背景 App（3）時讀到的已經是切換後的：用紀錄判斷，按下時最前面是 2，不動
+        XCTAssertEqual(decide(frontAtDown: DockClick.frontApp(at: 30, history: history), item: 3), .none)
+    }
+
+    /// 按下之後才收到視窗叫回：是 Dock 這一下叫回的，按下時沒有開著的視窗（#25：再點一次叫回後又被縮下去）
+    func testRestoredByThisClickCountsAsMinimized() {
+        let late = DockClick.stateAtClick(visibleNow: true, oursMinimizedNow: false, hasOurs: true, restoredAfterClick: true)
+        XCTAssertTrue(!late.visible)
+        XCTAssertTrue(late.minimizedByUs)
+        XCTAssertEqual(decide(visibleWindows: late.visible, weMinimized: late.minimizedByUs), .restore)
+        // 使用者自己縮的被 Dock 叫回：不動，不能又縮下去
+        let user = DockClick.stateAtClick(visibleNow: true, oursMinimizedNow: false, hasOurs: false, restoredAfterClick: true)
+        XCTAssertEqual(decide(visibleWindows: user.visible, weMinimized: user.minimizedByUs), .none)
+        // 沒有叫回：照讀到的狀態
+        let normal = DockClick.stateAtClick(visibleNow: true, oursMinimizedNow: false, hasOurs: true, restoredAfterClick: false)
+        XCTAssertTrue(normal.visible)
+        XCTAssertTrue(!normal.minimizedByUs)
+    }
 }

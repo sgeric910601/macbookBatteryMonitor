@@ -16,4 +16,18 @@ enum DockClick {
         if hadVisibleWindows { return mode == .minimize ? .minimize : .hide }
         return minimizedByUs ? .restore : .none
     }
+
+    /// 某個時間點最前面的 App。監聽只收不擋，回呼跑到時 Dock 可能已經切換 App，不能讀「現在」的前景 App：
+    /// 用切換紀錄（依時間排序）找出按下那一刻以前最後一次切換到的 App；紀錄都比按下晚時為 nil
+    static func frontApp(at time: Double, history: [(pid: Int32, time: Double)]) -> Int32? {
+        history.last { $0.time <= time }?.pid
+    }
+
+    /// 點擊當下的視窗狀態。讀到的是按下後的狀態，Dock 可能已經把縮下去的視窗叫回來；
+    /// 按下之後才收到「視窗叫回」就是 Dock 這一下叫回的，代表按下那一刻沒有開著的視窗，我們縮下去的也還沒被叫回
+    static func stateAtClick(visibleNow: Bool, oursMinimizedNow: Bool, hasOurs: Bool,
+                             restoredAfterClick: Bool) -> (visible: Bool, minimizedByUs: Bool) {
+        guard restoredAfterClick else { return (visibleNow, oursMinimizedNow) }
+        return (false, hasOurs)
+    }
 }

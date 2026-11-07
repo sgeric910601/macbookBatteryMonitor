@@ -166,14 +166,13 @@ final class ScrollTap: @unchecked Sendable {
         let thread = Thread { [self] in
             // 觸控板手指的事件（NSEvent.EventType.gesture，數值 29）用來分辨是不是觸控板
             let mask: CGEventMask = (1 << CGEventType.scrollWheel.rawValue) | (1 << 29)
+            let loop: CFRunLoop = CFRunLoopGetCurrent()
             guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
                                                mask: mask, callback: scrollTapCallback,
-                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+                                               userInfo: Unmanaged.passUnretained(self).toOpaque(), loop: loop) else {
                 ready.signal()
                 return
             }
-            let loop = CFRunLoopGetCurrent()
-            CFRunLoopAddSource(loop, CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
             CGEvent.tapEnable(tap: port, enable: true)
             locked {
                 self.port = port
@@ -555,8 +554,8 @@ extension ScrollDirection {
                 }
                 return Unmanaged.passUnretained(event)
             }, userInfo: Unmanaged.passUnretained(count).toOpaque())
-            if let listener {
-                CFRunLoopAddSource(CFRunLoopGetCurrent(), CFMachPortCreateRunLoopSource(nil, listener, 0), .commonModes)
+            if let listener, let source = CFMachPortCreateRunLoopSource(nil, listener, 0) as CFRunLoopSource? {
+                CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
                 CGEvent.tapEnable(tap: listener, enable: true)
             }
             let absorbed = tap.absorbIntoSmooth(event)

@@ -257,14 +257,13 @@ final class QuitGuardTap: @unchecked Sendable {
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
+            let loop: CFRunLoop = CFRunLoopGetCurrent()
             guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
                                                mask: mask, callback: quitGuardCallback,
-                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+                                               userInfo: Unmanaged.passUnretained(self).toOpaque(), loop: loop) else {
                 ready.signal()
                 return
             }
-            let loop = CFRunLoopGetCurrent()
-            CFRunLoopAddSource(loop, CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
             CGEvent.tapEnable(tap: port, enable: true)
             locked {
                 self.port = port

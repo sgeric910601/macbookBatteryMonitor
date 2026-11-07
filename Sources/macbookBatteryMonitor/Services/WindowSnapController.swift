@@ -46,7 +46,12 @@ final class WindowSnapController {
             | (1 << CGEventType.leftMouseUp.rawValue)
         guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .listenOnly,
                                            eventsOfInterest: mask, callback: windowSnapCallback, userInfo: nil) else { return false }
-        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+        // 攔截剛好被作廢時建不出來源
+        guard let source = CFMachPortCreateRunLoopSource(nil, port, 0) as CFRunLoopSource? else {
+            CFMachPortInvalidate(port)
+            return false
+        }
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in

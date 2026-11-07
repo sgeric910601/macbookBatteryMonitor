@@ -31,4 +31,18 @@ struct TapAccessTests {
         XCTAssertTrue(!TapAccess.shouldAnnounce(lastRelaunch: nil, now: now))
         XCTAssertTrue(!TapAccess.shouldAnnounce(lastRelaunch: now.addingTimeInterval(10), now: now))
     }
+
+    /// 從磁碟映像或暫存位置執行時重開會找不到 App：改成停用；沒權限時照樣等
+    func testDisablesWhenRelaunchImpossible() {
+        XCTAssertEqual(TapAccess.recovery(trustedReported: true, lastRelaunch: nil, now: now, canRelaunch: false), .disable)
+        XCTAssertEqual(TapAccess.recovery(trustedReported: false, lastRelaunch: nil, now: now, canRelaunch: false), .waitForPermission)
+    }
+
+    /// 喚醒後 15 秒內不試建；時鐘往回調時不算在寬限期
+    func testWakeGrace() {
+        XCTAssertEqual(TapAccess.wakeGraceLeft(lastWake: now.addingTimeInterval(-5), now: now), TapAccess.wakeGrace - 5)
+        XCTAssertNil(TapAccess.wakeGraceLeft(lastWake: now.addingTimeInterval(-TapAccess.wakeGrace), now: now))
+        XCTAssertNil(TapAccess.wakeGraceLeft(lastWake: nil, now: now))
+        XCTAssertNil(TapAccess.wakeGraceLeft(lastWake: now.addingTimeInterval(60), now: now))
+    }
 }

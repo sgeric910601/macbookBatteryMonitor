@@ -31,8 +31,7 @@ final class KeyboardCleaningController {
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventMask(Self.systemDefinedType))
         guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
-                                           mask: mask, callback: cleaningCallback, userInfo: nil) else { return false }
-        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+                                           mask: mask, callback: cleaningCallback, userInfo: nil, loop: CFRunLoopGetMain()) else { return false }
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
         state.start(seconds: KeyboardCleaning.validDuration(seconds), now: Date())

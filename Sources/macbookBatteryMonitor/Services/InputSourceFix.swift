@@ -184,7 +184,7 @@ final class ShiftTap: @unchecked Sendable {
     func reenable() {
         // 權限被撤銷：不重新打開，交給 InputSourceFix.check 停掉
         guard AXIsProcessTrusted() else { return }
-        if let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
+        if let port = locked({ self.port }) { EventTapAccess.shared.reenable(port) }
     }
 
     func start() -> Bool {
@@ -192,8 +192,8 @@ final class ShiftTap: @unchecked Sendable {
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: shiftTapCallback,
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: shiftTapCallback,
                                                userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
                 ready.signal()
                 return

@@ -166,8 +166,8 @@ final class ScrollTap: @unchecked Sendable {
         let thread = Thread { [self] in
             // 觸控板手指的事件（NSEvent.EventType.gesture，數值 29）用來分辨是不是觸控板
             let mask: CGEventMask = (1 << CGEventType.scrollWheel.rawValue) | (1 << 29)
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: scrollTapCallback,
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: scrollTapCallback,
                                                userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
                 ready.signal()
                 return
@@ -226,7 +226,7 @@ final class ScrollTap: @unchecked Sendable {
         // 權限被撤銷：重新打開只會一直被逾時暫停，整台 Mac 的捲動跟著卡；交給 ScrollDirection.check 停掉
         guard AXIsProcessTrusted() else { return }
         Self.log.notice("事件攔截被暫停（\(reason, privacy: .public)），重新打開")
-        CGEvent.tapEnable(tap: port, enable: true)
+        EventTapAccess.shared.reenable(port)
     }
 
     /// 平滑捲動的動畫結束、計時器也停了（自我測試用）

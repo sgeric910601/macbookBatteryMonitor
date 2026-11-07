@@ -97,7 +97,7 @@ final class FinderKeysTap: @unchecked Sendable {
             stop()
             _ = start()
         } else if !CGEvent.tapIsEnabled(tap: port) {
-            CGEvent.tapEnable(tap: port, enable: true)
+            EventTapAccess.shared.reenable(port)
         }
     }
 
@@ -106,8 +106,8 @@ final class FinderKeysTap: @unchecked Sendable {
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: finderKeysCallback,
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: finderKeysCallback,
                                                userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
                 ready.signal()
                 return
@@ -166,7 +166,7 @@ final class FinderKeysTap: @unchecked Sendable {
     fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if type == .tapDisabledByTimeout, AXIsProcessTrusted(), let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
+            if type == .tapDisabledByTimeout, AXIsProcessTrusted(), let port = locked({ self.port }) { EventTapAccess.shared.reenable(port) }
             remapped = [:]
             return pass
         }

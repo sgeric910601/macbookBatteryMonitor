@@ -30,8 +30,8 @@ final class KeyboardCleaningController {
         guard AXIsProcessTrusted() else { return false }
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventMask(Self.systemDefinedType))
-        guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                           eventsOfInterest: mask, callback: cleaningCallback, userInfo: nil) else { return false }
+        guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                           mask: mask, callback: cleaningCallback, userInfo: nil) else { return false }
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
@@ -71,8 +71,9 @@ final class KeyboardCleaningController {
         view.remaining = state.remainingSeconds(now: now)
         // 系統暫停了攔截（例如回應逾時）：重新打開，清潔中鍵盤才不會突然有作用。權限被撤銷時擋不住鍵盤，直接結束清潔
         if let port, !CGEvent.tapIsEnabled(tap: port) {
-            guard AXIsProcessTrusted() else { return stop() }
-            CGEvent.tapEnable(tap: port, enable: true)
+            // 權限被撤銷、或攔截被 EventTapAccess 放掉：擋不住鍵盤，直接結束清潔
+            guard AXIsProcessTrusted(), CFMachPortIsValid(port) else { return stop() }
+            EventTapAccess.shared.reenable(port)
         }
     }
 
@@ -90,7 +91,7 @@ final class KeyboardCleaningController {
     }
 
     fileprivate func reenable() {
-        if let port, state.isActive, AXIsProcessTrusted() { CGEvent.tapEnable(tap: port, enable: true) }
+        if let port, state.isActive, AXIsProcessTrusted() { EventTapAccess.shared.reenable(port) }
     }
 
     /// 畫面中央的清潔視窗：拿到焦點，原本的密碼欄等安全輸入就不會讓按鍵繞過攔截

@@ -169,7 +169,7 @@ final class WindowMaximizeTap: @unchecked Sendable {
             stop()
             _ = start()
         } else if !CGEvent.tapIsEnabled(tap: port) {
-            CGEvent.tapEnable(tap: port, enable: true)
+            EventTapAccess.shared.reenable(port)
         }
     }
 
@@ -178,8 +178,8 @@ final class WindowMaximizeTap: @unchecked Sendable {
         let mask: CGEventMask = (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.leftMouseUp.rawValue)
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: windowMaximizeCallback,
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: windowMaximizeCallback,
                                                userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
                 ready.signal()
                 return
@@ -220,7 +220,7 @@ final class WindowMaximizeTap: @unchecked Sendable {
         let pass = Unmanaged.passUnretained(event)
         switch type {
         case .tapDisabledByTimeout:
-            if AXIsProcessTrusted(), let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
+            if AXIsProcessTrusted(), let port = locked({ self.port }) { EventTapAccess.shared.reenable(port) }
             return pass
         case .leftMouseDown:
             swallowingUp = false

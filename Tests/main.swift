@@ -265,7 +265,7 @@ dockClick.testOtherClicksAreLeftAlone()
 dockClick.testSecondClickRestoresWhatWeMinimized()
 dockClick.testDragIsNotAClick()
 dockClick.testFrontAppIsTheOneBeforeTheClick()
-dockClick.testRestoredByThisClickCountsAsMinimized()
+dockClick.testVisibleWindowFromWindowServer()
 print("6 dock click tests passed")
 
 let cleaning = KeyboardCleaningTests()

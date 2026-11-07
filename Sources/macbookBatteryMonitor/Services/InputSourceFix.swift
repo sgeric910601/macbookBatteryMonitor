@@ -22,18 +22,44 @@ final class InputSourceFix {
 
     // MARK: Caps Lock
 
-    /// 0 會讓 Caps Lock 一次切兩次、誤開大寫，注音打出全形（實測）；30 ms 不會，延遲也幾乎感覺不到
-    static let shortCapsLockDelay = 30
-    /// 關掉功能時寫回的系統預設延遲
-    static let defaultCapsLockDelay = 75
-    /// 這次執行有改過延遲；沒改過就不寫回，不蓋掉使用者自己用 hidutil 設的值
-    private static var capsLockDelayChanged = false
+    /// 縮短前讀到的原本延遲；有值代表改過、關掉時要還原。存在 defaults：重開 App（例如匯入關掉這個選項的設定）後也會還原
+    private static let originalDelayKey = "capsLockDelayOriginal"
 
-    /// 開：把 Caps Lock 延遲縮短；關：改過的話寫回預設。參數固定，不經過 shell
+    /// 開：記下原本的值，把 Caps Lock 延遲縮短；關：改過的話還原原本的值。沒改過就不寫，不蓋掉使用者自己用 hidutil 設的值
     static func applyCapsLockDelay(short: Bool) {
-        guard short || capsLockDelayChanged else { return }
-        capsLockDelayChanged = short
-        let delay = short ? shortCapsLockDelay : defaultCapsLockDelay
+        let defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: originalDelayKey) as? Int
+        if short {
+            if saved == nil {
+                defaults.set(readCapsLockDelay().flatMap(CapsLockDelay.original(fromHidutil:)) ?? CapsLockDelay.fallback, forKey: originalDelayKey)
+            }
+            setCapsLockDelay(CapsLockDelay.short)
+        } else if let saved {
+            defaults.removeObject(forKey: originalDelayKey)
+            setCapsLockDelay(CapsLockDelay.restoreValue(saved: saved))
+        }
+    }
+
+    /// 參數固定，不經過 shell
+    private static func readCapsLockDelay() -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
+        process.arguments = ["property", "--get", "CapsLockDelayOverride"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            log.error("無法執行 hidutil：\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return process.terminationStatus == 0 ? String(data: data, encoding: .utf8) : nil
+    }
+
+    private static func setCapsLockDelay(_ delay: Int) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
         process.arguments = ["property", "--set", #"{"CapsLockDelayOverride":\#(delay)}"#]

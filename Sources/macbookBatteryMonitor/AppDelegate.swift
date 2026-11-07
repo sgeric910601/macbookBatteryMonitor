@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var timers: [Timer] = []
     /// 上次畫到選單列的內容，沒變就不重畫
     private var lastStatusKey = ""
+    private var chargingIconFlow: ChargingIconFlowView?
     private var sleeping = false
     private var powerTransitionTask: Task<Void, Never>?
 
@@ -72,7 +73,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.imagePosition = .imageTrailing
         }
 
-        settings.onChange = { [weak self] in self?.updateStatusItem() }
+        settings.onChange = { [weak self] in
+            self?.lastStatusKey = ""
+            self?.updateStatusItem()
+        }
         settings.onIntervalChange = { [weak self] in self?.applySampleInterval() }
         // 全新安裝：所有需要授權的東西都在第一次啟動時問完（系統監控、管理員 CPU 取樣、通知、藍牙）
         let freshInstall = settings.needsModeChoice
@@ -673,6 +677,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func willSleep() {
+        chargingIconFlow?.removeFromSuperview()
+        chargingIconFlow = nil
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統即將睡眠") }
         sleeping = true
         powerTransitionTask?.cancel()
@@ -741,6 +747,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
+        let flowActive = store.estimates?.state == .charging && settings.display != .percentOnly
+            && settings.chargingIconFlow && !settings.powerSavingActive && !sleeping
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if flowActive {
+            if chargingIconFlow == nil {
+                let flow = ChargingIconFlowView(frame: button.bounds)
+                button.addSubview(flow)
+                chargingIconFlow = flow
+            }
+            chargingIconFlow?.percent = store.snapshot?.percent ?? 0
+            chargingIconFlow?.inlinePercent = settings.display == .iconPercentAndTime
+            chargingIconFlow?.alphaValue = settings.chargingIconOpacity
+            chargingIconFlow?.needsLayout = true
+        } else {
+            chargingIconFlow?.removeFromSuperview()
+            chargingIconFlow = nil
+        }
         if store.snapshot == nil, let desktop = store.desktop, let watts = desktop.systemWatts {
             updateDesktopStatusItem(button, watts: watts)
             return
@@ -763,7 +786,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let inlinePercent = settings.display == .iconPercentAndTime
         button.imagePosition = inlinePercent ? .imageLeading : .imageTrailing
-        button.image = settings.display == .percentOnly ? nil : StatusIconRenderer.image(percent: s.percent, state: e.state, low: low, showsPercent: inlinePercent)
+        button.image = settings.display == .percentOnly ? nil : StatusIconRenderer.image(percent: s.percent, state: e.state,
+            low: low, showsPercent: inlinePercent, chargingColor: settings.chargingIconColor,
+            chargingTextColor: settings.chargingIconTextColor)
         let text: String
         switch settings.display {
         case .iconAndPercent:
@@ -787,6 +812,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)]
         )
         button.toolTip = tooltip(s, e)
+        chargingIconFlow?.needsLayout = true
     }
 
     private func tooltip(_ s: BatterySnapshot, _ e: Estimates) -> String {

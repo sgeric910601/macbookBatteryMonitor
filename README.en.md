@@ -366,7 +366,8 @@ Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管�
 
 Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
 
-- **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a single click, not a drag. Clicking another app switches to it as usual, and double-clicking a background app's icon only switches to it; windows you minimized yourself are not restored; this app's own icon (while Settings is open) is ignored
+- **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a single click, not a drag or long press. Clicking another app switches to it as usual, and double-clicking a background app's icon only switches to it; windows you minimized yourself are not restored; this app's own icon (while Settings is open) is ignored
+- **How it decides**: on mouse down, before the Dock reacts (the Dock acts on mouse up), asking WindowServer whether the app has open windows instead of waiting on the app. On mouse up the Dock asks the app to reopen and the app restores a window itself, so minimizing waits 0.05 s; for apps that answer later (for example LINE), windows restored within 0.4 s are minimized again, unless you click again in the meantime. Clicking again brings back every window it minimized
 - **Nothing is intercepted**: it only listens to the mouse, so Dock clicks, drags and right-clicks work as usual; Dock icon positions are read only for clicks near a screen edge
 - **Permission**: needs Accessibility; nothing is observed while the feature is off
 

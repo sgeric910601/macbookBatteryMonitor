@@ -1,6 +1,9 @@
+import CoreGraphics
+
 /// 點 Dock 圖示縮到 Dock：只監聽、不攔截滑鼠，Dock 原本的點擊與拖曳都照常。
-/// 只有點的是按下時最前面那個 App、它有開著的視窗、而且不是拖曳時才動作。再點一次時叫回上次縮下去的視窗
+/// 只有點的是按下時最前面那個 App、它有開著的視窗、而且不是拖曳或長按時才動作。再點一次時叫回上次縮下去的所有視窗
 /// （很多 App 自己不會叫回）；使用者自己縮的不動。
+/// 按下時判斷（Dock 還沒動作），放開時執行；做法參考 braenden/dock-minimize（MIT，只參考行為）。
 /// 只做判斷，監聽與執行在 DockClickController
 enum DockClick {
     enum Mode: String, CaseIterable { case minimize, hide }
@@ -23,11 +26,24 @@ enum DockClick {
         history.last { $0.time <= time }?.pid
     }
 
-    /// 點擊當下的視窗狀態。讀到的是按下後的狀態，Dock 可能已經把縮下去的視窗叫回來；
-    /// 按下之後才收到「視窗叫回」就是 Dock 這一下叫回的，代表按下那一刻沒有開著的視窗，我們縮下去的也還沒被叫回
-    static func stateAtClick(visibleNow: Bool, oursMinimizedNow: Bool, hasOurs: Bool,
-                             restoredAfterClick: Bool) -> (visible: Bool, minimizedByUs: Bool) {
-        guard restoredAfterClick else { return (visibleNow, oursMinimizedNow) }
-        return (false, hasOurs)
+    /// WindowServer 列出的一個畫面上的視窗（CGWindowList，不問 App，不會等）
+    struct ScreenWindow: Equatable {
+        var pid: Int32
+        var id: UInt32
+        var layer: Int
+        var alpha: Double
+        var size: CGSize
+    }
+
+    /// 有些 App 在畫面上留著看不見的小輔助視窗，不算
+    static let minWindowSide: CGFloat = 40
+
+    /// 按下那一刻這個 App 在目前桌面上有沒有開著的一般視窗。Dock 在放開時才讓 App 叫回視窗，按下時讀到的就是點擊前的狀態；
+    /// excluding 是我們縮下去、還沒叫回的視窗：回呼晚跑時 Dock 可能已經叫回其中一個，不能把它當成開著的視窗又縮下去
+    static func hasVisibleWindow(_ windows: [ScreenWindow], pid: Int32, excluding: Set<UInt32>) -> Bool {
+        windows.contains {
+            $0.pid == pid && $0.layer == 0 && $0.alpha > 0 && !excluding.contains($0.id)
+                && $0.size.width > minWindowSide && $0.size.height > minWindowSide
+        }
     }
 }

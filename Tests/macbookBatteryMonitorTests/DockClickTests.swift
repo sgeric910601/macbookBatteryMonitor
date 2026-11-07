@@ -46,18 +46,23 @@ struct DockClickTests {
         XCTAssertEqual(decide(frontAtDown: DockClick.frontApp(at: 30, history: history), item: 3), .none)
     }
 
-    /// 按下之後才收到視窗叫回：是 Dock 這一下叫回的，按下時沒有開著的視窗（#25：再點一次叫回後又被縮下去）
-    func testRestoredByThisClickCountsAsMinimized() {
-        let late = DockClick.stateAtClick(visibleNow: true, oursMinimizedNow: false, hasOurs: true, restoredAfterClick: true)
-        XCTAssertTrue(!late.visible)
-        XCTAssertTrue(late.minimizedByUs)
-        XCTAssertEqual(decide(visibleWindows: late.visible, weMinimized: late.minimizedByUs), .restore)
-        // 使用者自己縮的被 Dock 叫回：不動，不能又縮下去
-        let user = DockClick.stateAtClick(visibleNow: true, oursMinimizedNow: false, hasOurs: false, restoredAfterClick: true)
-        XCTAssertEqual(decide(visibleWindows: user.visible, weMinimized: user.minimizedByUs), .none)
-        // 沒有叫回：照讀到的狀態
-        let normal = DockClick.stateAtClick(visibleNow: true, oursMinimizedNow: false, hasOurs: true, restoredAfterClick: false)
-        XCTAssertTrue(normal.visible)
-        XCTAssertTrue(!normal.minimizedByUs)
+    /// 有沒有開著的視窗用 WindowServer 的清單判斷：只算這個 App 一般層級、看得見、夠大的視窗；
+    /// 我們縮下去還沒叫回的視窗就算被 Dock 先叫回了也不算（回呼晚跑時不會又縮下去，#25）
+    func testVisibleWindowFromWindowServer() {
+        let normal = DockClick.ScreenWindow(pid: 7, id: 1, layer: 0, alpha: 1, size: CGSize(width: 800, height: 600))
+        XCTAssertTrue(DockClick.hasVisibleWindow([normal], pid: 7, excluding: []))
+        XCTAssertTrue(!DockClick.hasVisibleWindow([normal], pid: 8, excluding: []))
+        XCTAssertTrue(!DockClick.hasVisibleWindow([normal], pid: 7, excluding: [1]))
+        var helper = normal
+        helper.size = CGSize(width: 10, height: 10)
+        var floating = normal
+        floating.layer = 3
+        var invisible = normal
+        invisible.alpha = 0
+        XCTAssertTrue(!DockClick.hasVisibleWindow([helper, floating, invisible], pid: 7, excluding: []))
+        // 被 Dock 先叫回的是我們縮的（1），另一個開著的視窗（2）照算
+        var other = normal
+        other.id = 2
+        XCTAssertTrue(DockClick.hasVisibleWindow([normal, other], pid: 7, excluding: [1]))
     }
 }

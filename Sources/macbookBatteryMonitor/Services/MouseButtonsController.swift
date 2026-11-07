@@ -34,9 +34,8 @@ final class MouseButtonsController {
         if let port, !CFMachPortIsValid(port) { stop() }
         guard port == nil else { return isRunning }
         let mask: CGEventMask = (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.otherMouseUp.rawValue)
-        guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                           eventsOfInterest: mask, callback: mouseButtonsCallback, userInfo: nil) else { return false }
-        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+        guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                           mask: mask, callback: mouseButtonsCallback, userInfo: nil, loop: CFRunLoopGetMain()) else { return false }
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
@@ -51,11 +50,14 @@ final class MouseButtonsController {
     /// 系統暫停攔截時重新打開；失效（例如權限被撤銷又給回）時重建
     private func keepAlive() {
         guard let port else { return }
-        if !CFMachPortIsValid(port) {
+        // 權限被撤銷：重新打開只會一直被系統逾時暫停，整台 Mac 的輸入跟著卡。停掉，權限回來後由 AppDelegate 每 5 秒的檢查重新開始
+        if !AXIsProcessTrusted() {
+            stop()
+        } else if !CFMachPortIsValid(port) {
             stop()
             apply(buttons)
         } else if !CGEvent.tapIsEnabled(tap: port) {
-            CGEvent.tapEnable(tap: port, enable: true)
+            EventTapAccess.shared.reenable(port)
         }
     }
 
@@ -90,7 +92,7 @@ final class MouseButtonsController {
     }
 
     fileprivate func reenable() {
-        if let port { CGEvent.tapEnable(tap: port, enable: true) }
+        if let port, AXIsProcessTrusted() { EventTapAccess.shared.reenable(port) }
     }
 
     private static func pointerOverFrontApp(_ point: CGPoint) -> Bool {

@@ -5,7 +5,7 @@ import SwiftUI
 struct PermissionsView: View {
     let settings: AppSettings
 
-    private enum Status { case granted, denied, askWhenUsed }
+    private enum Status { case granted, denied, askWhenUsed, unconfirmed }
 
     @State private var statuses: [AppPermission: Status] = [:]
     private let ticker = Timer.publish(every: 2.5, on: .main, in: .common).autoconnect()
@@ -53,12 +53,14 @@ struct PermissionsView: View {
         case .granted: Label("已允許", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green)
         case .denied: Label("未允許", systemImage: "exclamationmark.circle.fill").font(.caption).foregroundStyle(.orange)
         case .askWhenUsed: Text("用到時詢問").font(.caption).foregroundStyle(.secondary)
+        case .unconfirmed: Label("無法確認", systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
         case nil: EmptyView()
         }
     }
 
     private func refresh() {
-        statuses[.accessibility] = ScrollDirection.trusted ? .granted : .denied
+        // 從清單「移除」後系統在這個行程裡仍回答有權限（#25），按鍵與滑鼠功能暫停中就不能顯示「已允許」
+        statuses[.accessibility] = EventTapAccess.shared.isLost ? .unconfirmed : ScrollDirection.trusted ? .granted : .denied
         statuses[.screenRecording] = WindowThumbnails.hasPermission ? .granted : .denied
         statuses[.bluetooth] = BLEBatteryReader.authorized ? .granted : BLEBatteryReader.denied ? .denied : .askWhenUsed
         // 自動化的狀態要實際詢問 System Events 才知道，查詢本身可能跳出系統詢問，所以不查

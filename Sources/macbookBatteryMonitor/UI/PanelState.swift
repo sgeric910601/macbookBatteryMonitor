@@ -84,6 +84,8 @@ final class PanelState {
     var windowSnapRunning = false
     /// Finder 加強在運作
     var finderKeysRunning = false
+    /// 無法確認「輔助使用」權限，會擋住輸入的按鍵與滑鼠功能已暫停（EventTapAccess 停用中）
+    var inputPaused = false
     /// 智慧充電頁的輸入：指定完成時間、每週排程的星期與時間
     var chargingCustomDeadline = Date().addingTimeInterval(4 * 3600)
     var chargingWeekdays: Set<Int> = [2, 3, 4, 5, 6]

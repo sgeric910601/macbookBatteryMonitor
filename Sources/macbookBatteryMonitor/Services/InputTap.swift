@@ -42,14 +42,13 @@ final class InputTap: @unchecked Sendable {
         }
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: inputTapCallback,
-                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+            let loop: CFRunLoop = CFRunLoopGetCurrent()
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: inputTapCallback,
+                                               userInfo: Unmanaged.passUnretained(self).toOpaque(), loop: loop) else {
                 ready.signal()
                 return
             }
-            let loop = CFRunLoopGetCurrent()
-            CFRunLoopAddSource(loop, CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
             CGEvent.tapEnable(tap: port, enable: true)
             locked {
                 self.port = port
@@ -110,11 +109,13 @@ final class InputTap: @unchecked Sendable {
 
     func reenable(reason: String) {
         guard let port = locked({ self.port }) else { return }
+        // 權限被撤銷：不重新打開，交給 InputController.check 停掉
+        guard AXIsProcessTrusted() else { return }
         Self.log.notice("事件攔截被暫停（\(reason, privacy: .public)），重新打開")
         // 暫停期間可能漏掉放開的事件：結束進行中的切換，免得狀態殘留
         cancelSwitching()
         DispatchQueue.main.async { MainActor.assumeIsolated { WindowSwitcher.shared.handle(.cancel) } }
-        CGEvent.tapEnable(tap: port, enable: true)
+        EventTapAccess.shared.reenable(port)
     }
 
     fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {

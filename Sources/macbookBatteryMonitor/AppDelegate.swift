@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 這個使用者的工作階段在前景。快速切換使用者後留在背景的攔截，會讓前景使用者的每個輸入都要等它逾時，
     /// 所以切到背景時停掉所有按鍵與滑鼠攔截，切回來再依設定開始
     private var sessionActive = true
+    /// 會擋住輸入的按鍵與滑鼠功能能不能運作：工作階段在前景，而且 EventTapAccess 沒有進入停用狀態。
+    /// 只監聽的功能（Dock 點擊、視窗吸附、關閉最後視窗）不受停用影響，只看 sessionActive
+    private var inputAllowed: Bool { sessionActive && !EventTapAccess.shared.isLost }
     private var mouseButtonsTrustTimer: Timer?
     private var lastWindowTrustTimer: Timer?
     private var shiftTrustTimer: Timer?
@@ -91,6 +94,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         if freshInstall { askForAdminCPU() }
         Notifier.shared.setup()
+        EventTapAccess.shared.announceIfRelaunched()
+        EventTapAccess.shared.onStateChange = { [weak self] in
+            let paused = EventTapAccess.shared.isLost
+            if paused { KeyboardCleaningController.shared.stop() }
+            self?.ui.inputPaused = paused
+            self?.applyInputFeatures()
+        }
         // 藍牙權限還沒決定時 macOS 會跳出詢問（從舊版升級也會問這一次）；已經允許就直接在背景讀；拒絕過就不再問
         if !BLEBatteryReader.denied { store.peripherals.startBluetoothLE() }
         // 用新版覆蓋 App 後，自訂的 App 圖示會消失，套回使用者選的顏色
@@ -142,6 +152,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
         // 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。都沒啟用時什麼都不做
         timers.append(repeating(every: 5) { delegate in
+            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
+            let shift = delegate.inputAllowed && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
+                && InputSourceFix.shared.isRunning
+            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
             let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
             guard features.contains(where: delegate.settings.isInstalled) else { return }
             delegate.applyQuitGuard(prompt: false)
@@ -310,9 +324,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyLastWindowQuit(prompt: Bool) {
         let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
-        let green = sessionActive && settings.isInstalled(.greenButton)
+        let green = inputAllowed && settings.isInstalled(.greenButton)
         let snap = sessionActive && settings.isInstalled(.windowSnap)
-        let finder = sessionActive && settings.isInstalled(.finderKeys)
+        let finder = inputAllowed && settings.isInstalled(.finderKeys)
         let wanted = lastWindow || dock || green || snap || finder
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
         DockClickController.shared.mode = settings.dockClickMode
@@ -347,7 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// 滑鼠側鍵。需要「輔助使用」：剛設定時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyMouseButtons(prompt: Bool) {
-        let installed = sessionActive && settings.isInstalled(.mouseButtons)
+        let installed = inputAllowed && settings.isInstalled(.mouseButtons)
         let buttons = MouseButtons(back: installed ? settings.mouseBackButton : .none, forward: installed ? settings.mouseForwardButton : .none)
         let running = MouseButtonsController.shared.apply(buttons)
         ui.mouseButtonsRunning = buttons.isActive && MouseButtonsController.shared.isRunning
@@ -363,7 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// ⌘Q／⌘W 防誤觸。需要「輔助使用」：剛加入或打開時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyQuitGuard(prompt: Bool) {
-        let installed = sessionActive && settings.isInstalled(.quitGuard)
+        let installed = inputAllowed && settings.isInstalled(.quitGuard)
         let quit = installed && settings.quitGuardQuit, close = installed && settings.quitGuardClose
         let running = QuitGuardController.shared.apply(quit: quit, close: close, duration: settings.quitGuardDuration)
         ui.quitGuardRunning = (quit || close) && QuitGuardController.shared.isRunning
@@ -380,7 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
     /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
     private func applyScrollDirection(prompt: Bool) {
-        let installed = sessionActive && settings.isInstalled(.scrollDirection)
+        let installed = inputAllowed && settings.isInstalled(.scrollDirection)
         let mouse = installed && settings.scrollReverseMouse
         let trackpad = installed && settings.scrollReverseTrackpad
         let linear = installed ? settings.scrollLinearLines : 0
@@ -405,19 +419,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let options = settings.switcher
         InputTap.shared.setSwitcher(shortcuts: options.profiles.map(\.shortcut), vimKeys: options.vimKeys, releaseCommits: !options.keepOpenAfterRelease)
         WindowSwitcher.shared.configure(options)
-        let wanted = sessionActive && settings.windowSwitcher && settings.isInstalled(.windowSwitcher)
+        let wanted = inputAllowed && settings.windowSwitcher && settings.isInstalled(.windowSwitcher)
         InputController.shared.apply(keys: wanted)
         if prompt, wanted, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
     }
 
     /// 中文輸入法：Caps Lock 不延遲（hidutil，不需權限）、按住 Shift 打半形（需要「輔助使用」，允許後每 2 秒檢查一次就開始）
     private func applyInputSourceFix(prompt: Bool) {
-        if settings.capsLockNoDelay, settings.isInstalled(.inputMethod) { InputSourceFix.removeCapsLockDelay() }
+        InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         applyShiftHalfWidth(prompt: prompt)
     }
 
     private func applyShiftHalfWidth(prompt: Bool) {
-        let wanted = sessionActive && settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
+        let wanted = inputAllowed && settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
         let running = InputSourceFix.shared.applyShift(wanted)
         ui.shiftRunning = wanted && InputSourceFix.shared.isRunning
         ui.scrollTrusted = ScrollDirection.trusted
@@ -717,7 +731,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         monitors.setSleeping(false)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設
-        if settings.capsLockNoDelay, settings.isInstalled(.inputMethod) { InputSourceFix.removeCapsLockDelay() }
+        InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         refresh()
         store.peripherals.refresh()
         store.recordHistory()

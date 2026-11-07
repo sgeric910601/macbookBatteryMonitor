@@ -3,7 +3,7 @@ import Carbon
 import OSLog
 
 /// 中文輸入法的兩個困擾：
-/// 1. Caps Lock 切換中英有延遲：macOS 為了防誤觸，Caps Lock 要按住一下才算數。用系統內建的 hidutil 把延遲設成 0
+/// 1. Caps Lock 切換中英有延遲：macOS 為了防誤觸，Caps Lock 要按住一下才算數。用系統內建的 hidutil 把延遲縮短成 30 ms（設 0 會一次切兩次）
 ///    （只存在記憶體，所以每次啟動與睡眠喚醒都重設一次）。
 /// 2. 按住 Shift 打字母與符號變全形：把這些按鍵換成半形字，輸入法不切換（判斷在 ShiftHalfWidth）。
 ///    攔截按鍵需要「輔助使用」權限；開關關掉時完全不攔截
@@ -22,11 +22,47 @@ final class InputSourceFix {
 
     // MARK: Caps Lock
 
-    /// 把 Caps Lock 延遲設成 0。參數固定，不經過 shell
-    static func removeCapsLockDelay() {
+    /// 縮短前讀到的原本延遲；有值代表改過、關掉時要還原。存在 defaults：重開 App（例如匯入關掉這個選項的設定）後也會還原
+    private static let originalDelayKey = "capsLockDelayOriginal"
+
+    /// 開：記下原本的值，把 Caps Lock 延遲縮短；關：改過的話還原原本的值。沒改過就不寫，不蓋掉使用者自己用 hidutil 設的值
+    static func applyCapsLockDelay(short: Bool) {
+        let defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: originalDelayKey) as? Int
+        if short {
+            if saved == nil {
+                defaults.set(readCapsLockDelay().flatMap(CapsLockDelay.original(fromHidutil:)) ?? CapsLockDelay.fallback, forKey: originalDelayKey)
+            }
+            setCapsLockDelay(CapsLockDelay.short)
+        } else if let saved {
+            defaults.removeObject(forKey: originalDelayKey)
+            setCapsLockDelay(CapsLockDelay.restoreValue(saved: saved))
+        }
+    }
+
+    /// 參數固定，不經過 shell
+    private static func readCapsLockDelay() -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
+        process.arguments = ["property", "--get", "CapsLockDelayOverride"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            log.error("無法執行 hidutil：\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return process.terminationStatus == 0 ? String(data: data, encoding: .utf8) : nil
+    }
+
+    private static func setCapsLockDelay(_ delay: Int) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
-        process.arguments = ["property", "--set", #"{"CapsLockDelayOverride":0}"#]
+        process.arguments = ["property", "--set", #"{"CapsLockDelayOverride":\#(delay)}"#]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         process.terminationHandler = { process in
@@ -85,6 +121,14 @@ final class InputSourceFix {
 
     private func check() {
         guard wanted else { return }
+        // 權限被撤銷：停掉攔截，權限回來後下一次檢查（.stopped）重新開始
+        guard AXIsProcessTrusted() else {
+            if tap.health() != .stopped {
+                tap.stop()
+                Self.log.notice("輔助使用權限被撤銷，停止 Shift 半形攔截")
+            }
+            return
+        }
         switch tap.health() {
         case .ok: return
         case .disabled: tap.reenable()
@@ -174,7 +218,9 @@ final class ShiftTap: @unchecked Sendable {
     }
 
     func reenable() {
-        if let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
+        // 權限被撤銷：不重新打開，交給 InputSourceFix.check 停掉
+        guard AXIsProcessTrusted() else { return }
+        if let port = locked({ self.port }) { EventTapAccess.shared.reenable(port) }
     }
 
     func start() -> Bool {
@@ -182,14 +228,13 @@ final class ShiftTap: @unchecked Sendable {
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
-            guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: shiftTapCallback,
-                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+            let loop: CFRunLoop = CFRunLoopGetCurrent()
+            guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
+                                               mask: mask, callback: shiftTapCallback,
+                                               userInfo: Unmanaged.passUnretained(self).toOpaque(), loop: loop) else {
                 ready.signal()
                 return
             }
-            let loop = CFRunLoopGetCurrent()
-            CFRunLoopAddSource(loop, CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
             CGEvent.tapEnable(tap: port, enable: true)
             locked {
                 self.port = port

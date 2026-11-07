@@ -156,8 +156,17 @@ final class FinderKeysTap: @unchecked Sendable {
         default: return true
         }
         guard let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
+        let element = focused as! AXUIElement
+        // 逾時是每個元件各自設定的，子元件不會沿用 Finder 的設定，而是用全域預設（約 6 秒），在攔截回呼裡會卡住鍵盤
+        AXUIElementSetMessagingTimeout(element, 0.05)
         var role: AnyObject?
-        AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXRoleAttribute as CFString, &role)
+        switch AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role) {
+        case .success: break
+        // 逾時或 Finder 沒回應：和上面一樣當作在打字
+        case .cannotComplete: return true
+        // 這個元件沒有 role：不是輸入欄位
+        default: return false
+        }
         return [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField"].contains(role as? String ?? "")
     }
 

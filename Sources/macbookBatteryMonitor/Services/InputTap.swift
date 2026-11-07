@@ -110,6 +110,8 @@ final class InputTap: @unchecked Sendable {
 
     func reenable(reason: String) {
         guard let port = locked({ self.port }) else { return }
+        // 權限被撤銷：不重新打開，交給 InputController.check 停掉
+        guard AXIsProcessTrusted() else { return }
         Self.log.notice("事件攔截被暫停（\(reason, privacy: .public)），重新打開")
         // 暫停期間可能漏掉放開的事件：結束進行中的切換，免得狀態殘留
         cancelSwitching()

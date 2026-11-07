@@ -58,6 +58,14 @@ final class ScrollDirection {
 
     private func check() {
         guard wanted else { return }
+        // 權限被撤銷：停掉攔截（設定頁跟著顯示沒在運作），權限回來後下一次檢查重新開始
+        guard Self.trusted else {
+            if tap.isRunning {
+                tap.stop()
+                ScrollTap.log.notice("輔助使用權限被撤銷，停止攔截")
+            }
+            return startIfTrusted(reason: "定時檢查")
+        }
         switch tap.health() {
         case .ok: return
         case .disabled: tap.reenable(reason: "檢查時發現被暫停")
@@ -215,6 +223,8 @@ final class ScrollTap: @unchecked Sendable {
     /// 系統覺得回呼太慢或使用者操作時會暫停攔截，再打開。每次都留紀錄，失效時查得到原因
     func reenable(reason: String) {
         guard let port = locked({ self.port }) else { return }
+        // 權限被撤銷：重新打開只會一直被逾時暫停，整台 Mac 的捲動跟著卡；交給 ScrollDirection.check 停掉
+        guard AXIsProcessTrusted() else { return }
         Self.log.notice("事件攔截被暫停（\(reason, privacy: .public)），重新打開")
         CGEvent.tapEnable(tap: port, enable: true)
     }

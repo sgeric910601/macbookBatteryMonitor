@@ -427,7 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// 中文輸入法：Caps Lock 不延遲（hidutil，不需權限）、按住 Shift 打半形（需要「輔助使用」，允許後每 2 秒檢查一次就開始）
     private func applyInputSourceFix(prompt: Bool) {
-        if settings.capsLockNoDelay, settings.isInstalled(.inputMethod) { InputSourceFix.removeCapsLockDelay() }
+        InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         applyShiftHalfWidth(prompt: prompt)
     }
 
@@ -734,7 +734,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         monitors.setSleeping(false)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設
-        if settings.capsLockNoDelay, settings.isInstalled(.inputMethod) { InputSourceFix.removeCapsLockDelay() }
+        InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         refresh()
         store.peripherals.refresh()
         store.recordHistory()

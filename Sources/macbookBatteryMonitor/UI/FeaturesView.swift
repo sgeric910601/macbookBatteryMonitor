@@ -34,7 +34,7 @@ struct FeatureManagerView: View {
                 }
             }
         }
-        Text("大部分擴充功能需要「輔助使用」權限，用到時才會詢問（功能自己的開關原本就開著時，會在啟用時詢問）。停用「中文輸入法」後，已經套用的 Caps Lock 不延遲要重新開機才恢復。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
+        Text("大部分擴充功能需要「輔助使用」權限，用到時才會詢問（功能自己的開關原本就開著時，會在啟用時詢問）。停用「中文輸入法」時，Caps Lock 恢復系統預設的延遲。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

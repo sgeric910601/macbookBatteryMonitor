@@ -3,7 +3,7 @@ import Carbon
 import OSLog
 
 /// 中文輸入法的兩個困擾：
-/// 1. Caps Lock 切換中英有延遲：macOS 為了防誤觸，Caps Lock 要按住一下才算數。用系統內建的 hidutil 把延遲設成 0
+/// 1. Caps Lock 切換中英有延遲：macOS 為了防誤觸，Caps Lock 要按住一下才算數。用系統內建的 hidutil 把延遲縮短成 30 ms（設 0 會一次切兩次）
 ///    （只存在記憶體，所以每次啟動與睡眠喚醒都重設一次）。
 /// 2. 按住 Shift 打字母與符號變全形：把這些按鍵換成半形字，輸入法不切換（判斷在 ShiftHalfWidth）。
 ///    攔截按鍵需要「輔助使用」權限；開關關掉時完全不攔截
@@ -22,11 +22,21 @@ final class InputSourceFix {
 
     // MARK: Caps Lock
 
-    /// 把 Caps Lock 延遲設成 0。參數固定，不經過 shell
-    static func removeCapsLockDelay() {
+    /// 0 會讓 Caps Lock 一次切兩次、誤開大寫，注音打出全形（實測）；30 ms 不會，延遲也幾乎感覺不到
+    static let shortCapsLockDelay = 30
+    /// 關掉功能時寫回的系統預設延遲
+    static let defaultCapsLockDelay = 75
+    /// 這次執行有改過延遲；沒改過就不寫回，不蓋掉使用者自己用 hidutil 設的值
+    private static var capsLockDelayChanged = false
+
+    /// 開：把 Caps Lock 延遲縮短；關：改過的話寫回預設。參數固定，不經過 shell
+    static func applyCapsLockDelay(short: Bool) {
+        guard short || capsLockDelayChanged else { return }
+        capsLockDelayChanged = short
+        let delay = short ? shortCapsLockDelay : defaultCapsLockDelay
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
-        process.arguments = ["property", "--set", #"{"CapsLockDelayOverride":0}"#]
+        process.arguments = ["property", "--set", #"{"CapsLockDelayOverride":\#(delay)}"#]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         process.terminationHandler = { process in

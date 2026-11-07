@@ -39,12 +39,29 @@ final class AppSettings {
     var chargingIconFlow: Bool {
         didSet { defaults.set(chargingIconFlow, forKey: "chargingIconFlow"); onChange?() }
     }
-    var chargingIconColor: NSColor {
-        guard !chargingIconNativeColor, let data = chargingIconColorData,
+    var chargingIconPreset: String {
+        didSet { defaults.set(chargingIconPreset, forKey: "chargingIconPreset"); onChange?() }
+    }
+    var chargingIconOpacity: Double {
+        didSet { defaults.set(chargingIconOpacity, forKey: "chargingIconOpacity"); onChange?() }
+    }
+    var chargingIconBaseColor: NSColor {
+        switch chargingIconPreset {
+        case "mint": return NSColor(srgbRed: 0.25, green: 0.85, blue: 0.65, alpha: 1)
+        case "emerald": return NSColor(srgbRed: 0.12, green: 0.68, blue: 0.38, alpha: 1)
+        case "lime": return NSColor(srgbRed: 0.55, green: 0.85, blue: 0.20, alpha: 1)
+        case "custom": break
+        default: return .systemGreen
+        }
+        guard let data = chargingIconColorData,
               let color = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data) else {
             return .systemGreen
         }
         return color
+    }
+    var chargingIconColor: NSColor {
+        chargingIconBaseColor.withAlphaComponent(chargingIconOpacity.isFinite
+            ? min(1, max(0, chargingIconOpacity)) : 1)
     }
     var chargingIconTextColor: NSColor {
         switch chargingIconText {
@@ -347,11 +364,16 @@ final class AppSettings {
     }
 
     private init() {
-        defaults.register(defaults: ["chargingIconNativeColor": true, "chargingIconFlow": true])
+        defaults.register(defaults: ["chargingIconNativeColor": true, "chargingIconFlow": true,
+                                     "chargingIconOpacity": 1.0])
         chargingIconText = defaults.string(forKey: "chargingIconText") ?? "white"
         chargingIconNativeColor = defaults.bool(forKey: "chargingIconNativeColor")
         chargingIconFlow = defaults.bool(forKey: "chargingIconFlow")
         chargingIconColorData = defaults.data(forKey: "chargingIconColorData")
+        chargingIconPreset = defaults.string(forKey: "chargingIconPreset")
+            ?? (defaults.bool(forKey: "chargingIconNativeColor") ? "native" : "custom")
+        let savedOpacity = defaults.double(forKey: "chargingIconOpacity")
+        chargingIconOpacity = savedOpacity.isFinite ? min(1, max(0, savedOpacity)) : 1
         defaults.register(defaults: [
             Keys.display: MenuBarDisplay.iconAndPercent.rawValue,
             Keys.lowAlertEnabled: true,

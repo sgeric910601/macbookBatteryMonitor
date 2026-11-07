@@ -517,6 +517,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             }
             chargingIconFlow?.percent = store.snapshot?.percent ?? 0
             chargingIconFlow?.inlinePercent = settings.display == .iconPercentAndTime
+            chargingIconFlow?.alphaValue = settings.chargingIconOpacity
             chargingIconFlow?.needsLayout = true
         } else {
             chargingIconFlow?.removeFromSuperview()

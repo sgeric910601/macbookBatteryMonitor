@@ -53,20 +53,37 @@ struct SettingsView: View {
                             Text("黑色").tag("black")
                             Text("跟隨系統外觀").tag("automatic")
                         }
-                        Toggle("使用原生充電綠色", isOn: binding(\.chargingIconNativeColor))
-                        if !settings.chargingIconNativeColor {
+                        Picker("充電顏色預設", selection: binding(\.chargingIconPreset)) {
+                            Text("Apple 原生綠").tag("native")
+                            Text("薄荷綠").tag("mint")
+                            Text("翡翠綠").tag("emerald")
+                            Text("萊姆綠").tag("lime")
+                            Text("自訂色盤").tag("custom")
+                        }
+                        if settings.chargingIconPreset == "custom" {
                             ColorPicker("自訂充電顏色", selection: Binding(
-                                get: { Color(nsColor: settings.chargingIconColor) },
+                                get: { Color(nsColor: settings.chargingIconBaseColor) },
                                 set: { settings.chargingIconColorData = try? NSKeyedArchiver.archivedData(
                                     withRootObject: NSColor($0), requiringSecureCoding: true) }
                             ), supportsOpacity: false)
                         }
+                        HStack {
+                            Text("底色不透明度")
+                            Slider(value: binding(\.chargingIconOpacity), in: 0...1, step: 0.01)
+                                .accessibilityLabel("充電底色不透明度")
+                            Text("\(Int((settings.chargingIconOpacity * 100).rounded()))%")
+                                .monospacedDigit().frame(width: 42, alignment: .trailing)
+                        }
+                        Text("0% 完全透明，100% 不透明；不影響文字。")
+                            .font(.caption).foregroundStyle(.secondary)
                         Toggle("充電時顯示流光", isOn: binding(\.chargingIconFlow))
                         Text("依實際電量比例填充。省電模式與減少動態效果會停止流光。")
                             .font(.caption).foregroundStyle(.secondary)
                         Button("還原圖示預設") {
                             settings.chargingIconText = "white"
                             settings.chargingIconNativeColor = true
+                            settings.chargingIconPreset = "native"
+                            settings.chargingIconOpacity = 1
                             settings.chargingIconColorData = nil
                             settings.chargingIconFlow = true
                         }

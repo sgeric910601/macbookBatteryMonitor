@@ -83,7 +83,86 @@ final class AppSettings {
     /// 桌面寵物開關改變時
     /// 捲動方向的設定改變時
     @ObservationIgnored var onScrollDirectionChange: (() -> Void)?
+    /// 視窗切換的開關改變時
+    @ObservationIgnored var onWindowSwitcherChange: (() -> Void)?
+    /// 中文輸入法的 Caps Lock 延遲或 Shift 半形開關改變時
+    @ObservationIgnored var onInputSourceFixChange: (() -> Void)?
     @ObservationIgnored var onDesktopPetChange: (() -> Void)?
+    /// 加入或移除擴充功能時（參數是改變的功能）
+    @ObservationIgnored var onFeatureInstallChange: ((ExtensionFeature) -> Void)?
+
+    /// 已加入的擴充功能；沒加入的不啟動，設定裡也看不到
+    private(set) var installedFeatures: Set<ExtensionFeature> = []
+
+    func isInstalled(_ feature: ExtensionFeature) -> Bool { installedFeatures.contains(feature) }
+
+    /// 可以匯出、帶到另一台 Mac 的設定。不含要另外安裝系統服務的（管理員 CPU 取樣、精準喚醒）、一次性的轉換標記，
+    /// 也不含周邊設備的低電量門檻（以藍牙裝置的硬體位址為鍵，匯出檔可能被分享）
+    static let backupSchema: [String: SettingsBackup.Kind] = {
+        var schema: [String: SettingsBackup.Kind] = [
+            Keys.display: .string, Keys.lowAlertEnabled: .bool, Keys.lowThreshold: .int, Keys.fullAlertEnabled: .bool,
+            Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
+            Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
+            Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
+            Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.keepAwakeApps: .strings, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.mouseBackButton: .string, Keys.mouseForwardButton: .string, Keys.updateInterval: .int,
+            Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
+            Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
+            Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
+            Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
+            Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.scrollLinearLines: .int, Keys.scrollHorizontalKey: .string, Keys.scrollSmooth: .bool, Keys.windowSwitcher: .bool,
+            Keys.switcher: .dictionary, Keys.capsLockNoDelay: .bool, Keys.shiftHalfWidth: .bool,
+            Keys.chargingTargetPercent: .int, Keys.chargingHoldPercent: .int, Keys.chargingSleepStrategy: .string,
+        ]
+        for feature in ExtensionFeature.allCases { schema[feature.installedKey] = .bool }
+        return schema
+    }()
+
+    func exportBackup() throws -> Data {
+        var values: [String: Any] = [:]
+        for key in Self.backupSchema.keys { values[key] = defaults.object(forKey: key) }
+        // 加入狀態用實際的值：從舊版更新、沒存過的也要帶過去，否則在全新安裝的 Mac 匯入後功能會變成沒加入
+        values.merge(ExtensionFeature.installedValues(isInstalled)) { _, actual in actual }
+        return try SettingsBackup.export(values, schema: Self.backupSchema)
+    }
+
+    /// 讀取並檢查設定檔，還不寫入。turnsOn：匯入後會從關閉變成打開的項目（擴充功能、睡眠時關閉藍牙、指定 App 防止休眠），
+    /// 要先讓使用者確認：其中有需要「輔助使用」或會記錄剪貼簿的功能
+    func readBackup(_ data: Data) throws -> (values: [String: Any], turnsOn: [String]) {
+        let values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        var turnsOn = ExtensionFeature.allCases.filter { values[$0.installedKey] as? Bool == true && !isInstalled($0) }.map(\.title)
+        // 功能自己的開關：加入了但開關關著時，匯入一樣會讓它開始攔截按鍵或滑鼠
+        let switches: [(String, String)] = [
+            (Keys.bluetoothOffDuringSleep, "睡眠時關閉藍牙"), (Keys.windowSwitcher, "視窗切換"),
+            (Keys.capsLockNoDelay, "Caps Lock 切換中英不延遲"), (Keys.shiftHalfWidth, "按住 Shift 打半形"),
+            (Keys.quitGuardQuit, "⌘Q 防誤觸"), (Keys.quitGuardClose, "⌘W 防誤觸"),
+            (Keys.scrollReverseMouse, "滑鼠滾輪反向"), (Keys.scrollReverseTrackpad, "觸控板反向"), (Keys.scrollSmooth, "滑鼠滾輪平滑捲動"),
+        ]
+        for (key, title) in switches where values[key] as? Bool == true && !defaults.bool(forKey: key) {
+            turnsOn.append(title)
+        }
+        if let apps = values[Keys.keepAwakeApps] as? [String], !apps.isEmpty, apps != (defaults.stringArray(forKey: Keys.keepAwakeApps) ?? []) {
+            turnsOn.append("指定 App 執行時防止休眠（\(apps.count) 個 App）")
+        }
+        return (values, turnsOn)
+    }
+
+    /// 寫入 readBackup 檢查過的設定，回傳寫入幾項；檔案裡沒有的設定維持原樣。重新開啟 App 後全部生效
+    func importBackup(_ values: [String: Any]) -> Int {
+        for (key, value) in values {
+            // 視窗切換的設定先整理成認得的欄位再存，不把檔案裡的原始內容整包存進去
+            let clean = key == Keys.switcher ? (value as? [String: Any]).map { SwitcherSettings(stored: $0).stored } ?? value : value
+            defaults.set(clean, forKey: key)
+        }
+        return values.count
+    }
+
+    func setInstalled(_ feature: ExtensionFeature, _ installed: Bool) {
+        guard isInstalled(feature) != installed else { return }
+        if installed { installedFeatures.insert(feature) } else { installedFeatures.remove(feature) }
+        // 只改加入狀態，功能自己的設定都不動，重新加入時照舊
+        defaults.set(installed, forKey: feature.installedKey)
+        onFeatureInstallChange?(feature)
+    }
 
     /// 可選的更新頻率（秒）
     static let updateIntervals = [1, 2, 5, 10]
@@ -101,6 +180,67 @@ final class AppSettings {
     /// 只在使用電池時套用省電模式，接上電源就恢復一般模式
     var powerSavingOnBatteryOnly: Bool {
         didSet { defaults.set(powerSavingOnBatteryOnly, forKey: Keys.powerSavingOnBatteryOnly); onIntervalChange?() }
+    }
+
+    /// ⌘Q／⌘W 防誤觸：要按住幾秒、各自開不開（見 QuitGuard）
+    var quitGuardQuit: Bool {
+        didSet { defaults.set(quitGuardQuit, forKey: Keys.quitGuardQuit); onQuitGuardChange?() }
+    }
+    var quitGuardClose: Bool {
+        didSet { defaults.set(quitGuardClose, forKey: Keys.quitGuardClose); onQuitGuardChange?() }
+    }
+    var quitGuardDuration: Double {
+        didSet { defaults.set(quitGuardDuration, forKey: Keys.quitGuardDuration); onQuitGuardChange?() }
+    }
+    static let quitGuardDurations: [Double] = [0.5, 1, 1.5]
+    @ObservationIgnored var onQuitGuardChange: (() -> Void)?
+
+    /// 關閉最後視窗時不結束的 App（識別碼；Finder 一律不結束，不用列）
+    var lastWindowQuitExcluded: Set<String> {
+        didSet {
+            defaults.set(lastWindowQuitExcluded.sorted(), forKey: Keys.lastWindowQuitExcluded)
+            onLastWindowQuitChange?()
+        }
+    }
+    @ObservationIgnored var onLastWindowQuitChange: (() -> Void)?
+
+    /// 滑鼠第 4、5 鍵的動作
+    var mouseBackButton: MouseButtons.Action {
+        didSet { defaults.set(mouseBackButton.rawValue, forKey: Keys.mouseBackButton); onMouseButtonsChange?() }
+    }
+    var mouseForwardButton: MouseButtons.Action {
+        didSet { defaults.set(mouseForwardButton.rawValue, forKey: Keys.mouseForwardButton); onMouseButtonsChange?() }
+    }
+    @ObservationIgnored var onMouseButtonsChange: (() -> Void)?
+
+    /// 鍵盤清潔模式的時間（秒）
+    var keyboardCleaningSeconds: Int {
+        didSet { defaults.set(keyboardCleaningSeconds, forKey: Keys.keyboardCleaningSeconds) }
+    }
+
+    /// 點 Dock 圖示時縮到 Dock 還是隱藏 App
+    var dockClickMode: DockClick.Mode {
+        didSet { defaults.set(dockClickMode.rawValue, forKey: Keys.dockClickMode); onLastWindowQuitChange?() }
+    }
+
+    /// 這些 App 執行中時自動防止休眠（識別碼）
+    var keepAwakeApps: Set<String> {
+        didSet {
+            defaults.set(keepAwakeApps.sorted(), forKey: Keys.keepAwakeApps)
+            onKeepAwakeAppsChange?()
+        }
+    }
+    @ObservationIgnored var onKeepAwakeAppsChange: (() -> Void)?
+
+    /// 睡眠時關閉藍牙、醒來打開（見 BluetoothSleep）
+    var bluetoothOffDuringSleep: Bool {
+        didSet { defaults.set(bluetoothOffDuringSleep, forKey: Keys.bluetoothOffDuringSleep) }
+    }
+
+    /// 這次睡眠的藍牙是我們關掉的（不匯出；睡眠中 App 被結束時，下次啟動靠它打開）
+    var bluetoothTurnedOffForSleep: Bool {
+        get { defaults.bool(forKey: Keys.bluetoothTurnedOffForSleep) }
+        set { defaults.set(newValue, forKey: Keys.bluetoothTurnedOffForSleep) }
     }
 
     /// 目前是否接著電源（不存檔，由 AppDelegate 每次更新時帶入；桌上型 Mac 一律視為接著電源）
@@ -153,6 +293,16 @@ final class AppSettings {
     /// 選單列圖示太多時，macOS 會把放不下的藏起來（尤其有瀏海的 MacBook）
     var menuBarCombined: Bool {
         didSet { defaults.set(menuBarCombined, forKey: Keys.menuBarCombined); onMonitorsChange?() }
+    }
+    /// 監控警示（預設關閉）：只在該模組有取樣時（選單列有它的圖示）才會判斷
+    var alertCPU: Bool {
+        didSet { defaults.set(alertCPU, forKey: Keys.alertCPU) }
+    }
+    var alertMemory: Bool {
+        didSet { defaults.set(alertMemory, forKey: Keys.alertMemory) }
+    }
+    var alertDisk: Bool {
+        didSet { defaults.set(alertDisk, forKey: Keys.alertDisk) }
     }
     /// 全新安裝、還沒選過要不要開系統監控（第一次啟動時詢問）
     private(set) var needsModeChoice = false
@@ -212,10 +362,66 @@ final class AppSettings {
             if scrollReverseMouse != oldValue { onScrollDirectionChange?() }
         }
     }
+    /// 左右捲動也反向（預設打開，和以前一樣上下左右一起反）；關掉時只反轉上下
+    var scrollReverseHorizontal: Bool {
+        didSet {
+            defaults.set(scrollReverseHorizontal, forKey: Keys.scrollReverseHorizontal)
+            if scrollReverseHorizontal != oldValue { onScrollDirectionChange?() }
+        }
+    }
+    /// 線性捲動：一般滾輪每格固定捲幾行，0 是關閉（見 ScrollLinear）
+    var scrollLinearLines: Int {
+        didSet {
+            defaults.set(scrollLinearLines, forKey: Keys.scrollLinearLines)
+            if scrollLinearLines != oldValue { onScrollDirectionChange?() }
+        }
+    }
+    /// 按住這個鍵時一般滾輪改成左右捲動（見 ScrollHorizontalKey）
+    var scrollHorizontalKey: ScrollHorizontalKey {
+        didSet {
+            defaults.set(scrollHorizontalKey.rawValue, forKey: Keys.scrollHorizontalKey)
+            if scrollHorizontalKey != oldValue { onScrollDirectionChange?() }
+        }
+    }
+    /// 一般滑鼠滾輪平滑捲動（見 SmoothScroll）
+    var scrollSmooth: Bool {
+        didSet {
+            defaults.set(scrollSmooth, forKey: Keys.scrollSmooth)
+            if scrollSmooth != oldValue { onScrollDirectionChange?() }
+        }
+    }
     var scrollReverseTrackpad: Bool {
         didSet {
             defaults.set(scrollReverseTrackpad, forKey: Keys.scrollReverseTrackpad)
             if scrollReverseTrackpad != oldValue { onScrollDirectionChange?() }
+        }
+    }
+    /// 用視窗切換取代 Cmd+Tab（預設關閉）
+    var windowSwitcher: Bool {
+        didSet {
+            defaults.set(windowSwitcher, forKey: Keys.windowSwitcher)
+            if windowSwitcher != oldValue { onWindowSwitcherChange?() }
+        }
+    }
+    /// 視窗切換的所有選項（快捷鍵、大小、篩選、排序、例外清單）
+    var switcher: SwitcherSettings {
+        didSet {
+            defaults.set(switcher.stored, forKey: Keys.switcher)
+            if switcher != oldValue { onWindowSwitcherChange?() }
+        }
+    }
+    /// Caps Lock 切換中英不延遲
+    var capsLockNoDelay: Bool {
+        didSet {
+            defaults.set(capsLockNoDelay, forKey: Keys.capsLockNoDelay)
+            if capsLockNoDelay != oldValue { onInputSourceFixChange?() }
+        }
+    }
+    /// 中文輸入法按住 Shift 打半形英文
+    var shiftHalfWidth: Bool {
+        didSet {
+            defaults.set(shiftHalfWidth, forKey: Keys.shiftHalfWidth)
+            if shiftHalfWidth != oldValue { onInputSourceFixChange?() }
         }
     }
     /// 桌面寵物的大小：1 是和日曆小工具差不多大，範圍 0.5～2（設定的地方用 clampPetScale 限制）
@@ -228,7 +434,7 @@ final class AppSettings {
     static let desktopPetScaleRange: ClosedRange<Double> = 0.5...2
 
     static func clampPetScale(_ value: Double) -> Double {
-        min(max(value, desktopPetScaleRange.lowerBound), desktopPetScaleRange.upperBound)
+        value.isFinite ? min(max(value, desktopPetScaleRange.lowerBound), desktopPetScaleRange.upperBound) : 1
     }
     /// 智慧充電的完成目標與保養上限（建立排程時的預設值）。完成目標預設是「原本的上限」（存成 0）：
     /// 建立排程時的系統充電上限，充好後就停在平常的上限，不會多充到 100%
@@ -328,9 +534,23 @@ final class AppSettings {
         static let mergeMemoryDisk = "mergeMemoryDisk"
         static let networkSpeedTest = "networkSpeedTest"
         static let systemMonitors = "systemMonitors"
+        static let alertCPU = "alertCPU"
+        static let alertMemory = "alertMemory"
+        static let alertDisk = "alertDisk"
         static let menuBarCombined = "menuBarCombined"
         static let powerSaving = "powerSaving"
         static let powerSavingOnBatteryOnly = "powerSavingOnBatteryOnly"
+        static let bluetoothOffDuringSleep = "bluetoothOffDuringSleep"
+        static let keepAwakeApps = "keepAwakeApps"
+        static let quitGuardQuit = "quitGuardQuit"
+        static let lastWindowQuitExcluded = "lastWindowQuitExcluded"
+        static let dockClickMode = "dockClickMode"
+        static let keyboardCleaningSeconds = "keyboardCleaningSeconds"
+        static let mouseBackButton = "mouseBackButton"
+        static let mouseForwardButton = "mouseForwardButton"
+        static let quitGuardClose = "quitGuardClose"
+        static let quitGuardDuration = "quitGuardDuration"
+        static let bluetoothTurnedOffForSleep = "bluetoothTurnedOffForSleep"
         static let updateInterval = "updateInterval"
         static let hiddenFlowItems = "hiddenFlowItems"
         static let hiddenDetailFields = "hiddenDetailFields"
@@ -349,6 +569,14 @@ final class AppSettings {
         static let desktopPetFollowCursor = "desktopPetFollowCursor"
         static let scrollReverseMouse = "scrollReverseMouse"
         static let scrollReverseTrackpad = "scrollReverseTrackpad"
+        static let scrollReverseHorizontal = "scrollReverseHorizontal"
+        static let scrollLinearLines = "scrollLinearLines"
+        static let scrollHorizontalKey = "scrollHorizontalKey"
+        static let scrollSmooth = "scrollSmooth"
+        static let windowSwitcher = "windowSwitcher"
+        static let switcher = "windowSwitcherSettings"
+        static let capsLockNoDelay = "capsLockNoDelay"
+        static let shiftHalfWidth = "shiftHalfWidth"
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
@@ -388,6 +616,10 @@ final class AppSettings {
             Keys.networkSpeedTest: false,
             Keys.powerSaving: false,
             Keys.powerSavingOnBatteryOnly: false,
+            Keys.bluetoothOffDuringSleep: false,
+            Keys.quitGuardQuit: true,
+            Keys.quitGuardClose: false,
+            Keys.quitGuardDuration: 1.0,
             Keys.updateInterval: 1,
             Keys.adminCPUSampling: false,
             Keys.autoCheckUpdates: true,
@@ -404,21 +636,43 @@ final class AppSettings {
             Keys.chargingSleepStrategy: ChargingSleepStrategy.readinessFirst.rawValue,
             Keys.chargingWakeEnabled: false,
         ])
+        // 要在寫入任何設定之前判斷（下面寫入安裝狀態後就判斷不出來）；從舊版更新的不算全新安裝，原本的功能都保留
+        let usedBefore = Self.usedBefore(defaults)
+        if !usedBefore {
+            for (key, installed) in ExtensionFeature.freshInstallChoices { defaults.set(installed, forKey: key) }
+        }
+        var installed = Set<ExtensionFeature>()
+        // 功能自己的開關有沒有打開過：舊版就用著的功能，更新後也要在
+        let switchedOn: [ExtensionFeature: Bool] = [
+            .windowSwitcher: defaults.bool(forKey: Keys.windowSwitcher),
+            .inputMethod: defaults.bool(forKey: Keys.capsLockNoDelay) || defaults.bool(forKey: Keys.shiftHalfWidth),
+        ]
+        for feature in ExtensionFeature.allCases {
+            let stored = defaults.object(forKey: feature.installedKey) as? Bool
+            let isInstalled = feature.isInstalled(stored: stored, switchedOn: switchedOn[feature] ?? false)
+            if isInstalled { installed.insert(feature) }
+            // 第一次推算完就存起來：之後關掉功能自己的開關（例如視窗切換）再重開 App，頁面不會因為重新推算而消失
+            if stored == nil { defaults.set(isInstalled, forKey: feature.installedKey) }
+        }
+        installedFeatures = installed
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)
         display = MenuBarDisplay(rawValue: defaults.string(forKey: Keys.display) ?? "") ?? .iconAndPercent
         lowAlertEnabled = defaults.bool(forKey: Keys.lowAlertEnabled)
-        lowThreshold = defaults.integer(forKey: Keys.lowThreshold)
+        lowThreshold = min(max(defaults.integer(forKey: Keys.lowThreshold), 5), 50)
         fullAlertEnabled = defaults.bool(forKey: Keys.fullAlertEnabled)
-        fullThreshold = defaults.integer(forKey: Keys.fullThreshold)
+        fullThreshold = min(max(defaults.integer(forKey: Keys.fullThreshold), 50), 100)
         monitorCPU = defaults.bool(forKey: Keys.monitorCPU)
         monitorMemory = defaults.bool(forKey: Keys.monitorMemory)
         monitorDisk = defaults.bool(forKey: Keys.monitorDisk)
         monitorNetwork = defaults.bool(forKey: Keys.monitorNetwork)
         mergeMemoryDisk = defaults.bool(forKey: Keys.mergeMemoryDisk)
         networkSpeedTest = defaults.bool(forKey: Keys.networkSpeedTest)
+        alertCPU = defaults.bool(forKey: Keys.alertCPU)
+        alertMemory = defaults.bool(forKey: Keys.alertMemory)
+        alertDisk = defaults.bool(forKey: Keys.alertDisk)
         if defaults.object(forKey: Keys.systemMonitors) != nil {
             systemMonitors = defaults.bool(forKey: Keys.systemMonitors)
-        } else if Self.usedBefore(defaults), AppEdition.current == .battery || AppEdition.current == .status {
+        } else if usedBefore, AppEdition.current == .battery || AppEdition.current == .status {
             // 用舊檔名的 zip 從 v1.6.2 以前一鍵更新：電池版維持只看電池，系統監控版維持開著，不再詢問。
             // 手動下載通用版升級的看不出原本是哪一版，和全新安裝一樣詢問
             let previous = AppEdition.current == .status
@@ -430,6 +684,22 @@ final class AppSettings {
         }
         powerSaving = defaults.bool(forKey: Keys.powerSaving)
         powerSavingOnBatteryOnly = defaults.bool(forKey: Keys.powerSavingOnBatteryOnly)
+        bluetoothOffDuringSleep = defaults.bool(forKey: Keys.bluetoothOffDuringSleep)
+        // 只收合法的識別碼、有上限（匯入的設定也走這裡）
+        keepAwakeApps = Set((defaults.stringArray(forKey: Keys.keepAwakeApps) ?? [])
+            .filter(SwitcherSettings.isValidBundleID).prefix(SwitcherSettings.maxExcludedApps))
+        quitGuardQuit = defaults.bool(forKey: Keys.quitGuardQuit)
+        mouseBackButton = MouseButtons.Action(stored: defaults.string(forKey: Keys.mouseBackButton))
+        mouseForwardButton = MouseButtons.Action(stored: defaults.string(forKey: Keys.mouseForwardButton))
+        keyboardCleaningSeconds = KeyboardCleaning.validDuration(defaults.integer(forKey: Keys.keyboardCleaningSeconds))
+        dockClickMode = DockClick.Mode(rawValue: defaults.string(forKey: Keys.dockClickMode) ?? "") ?? .minimize
+        // 只收合法的識別碼、最多 SwitcherSettings.maxExcludedApps 個（匯入的設定也走這裡）
+        lastWindowQuitExcluded = Set((defaults.stringArray(forKey: Keys.lastWindowQuitExcluded) ?? [])
+            .filter(SwitcherSettings.isValidBundleID).prefix(SwitcherSettings.maxExcludedApps))
+        quitGuardClose = defaults.bool(forKey: Keys.quitGuardClose)
+        // 只收選單上的值，其他（包括匯入的設定）退回 1 秒
+        let duration = defaults.double(forKey: Keys.quitGuardDuration)
+        quitGuardDuration = Self.quitGuardDurations.contains(duration) ? duration : 1
         let interval = defaults.integer(forKey: Keys.updateInterval)
         updateInterval = Self.updateIntervals.contains(interval) ? interval : 1
         hiddenFlowItems = Set(defaults.stringArray(forKey: Keys.hiddenFlowItems) ?? [])
@@ -456,6 +726,14 @@ final class AppSettings {
         desktopPetFollowCursor = defaults.bool(forKey: Keys.desktopPetFollowCursor)
         scrollReverseMouse = defaults.bool(forKey: Keys.scrollReverseMouse)
         scrollReverseTrackpad = defaults.bool(forKey: Keys.scrollReverseTrackpad)
+        scrollReverseHorizontal = defaults.object(forKey: Keys.scrollReverseHorizontal) as? Bool ?? true
+        scrollLinearLines = ScrollLinear.valid(defaults.integer(forKey: Keys.scrollLinearLines))
+        scrollHorizontalKey = ScrollHorizontalKey(stored: defaults.string(forKey: Keys.scrollHorizontalKey))
+        scrollSmooth = defaults.bool(forKey: Keys.scrollSmooth)
+        windowSwitcher = defaults.bool(forKey: Keys.windowSwitcher)
+        switcher = SwitcherSettings(stored: defaults.dictionary(forKey: Keys.switcher) ?? [:])
+        capsLockNoDelay = defaults.bool(forKey: Keys.capsLockNoDelay)
+        shiftHalfWidth = defaults.bool(forKey: Keys.shiftHalfWidth)
         let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
         let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target

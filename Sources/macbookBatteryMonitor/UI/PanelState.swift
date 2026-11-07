@@ -66,6 +66,24 @@ final class PanelState {
     var scrollTrusted = false
     /// 捲動方向的事件攔截正在運作
     var scrollRunning = false
+    /// 視窗切換的事件攔截正在運作
+    var inputTapRunning = false
+    /// Shift 半形的按鍵攔截在運作
+    var shiftRunning = false
+    /// ⌘Q／⌘W 防誤觸的按鍵攔截在運作
+    var quitGuardRunning = false
+    /// 滑鼠側鍵的攔截在運作
+    var mouseButtonsRunning = false
+    /// 關閉最後視窗時結束 App 在運作
+    var lastWindowQuitRunning = false
+    /// 點 Dock 圖示縮到 Dock 在運作
+    var dockClickRunning = false
+    /// 綠色按鈕放大在運作
+    var greenButtonRunning = false
+    /// 視窗吸附在運作
+    var windowSnapRunning = false
+    /// Finder 加強在運作
+    var finderKeysRunning = false
     /// 智慧充電頁的輸入：指定完成時間、每週排程的星期與時間
     var chargingCustomDeadline = Date().addingTimeInterval(4 * 3600)
     var chargingWeekdays: Set<Int> = [2, 3, 4, 5, 6]

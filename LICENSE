@@ -1,0 +1,106 @@
+macbookBatteryMonitor
+
+Copyright © 2026 TSENG KUAN-CHENG and contributors (except the materials
+listed in section 5). All rights reserved.
+
+1. Source available for viewing. Except as expressly permitted in this
+   document, no one may use, copy, modify, merge, publish, distribute,
+   sublicense or sell the contents of this repository, in whole or in part,
+   without the prior written permission of the copyright holder.
+
+2. Building and contributing. You may clone this repository and build and
+   modify it on your own devices, solely for your personal use or to prepare
+   a contribution to this repository. You may not distribute modified
+   versions or builds you made yourself, except by submitting a contribution
+   to this repository.
+
+3. Released builds. All builds published by the copyright holder on this
+   repository's Releases page, including pre-releases and builds obtained
+   through the in-app updater, may be downloaded, installed and used free of
+   charge for personal use or for internal use within an organization.
+   Redistributing them requires prior permission.
+
+4. Contributions. By submitting a contribution to this repository (for
+   example, a pull request), you:
+   - confirm that you have the right to submit it;
+   - grant TSENG KUAN-CHENG a perpetual, worldwide, non-exclusive,
+     royalty-free, irrevocable license to use, modify, distribute and
+     sublicense it as part of this project and its released builds;
+   - keep the copyright in your contribution; and
+   - agree not to assert your moral rights against TSENG KUAN-CHENG or
+     anyone licensed by TSENG KUAN-CHENG.
+
+5. Materials provided by others. The following cat photos and animations
+   were provided by others. Their copyright belongs to their respective
+   rights holders:
+   - Resources/icon-cat.png
+   - companion-photo.heic, and companion-charging, companion-resting and
+     pet-cat (.mov and .png), in Resources/Companion/
+   - the cat images in Resources/AppIcon.icns, Resources/AppIcons/*.png and
+     docs/screenshots/
+   - any other file that reproduces these images
+   These materials may not be extracted from the builds covered by sections
+   2 and 3 or used separately. Rights in the materials themselves belong to
+   their rights holders; this document grants none.
+
+6. Trademarks. MacBook and macOS are trademarks of Apple Inc. This document
+   grants no rights in this project's name or icons.
+
+7. GitHub. Under section D.5 of the GitHub Terms of Service, GitHub users may
+   view and fork this repository on GitHub. Forks remain subject to this
+   document.
+
+8. No warranty; limitation of liability. This project is provided "as is",
+   without warranty of any kind, express or implied. To the maximum extent
+   permitted by law, the copyright holder and contributors are not liable for
+   any damages arising from the use of this project or its released builds.
+
+9. No rights are granted except those expressly granted in this document.
+   This document is written in Chinese and English. If the two versions
+   differ, the Chinese version prevails.
+
+--------------------------------------------------------------------------------
+
+macbookBatteryMonitor
+
+Copyright © 2026 TSENG KUAN-CHENG 及各貢獻者（第 5 條所列素材除外）。保留所有權利。
+
+1. 原始碼公開供檢視：除本文件明文允許的情形外，未經著作權人事先書面同意，不得使用、
+   複製、修改、合併、發表、散布、再授權或販售本儲存庫的內容，包括全部或一部分。
+
+2. 自行編譯與貢獻：可以複製（clone）本儲存庫，在自己的裝置上編譯與修改，用途限於
+   個人使用，或準備向本儲存庫提出的貢獻。除了向本儲存庫提出貢獻之外，不得散布修改過
+   或自行編譯的版本。
+
+3. 發佈的版本：著作權人在本儲存庫 Releases 頁面發佈的所有版本，包括預先發行版本，
+   以及透過 App 內更新取得的版本，可以免費下載、安裝，供個人或組織內部使用。
+   轉散布須先取得同意。
+
+4. 貢獻：提交貢獻（例如 PR）即表示：
+   - 你有權提交這份貢獻；
+   - 你授予 TSENG KUAN-CHENG 永久、全球、非專屬、免權利金、不可撤回的授權，
+     可以在本專案及其發佈版本中使用、修改、散布與再授權這份貢獻；
+   - 這份貢獻的著作權仍然屬於你；
+   - 你同意不對 TSENG KUAN-CHENG 及其授權對象行使著作人格權。
+
+5. 他人提供的素材：下列貓咪照片與動畫由他人提供，著作權屬於原權利人：
+   - Resources/icon-cat.png
+   - Resources/Companion/ 裡的 companion-photo.heic，以及 companion-charging、
+     companion-resting、pet-cat（.mov 與 .png）
+   - Resources/AppIcon.icns、Resources/AppIcons/*.png 與 docs/screenshots/ 裡的
+     貓咪影像
+   - 其他任何重製這些影像的檔案
+   不得把這些素材從第 2、3 條的版本中抽出，或另作他用。這些素材本身的權利屬於
+   原權利人，本文件不授予任何權利。
+
+6. 商標：MacBook、macOS 是 Apple Inc. 的商標。本文件不授予本專案名稱或圖示的
+   任何權利。
+
+7. GitHub：依 GitHub 服務條款 D.5，GitHub 使用者可以在 GitHub 上檢視與分叉
+   本儲存庫。分叉的副本仍受本文件約束。
+
+8. 免責與責任限制：本專案依「現況」提供，不提供任何明示或默示的擔保。在法律允許的
+   最大範圍內，著作權人與貢獻者對使用本專案或其發佈版本所生的任何損害，不負賠償責任。
+
+9. 除本文件明文授予者外，不授予其他權利。本文件以中文與英文寫成，兩者有出入時
+   以中文為準。

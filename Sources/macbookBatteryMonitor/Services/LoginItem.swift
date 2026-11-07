@@ -10,7 +10,7 @@ enum LoginItem {
         case disabled
     }
 
-    private static let label = "com.kuan.batterymonitor"
+    static let label = "com.kuan.batterymonitor"
     /// 上次自動註冊時 App 的位置
     static let registeredPathKey = "loginItemRegisteredPath"
     /// 上次自動註冊時 App 的程式碼雜湊（cdhash）

@@ -142,6 +142,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
         // 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。都沒啟用時什麼都不做
         timers.append(repeating(every: 5) { delegate in
+            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
+            let shift = delegate.sessionActive && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
+                && InputSourceFix.shared.isRunning
+            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
             let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
             guard features.contains(where: delegate.settings.isInstalled) else { return }
             delegate.applyQuitGuard(prompt: false)

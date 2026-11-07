@@ -231,7 +231,10 @@ final class QuitGuardTap: @unchecked Sendable {
 
     func keepAlive() {
         guard let port = locked({ self.port }) else { return }
-        if !CFMachPortIsValid(port) {
+        // 權限被撤銷：重新打開只會一直被系統逾時暫停，整台 Mac 的輸入跟著卡。停掉，權限回來後由 AppDelegate 每 5 秒的檢查重新開始
+        if !AXIsProcessTrusted() {
+            stop()
+        } else if !CFMachPortIsValid(port) {
             stop()
             _ = start()
         } else if !CGEvent.tapIsEnabled(tap: port) {
@@ -299,7 +302,7 @@ final class QuitGuardTap: @unchecked Sendable {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // 暫停期間可能漏掉放開：放棄這次按住
             locked { logic.cancelHold() }
-            if type == .tapDisabledByTimeout, let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
+            if type == .tapDisabledByTimeout, AXIsProcessTrusted(), let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
             return pass
         }
         if event.getIntegerValueField(.eventSourceUserData) == Self.postedMark { return pass }

@@ -69,8 +69,11 @@ final class KeyboardCleaningController {
         let now = Date()
         if state.isExpired(now: now) { return stop() }
         view.remaining = state.remainingSeconds(now: now)
-        // 系統暫停了攔截（例如回應逾時）：重新打開，清潔中鍵盤才不會突然有作用
-        if let port, !CGEvent.tapIsEnabled(tap: port) { CGEvent.tapEnable(tap: port, enable: true) }
+        // 系統暫停了攔截（例如回應逾時）：重新打開，清潔中鍵盤才不會突然有作用。權限被撤銷時擋不住鍵盤，直接結束清潔
+        if let port, !CGEvent.tapIsEnabled(tap: port) {
+            guard AXIsProcessTrusted() else { return stop() }
+            CGEvent.tapEnable(tap: port, enable: true)
+        }
     }
 
     fileprivate func blocks(_ type: CGEventType, isRepeat: Bool) -> Bool {
@@ -87,7 +90,7 @@ final class KeyboardCleaningController {
     }
 
     fileprivate func reenable() {
-        if let port, state.isActive { CGEvent.tapEnable(tap: port, enable: true) }
+        if let port, state.isActive, AXIsProcessTrusted() { CGEvent.tapEnable(tap: port, enable: true) }
     }
 
     /// 畫面中央的清潔視窗：拿到焦點，原本的密碼欄等安全輸入就不會讓按鍵繞過攔截

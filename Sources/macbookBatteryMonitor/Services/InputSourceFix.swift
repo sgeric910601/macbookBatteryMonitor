@@ -85,6 +85,14 @@ final class InputSourceFix {
 
     private func check() {
         guard wanted else { return }
+        // 權限被撤銷：停掉攔截，權限回來後下一次檢查（.stopped）重新開始
+        guard AXIsProcessTrusted() else {
+            if tap.health() != .stopped {
+                tap.stop()
+                Self.log.notice("輔助使用權限被撤銷，停止 Shift 半形攔截")
+            }
+            return
+        }
         switch tap.health() {
         case .ok: return
         case .disabled: tap.reenable()
@@ -174,6 +182,8 @@ final class ShiftTap: @unchecked Sendable {
     }
 
     func reenable() {
+        // 權限被撤銷：不重新打開，交給 InputSourceFix.check 停掉
+        guard AXIsProcessTrusted() else { return }
         if let port = locked({ self.port }) { CGEvent.tapEnable(tap: port, enable: true) }
     }
 

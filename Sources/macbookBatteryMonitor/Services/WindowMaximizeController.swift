@@ -2,12 +2,12 @@ import AppKit
 import ApplicationServices
 import OSLog
 
-/// 綠色按鈕改成放大（計算在 WindowMaximize）。左鍵按下時問最前面那個 App 點到的是什麼，是視窗的全螢幕（綠色）按鈕才接手：
-/// 攔下按下與放開，把視窗放大到填滿螢幕的可用範圍，再按一次還原。全螢幕中的視窗與不能改大小的視窗照系統原本的行為（替它按下按鈕）。
-/// 按著 Option 時照系統原本的 Option 點（縮放）。
+/// 綠色按鈕改成填滿（計算在 WindowMaximize）。左鍵按下時先問 WindowServer 滑鼠底下是哪個視窗，點在它左上角紅黃綠按鈕那一塊才問那個 App
+/// 點到的是什麼，是視窗的全螢幕（綠色）按鈕才接手：攔下按下與放開，把視窗帶到最前面，按系統「視窗」選單的「填滿」，
+/// 已填滿時按「返回上一個大小」（系統動畫，填滿視窗所在的螢幕）；選單沒有這些項目的 App 改用 App 自己的縮放。
+/// 全螢幕中的視窗與不能改大小的視窗照系統原本的行為（替它按下按鈕）。按著 Option 時照系統原本的 Option 點。
 /// 查詢在自己的執行緒上做，最多等 15 毫秒，來不及就當作不是綠色按鈕、照常放行，不會拖慢點擊。
-/// 只問最前面的 App：等待上限要設在那個 App 的物件上；設在系統層級的物件上會變成整個 App 所有查詢的預設上限。
-/// 點背景視窗的綠色按鈕照系統原本的行為。需要「輔助使用」權限
+/// 等待上限設在各 App 的物件上；設在系統層級的物件上會變成整個 App 所有查詢的預設上限。需要「輔助使用」權限
 @MainActor
 final class WindowMaximizeController {
     static let shared = WindowMaximizeController()
@@ -75,11 +75,97 @@ final class WindowMaximizeController {
         }
         guard let frame = Self.frame(of: window), let visible = Self.visibleFrame(containing: frame) else { return }
         let id = AX.windowID(of: window) ?? 0
-        let target = memory.toggle(window: id, frame: frame, visible: visible)
-        // 先移位置再改大小，最後再對一次位置：有些 App 改大小時會自己把視窗推回原位
-        Self.set(window, position: target.origin)
-        Self.set(window, size: target.size)
-        Self.set(window, position: target.origin)
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(window, &pid) == .success else { return }
+        let wasFront = NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        // 原生點背景視窗的綠色按鈕會把它帶到最前面；攔下點擊後要自己做，系統的「填滿」也只對最前面的 App 有效
+        NSRunningApplication(processIdentifier: pid)?.activate()
+        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        // 上次縮放跳到別的螢幕、改成自己填滿的視窗：這次也自己還原
+        if pinned.remove(id) != nil { return Self.move(window, to: memory.toggle(window: id, frame: frame, visible: visible)) }
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.2)
+        tileGeneration &+= 1
+        // 剛被帶到最前面的 App 選單項目還是停用的，要等一下；本來就在最前面就不用等
+        systemTile(app: app, button: button, window: window, id: id, frame: frame, visible: visible,
+                   generation: tileGeneration, triesLeft: wasFront ? 0 : 8)
+    }
+
+    /// 系統「視窗」選單的「填滿」和「移動與調整大小 → 返回上一個大小」（macOS 15 起每個 AppKit App 都有，代號不受語言影響）：
+    /// 和自己點選單一樣是系統動畫，填滿視窗所在的螢幕
+    private static let fillItem = "_zoomFill:", untileItem = "_zoomUntile:"
+    /// 每次點擊加一：重試途中又點了一次，舊的那串就不再做
+    private var tileGeneration = 0
+
+    /// 「返回上一個大小」能按代表視窗是系統排過的（例如上次填滿的）就還原，否則填滿。
+    /// 用系統的狀態判斷，不看視窗大小：外接螢幕的選單列不算在可用範圍裡，填滿後的大小和可用範圍對不上。
+    /// 選單項目停用（App 還沒到最前面）時每 0.05 秒再試，最多約 0.4 秒；沒有這些項目（例如 Qt）或一直停用就改用 App 自己的縮放
+    private func systemTile(app: AXUIElement, button: AXUIElement, window: AXUIElement, id: UInt32,
+                            frame: CGRect, visible: CGRect, generation: Int, triesLeft: Int) {
+        guard generation == tileGeneration else { return }
+        let menu = Self.windowMenu(of: app)
+        let fill = menu.flatMap { Self.menuItem(Self.fillItem, in: $0, depth: 0) }
+        if let fill, Self.attribute(fill, kAXEnabledAttribute) as? Bool == true {
+            let untile = menu.flatMap { Self.menuItem(Self.untileItem, in: $0, depth: 0) }
+            let target = untile.flatMap { Self.attribute($0, kAXEnabledAttribute) as? Bool == true ? $0 : nil } ?? fill
+            AXUIElementPerformAction(target, kAXPressAction as CFString)
+            return
+        }
+        if fill != nil, triesLeft > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                MainActor.assumeIsolated {
+                    WindowMaximizeController.shared.systemTile(app: app, button: button, window: window, id: id, frame: frame,
+                                                               visible: visible, generation: generation, triesLeft: triesLeft - 1)
+                }
+            }
+            return
+        }
+        zoom(button: button, window: window, id: id, frame: frame, visible: visible)
+    }
+
+    /// 有「填滿」的那個選單（「視窗」選單通常在倒數第二個，從後面找比較快）
+    private static func windowMenu(of app: AXUIElement) -> AXUIElement? {
+        guard let bar = attribute(app, kAXMenuBarAttribute), CFGetTypeID(bar) == AXUIElementGetTypeID(),
+              let menus = attribute(bar as! AXUIElement, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+        return menus.reversed().first { menuItem(fillItem, in: $0, depth: 0) != nil }
+    }
+
+    private static func menuItem(_ id: String, in element: AXUIElement, depth: Int) -> AXUIElement? {
+        guard depth < 4, let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+        for child in children {
+            if attribute(child, "AXIdentifier") as? String == id { return child }
+            if let found = menuItem(id, in: child, depth: depth + 1) { return found }
+        }
+        return nil
+    }
+
+    /// App 自己的縮放（和 Option 點綠色按鈕一樣，原生動畫，大小由 App 決定）。
+    /// App 做完縮放動畫才回覆，常超過等待上限（回 cannotComplete），但指令已經送到：只有明確不支援才自己填滿（沒有動畫），
+    /// 否則會在 App 縮回去的途中又被填滿
+    private func zoom(button: AXUIElement, window: AXUIElement, id: UInt32, frame: CGRect, visible: CGRect) {
+        let result = AXUIElementPerformAction(button, "AXZoomWindow" as CFString)
+        guard result != .actionUnsupported else { return Self.move(window, to: memory.toggle(window: id, frame: frame, visible: visible)) }
+        guard id != 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            MainActor.assumeIsolated { WindowMaximizeController.shared.keepOnScreen(window, id: id, original: frame, visible: visible) }
+        }
+    }
+
+    /// 縮放後跳到別的螢幕的視窗（有些 App 在外接螢幕縮放時用主螢幕算大小）
+    private var pinned: Set<UInt32> = []
+
+    /// 縮放做完後視窗跑到別的螢幕：放回原本的螢幕並填滿，下次按自己還原（這種情況沒有動畫，但不會跳螢幕）
+    private func keepOnScreen(_ window: AXUIElement, id: UInt32, original: CGRect, visible: CGRect) {
+        guard let now = Self.frame(of: window), !visible.contains(CGPoint(x: now.midX, y: now.midY)) else { return }
+        pinned.insert(id)
+        Self.move(window, to: memory.toggle(window: id, frame: original, visible: visible))
+    }
+
+    /// 先移位置再改大小，最後再對一次位置：有些 App 改大小時會自己把視窗推回原位
+    private static func move(_ window: AXUIElement, to target: CGRect) {
+        set(window, position: target.origin)
+        set(window, size: target.size)
+        set(window, position: target.origin)
     }
 
     // MARK: - 「輔助使用」
@@ -228,9 +314,19 @@ final class WindowMaximizeTap: @unchecked Sendable {
             guard !event.flags.contains(.maskAlternate), event.getIntegerValueField(.mouseEventClickState) <= 1,
                   let onButton else { return pass }
             let point = event.location
+            // 先看滑鼠底下是誰的視窗、點的是不是左上角紅黃綠按鈕那一塊：不是就不去問任何 App（一般點擊不打擾 App），
+            // 是背景視窗（例如直接點另一個螢幕上的視窗）就問那個 App，不然會照系統原本的行為進入全螢幕
+            guard let owner = Self.trafficLightOwner(at: point) else { return pass }
+            let front = locked { frontApp }
+            let app: AXUIElement
+            if let front, front.pid == owner {
+                app = front.element
+            } else {
+                app = AXUIElementCreateApplication(owner)
+                AXUIElementSetMessagingTimeout(app, 0.015)
+            }
             var element: AXUIElement?
-            guard let app = locked({ frontApp?.element }),
-                  AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) == .success, let element else { return pass }
+            guard AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) == .success, let element else { return pass }
             var subrole: AnyObject?
             guard AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole) == .success,
                   subrole as? String == kAXFullScreenButtonSubrole as String else { return pass }
@@ -244,6 +340,21 @@ final class WindowMaximizeTap: @unchecked Sendable {
         default:
             return pass
         }
+    }
+
+    /// 滑鼠底下最上層的一般視窗，點的位置落在它左上角紅黃綠按鈕那一塊時，回傳那個視窗的 App（只問 WindowServer，不打擾 App）
+    private static func trafficLightOwner(at point: CGPoint) -> pid_t? {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return nil }
+        for info in list where info[kCGWindowLayer as String] as? Int == 0 {
+            guard let dict = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: dict), bounds.contains(point) else { continue }
+            // 最上層的視窗就是點到的那個：不在按鈕那一塊就不是綠色按鈕
+            guard WindowMaximize.isNearTrafficLights(point, window: bounds),
+                  let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != getpid() else { return nil }
+            return pid
+        }
+        return nil
     }
 }
 

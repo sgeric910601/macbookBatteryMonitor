@@ -118,7 +118,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .keyboardCleaning: return "暫時停用鍵盤，方便擦鍵盤；時間到或點「結束清潔」就恢復"
         case .mouseButtons: return "多按鍵滑鼠的第 4、5 鍵換成上一頁、下一頁或 Mission Control"
         case .audioSwitch: return "面板上切換音訊輸出裝置、一鍵把麥克風靜音"
-        case .greenButton: return "點視窗的綠色按鈕改成放大到填滿螢幕（不進全螢幕），再按一次還原"
+        case .greenButton: return "點視窗的綠色按鈕改成填滿螢幕（不進全螢幕），再按一次還原"
         case .windowSnap: return "把視窗拖到螢幕邊緣或角落，放開後排成半邊、填滿或四分之一"
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
         case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、音訊、麥克風、鍵盤清潔與擴充功能開關"

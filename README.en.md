@@ -353,11 +353,13 @@ Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and draggi
 
 ## Green button maximizes
 
-Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the screen's usable area instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size:
+Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the usable area of the screen the window is on instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size, both with the system animation:
 
 - **Full screen**: with the feature on, the green button no longer enters full screen. Option-click is the system's own "Zoom", not full screen either. Use Window → Full Screen or ⌃⌘F instead
 - **Windows already in full screen, windows that cannot be resized**: keep the system behaviour (leave full screen; nothing happens when the button is disabled)
-- **Clicks stay fast**: each left mouse down asks Accessibility what is under the pointer, on its own thread and waiting at most 15 ms; if that is too slow, that one click enters full screen as usual
+- **How it fills**: it uses Window → Fill and Window → Move & Resize → Return to Previous Size from macOS 15, the same as choosing them yourself; Safari, Finder, Chrome, Office, Electron apps and others have them. Apps without them (for example LINE, built with Qt) zoom the window themselves instead, and a window that lands on another screen is moved back and filled there. Windows that support neither are filled directly (no animation)
+- **Background windows**: clicking the green button of a window that is not in front, for example on another screen, works the same and brings it to the front first
+- **Clicks stay fast**: each left mouse down first asks WindowServer which window is under the pointer, and asks that app what was clicked (on its own thread, waiting at most 15 ms) only when the click is near the window's top-left traffic light buttons (if the app is too slow to answer, that one click enters full screen as usual), so ordinary clicks never disturb apps and each click costs about 1 ms more
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is off
 
 ## Click a Dock icon to minimize

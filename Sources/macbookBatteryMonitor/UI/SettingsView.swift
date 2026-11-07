@@ -37,6 +37,40 @@ struct SettingsView: View {
                     Picker("顯示方式", selection: binding(\.display)) {
                         ForEach(MenuBarDisplay.allCases) { Text($0.title).tag($0) }
                     }
+                    if hasBattery {
+                        Divider()
+                        Text("充電圖示自訂").font(.callout.weight(.semibold))
+                        HStack {
+                            Text("充電預覽 · 68%").foregroundStyle(.secondary)
+                            Spacer()
+                            Image(nsImage: StatusIconRenderer.image(percent: 68, state: .charging, low: false,
+                                showsPercent: true, chargingColor: settings.chargingIconColor,
+                                chargingTextColor: settings.chargingIconTextColor))
+                                .resizable().interpolation(.high).frame(width: 72, height: 30)
+                        }
+                        Picker("百分比文字", selection: binding(\.chargingIconText)) {
+                            Text("白色").tag("white")
+                            Text("黑色").tag("black")
+                            Text("跟隨系統外觀").tag("automatic")
+                        }
+                        Toggle("使用原生充電綠色", isOn: binding(\.chargingIconNativeColor))
+                        if !settings.chargingIconNativeColor {
+                            ColorPicker("自訂充電顏色", selection: Binding(
+                                get: { Color(nsColor: settings.chargingIconColor) },
+                                set: { settings.chargingIconColorData = try? NSKeyedArchiver.archivedData(
+                                    withRootObject: NSColor($0), requiringSecureCoding: true) }
+                            ), supportsOpacity: false)
+                        }
+                        Toggle("充電時顯示流光", isOn: binding(\.chargingIconFlow))
+                        Text("依實際電量比例填充。省電模式與減少動態效果會停止流光。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("還原圖示預設") {
+                            settings.chargingIconText = "white"
+                            settings.chargingIconNativeColor = true
+                            settings.chargingIconColorData = nil
+                            settings.chargingIconFlow = true
+                        }
+                    }
                     if !hasBattery {
                         Text("沒有電池的 Mac 改顯示系統耗電瓦數。")
                             .font(.caption)

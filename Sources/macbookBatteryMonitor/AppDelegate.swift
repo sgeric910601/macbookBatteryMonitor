@@ -66,7 +66,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.imagePosition = .imageTrailing
         }
 
-        settings.onChange = { [weak self] in self?.updateStatusItem() }
+        settings.onChange = { [weak self] in
+            self?.lastStatusKey = ""
+            self?.updateStatusItem()
+        }
         settings.onIntervalChange = { [weak self] in self?.applySampleInterval() }
         // 全新安裝：所有需要授權的東西都在第一次啟動時問完（系統監控、管理員 CPU 取樣、通知、藍牙）
         let freshInstall = settings.needsModeChoice
@@ -504,7 +507,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
         let flowActive = store.estimates?.state == .charging && settings.display != .percentOnly
-            && !settings.powerSavingActive && !sleeping
+            && settings.chargingIconFlow && !settings.powerSavingActive && !sleeping
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if flowActive {
             if chargingIconFlow == nil {
@@ -541,7 +544,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let inlinePercent = settings.display == .iconPercentAndTime
         button.imagePosition = inlinePercent ? .imageLeading : .imageTrailing
-        button.image = settings.display == .percentOnly ? nil : StatusIconRenderer.image(percent: s.percent, state: e.state, low: low, showsPercent: inlinePercent)
+        button.image = settings.display == .percentOnly ? nil : StatusIconRenderer.image(percent: s.percent, state: e.state,
+            low: low, showsPercent: inlinePercent, chargingColor: settings.chargingIconColor,
+            chargingTextColor: settings.chargingIconTextColor)
         let text: String
         switch settings.display {
         case .iconAndPercent:

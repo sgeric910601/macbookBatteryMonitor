@@ -3,7 +3,8 @@ import AppKit
 /// 畫選單列的電池圖示。用 drawingHandler 延後繪製，
 /// labelColor 會在實際畫到選單列時才依深色/淺色外觀決定顏色。
 enum StatusIconRenderer {
-    static func image(percent: Int, state: PowerState, low: Bool, showsPercent: Bool = false) -> NSImage {
+    static func image(percent: Int, state: PowerState, low: Bool, showsPercent: Bool = false,
+                      chargingColor: NSColor = .systemGreen, chargingTextColor: NSColor = .white) -> NSImage {
         let image = NSImage(size: NSSize(width: showsPercent ? 36 : 26, height: showsPercent ? 15 : 13), flipped: false) { _ in
             let charging = state == .charging
             let outlineColor = NSColor.labelColor.withAlphaComponent(0.5)
@@ -19,27 +20,25 @@ enum StatusIconRenderer {
             let level = CGFloat(min(max(percent, 0), 100)) / 100
             let fill = NSRect(x: inner.minX, y: inner.minY, width: max(1.5, inner.width * level), height: inner.height)
             let color = fillColor(state: state, low: low)
-            (charging ? NSColor.systemGreen : showsPercent ? color.withAlphaComponent(0.22) : color).setFill()
+            (charging ? chargingColor : showsPercent ? color.withAlphaComponent(0.22) : color).setFill()
             NSBezierPath(roundedRect: fill, xRadius: 1.5, yRadius: 1.5).fill()
 
             if showsPercent {
                 let text = "\(min(max(percent, 0), 100))%" as NSString
-                let attributes: [NSAttributedString.Key: Any] = [
+                var attributes: [NSAttributedString.Key: Any] = [
                     .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .bold),
-                    .foregroundColor: NSColor.labelColor,
+                    .foregroundColor: charging ? chargingTextColor : NSColor.labelColor,
                 ]
+                if charging {
+                    let shadow = NSShadow()
+                    shadow.shadowColor = NSColor.black.withAlphaComponent(0.45)
+                    shadow.shadowBlurRadius = 1
+                    shadow.shadowOffset = .zero
+                    attributes[.shadow] = shadow
+                }
                 let size = text.size(withAttributes: attributes)
                 text.draw(at: NSPoint(x: body.midX - size.width / 2, y: body.midY - size.height / 2),
                           withAttributes: attributes)
-                if charging {
-                    NSGraphicsContext.saveGraphicsState()
-                    NSBezierPath(roundedRect: fill, xRadius: 1.5, yRadius: 1.5).addClip()
-                    var filledAttributes = attributes
-                    filledAttributes[.foregroundColor] = NSColor.black
-                    text.draw(at: NSPoint(x: body.midX - size.width / 2, y: body.midY - size.height / 2),
-                              withAttributes: filledAttributes)
-                    NSGraphicsContext.restoreGraphicsState()
-                }
             } else if let name = overlaySymbol(state),
                let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil),
                let tinted = symbol.withSymbolConfiguration(

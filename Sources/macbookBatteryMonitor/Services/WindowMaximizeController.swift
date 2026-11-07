@@ -5,6 +5,7 @@ import OSLog
 /// 綠色按鈕改成填滿（計算在 WindowMaximize）。左鍵按下時先問 WindowServer 滑鼠底下是哪個視窗，點在它左上角紅黃綠按鈕那一塊才問那個 App
 /// 點到的是什麼，是視窗的全螢幕（綠色）按鈕才接手：攔下按下與放開，把視窗帶到最前面，按系統「視窗」選單的「填滿」，
 /// 已填滿時按「返回上一個大小」（系統動畫，填滿視窗所在的螢幕）；選單沒有這些項目的 App 改用 App 自己的縮放。
+/// macOS 14 沒有這些選單項目：照原本自己算大小填滿（沒有系統動畫）。
 /// 全螢幕中的視窗與不能改大小的視窗照系統原本的行為（替它按下按鈕）。按著 Option 時照系統原本的 Option 點。
 /// 查詢在自己的執行緒上做，最多等 15 毫秒，來不及就當作不是綠色按鈕、照常放行，不會拖慢點擊。
 /// 等待上限設在各 App 的物件上；設在系統層級的物件上會變成整個 App 所有查詢的預設上限。需要「輔助使用」權限
@@ -15,6 +16,7 @@ final class WindowMaximizeController {
 
     private let tap = WindowMaximizeTap()
     private var activationObserver: NSObjectProtocol?
+    private var terminationObserver: NSObjectProtocol?
 
     private func updateFrontApp() {
         tap.setFrontApp(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)
@@ -31,14 +33,25 @@ final class WindowMaximizeController {
             watchdog?.invalidate()
             watchdog = nil
             tap.stop()
-            if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+            for observer in [activationObserver, terminationObserver].compactMap({ $0 }) {
+                NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            }
             activationObserver = nil
+            terminationObserver = nil
+            // 停用期間結束的 App 收不到通知；pid 之後可能被別的 App 用，記錄一起清掉
+            withoutFill.removeAll()
             return !enabled
         }
         if activationObserver == nil {
             activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
             ) { _ in MainActor.assumeIsolated { WindowMaximizeController.shared.updateFrontApp() } }
+            terminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
+            ) { note in
+                guard let pid = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier else { return }
+                MainActor.assumeIsolated { _ = WindowMaximizeController.shared.withoutFill.remove(pid) }
+            }
         }
         updateFrontApp()
         if tap.onButton == nil {
@@ -78,13 +91,20 @@ final class WindowMaximizeController {
         var pid: pid_t = 0
         guard AXUIElementGetPid(window, &pid) == .success else { return }
         let wasFront = NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
-        // 原生點背景視窗的綠色按鈕會把它帶到最前面；攔下點擊後要自己做，系統的「填滿」也只對最前面的 App 有效
+        // 原生點背景視窗的綠色按鈕會把它帶到最前面；攔下點擊後要自己做。系統的「填滿」只對最前面的 App 的主視窗有效，
+        // 點的是同一個 App 的另一個視窗時也要先把它設成主視窗
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.2)
         NSRunningApplication(processIdentifier: pid)?.activate()
+        AXUIElementSetAttributeValue(app, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
         AXUIElementPerformAction(window, kAXRaiseAction as CFString)
         // 上次縮放跳到別的螢幕、改成自己填滿的視窗：這次也自己還原
         if pinned.remove(id) != nil { return Self.move(window, to: memory.toggle(window: id, frame: frame, visible: visible)) }
-        let app = AXUIElementCreateApplication(pid)
-        AXUIElementSetMessagingTimeout(app, 0.2)
+        // macOS 14 沒有「填滿」：照原本自己算大小
+        guard #available(macOS 15, *) else { return Self.move(window, to: memory.toggle(window: id, frame: frame, visible: visible)) }
+        // 已知選單沒有「填滿」的 App（例如 Qt）：不再掃選單列
+        if withoutFill.contains(pid) { return zoom(button: button, window: window, id: id, frame: frame, visible: visible) }
         tileGeneration &+= 1
         // 剛被帶到最前面的 App 選單項目還是停用的，要等一下；本來就在最前面就不用等
         systemTile(app: app, button: button, window: window, id: id, frame: frame, visible: visible,
@@ -96,6 +116,8 @@ final class WindowMaximizeController {
     private static let fillItem = "_zoomFill:", untileItem = "_zoomUntile:"
     /// 每次點擊加一：重試途中又點了一次，舊的那串就不再做
     private var tileGeneration = 0
+    /// 選單沒有「填滿」的 App：直接用 App 自己的縮放，不必每次點都掃一遍選單列。App 結束時拿掉（pid 會被重複使用）
+    private var withoutFill: Set<pid_t> = []
 
     /// 「返回上一個大小」能按代表視窗是系統排過的（例如上次填滿的）就還原，否則填滿。
     /// 用系統的狀態判斷，不看視窗大小：外接螢幕的選單列不算在可用範圍裡，填滿後的大小和可用範圍對不上。
@@ -103,13 +125,23 @@ final class WindowMaximizeController {
     private func systemTile(app: AXUIElement, button: AXUIElement, window: AXUIElement, id: UInt32,
                             frame: CGRect, visible: CGRect, generation: Int, triesLeft: Int) {
         guard generation == tileGeneration else { return }
-        let menu = Self.windowMenu(of: app)
+        let (scanned, menu) = Self.windowMenu(of: app)
         let fill = menu.flatMap { Self.menuItem(Self.fillItem, in: $0, depth: 0) }
         if let fill, Self.attribute(fill, kAXEnabledAttribute) as? Bool == true {
             let untile = menu.flatMap { Self.menuItem(Self.untileItem, in: $0, depth: 0) }
             let target = untile.flatMap { Self.attribute($0, kAXEnabledAttribute) as? Bool == true ? $0 : nil } ?? fill
-            AXUIElementPerformAction(target, kAXPressAction as CFString)
+            let result = AXUIElementPerformAction(target, kAXPressAction as CFString)
+            // 逾時（App 做動畫時才回覆）代表已經送到；其他錯誤代表沒按到，點擊已經被攔下，改用縮放才不會什麼都沒發生
+            if result != .success, result != .cannotComplete {
+                Self.log.notice("按下填滿失敗（\(result.rawValue)），改用縮放")
+                zoom(button: button, window: window, id: id, frame: frame, visible: visible)
+            }
             return
+        }
+        // 讀得到選單列卻沒有「填滿」才記住；讀不到（App 忙、逾時）下次再試
+        if fill == nil, scanned {
+            var pid: pid_t = 0
+            if AXUIElementGetPid(app, &pid) == .success { withoutFill.insert(pid) }
         }
         if fill != nil, triesLeft > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -124,19 +156,51 @@ final class WindowMaximizeController {
     }
 
     /// 有「填滿」的那個選單（「視窗」選單通常在倒數第二個，從後面找比較快）
-    private static func windowMenu(of app: AXUIElement) -> AXUIElement? {
-        guard let bar = attribute(app, kAXMenuBarAttribute), CFGetTypeID(bar) == AXUIElementGetTypeID(),
-              let menus = attribute(bar as! AXUIElement, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
-        return menus.reversed().first { menuItem(fillItem, in: $0, depth: 0) != nil }
+    /// 子元素不會沿用 App 元素的等待上限（會用全域預設約 6 秒），所以選單列、選單、選單項目各自設定
+    private static let menuTimeout: Float = 0.1
+
+    /// scanned：整條選單列都讀完了，每個查詢不是成功就是「沒有這個值」；有任何逾時或失敗時為 false，不能斷定沒有「填滿」
+    private static func windowMenu(of app: AXUIElement) -> (scanned: Bool, menu: AXUIElement?) {
+        var complete = true
+        guard let bar = menuAttribute(app, kAXMenuBarAttribute, complete: &complete),
+              CFGetTypeID(bar) == AXUIElementGetTypeID() else { return (false, nil) }
+        let menuBar = bar as! AXUIElement
+        AXUIElementSetMessagingTimeout(menuBar, menuTimeout)
+        guard let menus = menuAttribute(menuBar, kAXChildrenAttribute, complete: &complete) as? [AXUIElement], !menus.isEmpty else {
+            return (false, nil)
+        }
+        let menu = menus.reversed().first {
+            AXUIElementSetMessagingTimeout($0, menuTimeout)
+            return menuItem(fillItem, in: $0, depth: 0, complete: &complete) != nil
+        }
+        return (complete, menu)
     }
 
     private static func menuItem(_ id: String, in element: AXUIElement, depth: Int) -> AXUIElement? {
-        guard depth < 4, let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+        var complete = true
+        return menuItem(id, in: element, depth: depth, complete: &complete)
+    }
+
+    private static func menuItem(_ id: String, in element: AXUIElement, depth: Int, complete: inout Bool) -> AXUIElement? {
+        guard depth < 4, let children = menuAttribute(element, kAXChildrenAttribute, complete: &complete) as? [AXUIElement] else { return nil }
         for child in children {
-            if attribute(child, "AXIdentifier") as? String == id { return child }
-            if let found = menuItem(id, in: child, depth: depth + 1) { return found }
+            AXUIElementSetMessagingTimeout(child, menuTimeout)
+            if menuAttribute(child, "AXIdentifier", complete: &complete) as? String == id { return child }
+            if let found = menuItem(id, in: child, depth: depth + 1, complete: &complete) { return found }
         }
         return nil
+    }
+
+    /// 和 attribute 一樣，但逾時或其他錯誤（不是「沒有這個值」）時把 complete 設成 false
+    private static func menuAttribute(_ element: AXUIElement, _ name: String, complete: inout Bool) -> AnyObject? {
+        var value: AnyObject?
+        switch AXUIElementCopyAttributeValue(element, name as CFString, &value) {
+        case .success: return value
+        case .noValue, .attributeUnsupported: return nil
+        default:
+            complete = false
+            return nil
+        }
     }
 
     /// App 自己的縮放（和 Option 點綠色按鈕一樣，原生動畫，大小由 App 決定）。

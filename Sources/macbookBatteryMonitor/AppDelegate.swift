@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var timers: [Timer] = []
     /// 上次畫到選單列的內容，沒變就不重畫
     private var lastStatusKey = ""
+    private var chargingIconFlow: ChargingIconFlowView?
     private var sleeping = false
     private var powerTransitionTask: Task<Void, Never>?
 
@@ -463,6 +464,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func willSleep() {
+        chargingIconFlow?.removeFromSuperview()
+        chargingIconFlow = nil
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統即將睡眠") }
         sleeping = true
         powerTransitionTask?.cancel()
@@ -500,6 +503,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
+        let flowActive = store.estimates?.state == .charging && settings.display != .percentOnly
+            && !settings.powerSavingActive && !sleeping
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if flowActive {
+            if chargingIconFlow == nil {
+                let flow = ChargingIconFlowView(frame: button.bounds)
+                button.addSubview(flow)
+                chargingIconFlow = flow
+            }
+            chargingIconFlow?.percent = store.snapshot?.percent ?? 0
+            chargingIconFlow?.inlinePercent = settings.display == .iconPercentAndTime
+            chargingIconFlow?.needsLayout = true
+        } else {
+            chargingIconFlow?.removeFromSuperview()
+            chargingIconFlow = nil
+        }
         if store.snapshot == nil, let desktop = store.desktop, let watts = desktop.systemWatts {
             updateDesktopStatusItem(button, watts: watts)
             return
@@ -546,6 +565,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)]
         )
         button.toolTip = tooltip(s, e)
+        chargingIconFlow?.needsLayout = true
     }
 
     private func tooltip(_ s: BatterySnapshot, _ e: Estimates) -> String {

@@ -1,19 +1,24 @@
 import AppKit
+import SwiftUI
 
-/// 選單列的貓咪快捷選單：點開直接操作常用功能（防止休眠、音訊、麥克風、鍵盤清潔、擴充功能開關、設定）。
-/// 選單每次打開時才依目前狀態建立，平常不做任何事；不需要權限
+/// 選單列的貓咪快捷面板：點開直接操作常用功能（防止休眠、麥克風、鍵盤清潔、音訊輸出、剪貼簿歷史）。
+/// 和電池、系統監控的面板同一套規則：點圖示開、再點收；點其他圖示直接換過去；點其他地方收起。
+/// 面板每次打開才建立、關掉就釋放，平常不做任何事；不需要權限
 @MainActor
-final class QuickMenuController: NSObject, NSMenuDelegate {
+final class QuickMenuController: NSObject, NSPopoverDelegate {
     static let shared = QuickMenuController()
 
     private var item: NSStatusItem?
     private var settings: AppSettings?
     private var openSettings: ((SettingsSection?) -> Void)?
+    private var popover: NSPopover?
+    private var outsideClickMonitors: [Any] = []
 
     func apply(enabled: Bool, settings: AppSettings, openSettings: @escaping (SettingsSection?) -> Void) {
         self.settings = settings
         self.openSettings = openSettings
         guard enabled else {
+            popover?.closeNow(animated: false)
             if let item { NSStatusBar.system.removeStatusItem(item) }
             item = nil
             return
@@ -23,9 +28,8 @@ final class QuickMenuController: NSObject, NSMenuDelegate {
         item.button?.image = Self.catIcon()
         item.button?.toolTip = "快捷選單"
         item.button?.setAccessibilityLabel("快捷選單")
-        let menu = NSMenu()
-        menu.delegate = self
-        item.menu = menu
+        item.button?.target = self
+        item.button?.action = #selector(itemClicked)
         self.item = item
     }
 
@@ -45,129 +49,72 @@ final class QuickMenuController: NSObject, NSMenuDelegate {
         }
     }
 
-    // MARK: - 選單
+    // MARK: - 面板
 
-    nonisolated func menuNeedsUpdate(_ menu: NSMenu) {
-        MainActor.assumeIsolated { rebuild(menu) }
+    @objc private func itemClicked(_ sender: NSStatusBarButton) {
+        if let popover, popover.isShown {
+            popover.closeNow()
+        } else {
+            showPopover(from: sender)
+        }
     }
 
-    private func rebuild(_ menu: NSMenu) {
-        menu.removeAllItems()
+    private func showPopover(from button: NSView) {
         guard let settings else { return }
-
-        // 防止休眠
-        let awake = KeepAwakeController.shared
-        let awakeItem = NSMenuItem(title: awake.state.isActive ? "防止休眠中（\(awake.state.remainingText(now: Date()) ?? "直到關閉")）" : "防止休眠",
-                                   action: nil, keyEquivalent: "")
-        awakeItem.image = NSImage(systemSymbolName: awake.state.isActive ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: nil)
-        let awakeMenu = NSMenu()
-        if awake.state.isActive { awakeMenu.addItem(action("停止防止休眠") { KeepAwakeController.shared.stop() }) }
-        for duration in KeepAwake.Duration.allCases {
-            awakeMenu.addItem(action(duration.title) { KeepAwakeController.shared.start(duration) })
-        }
-        awakeMenu.addItem(.separator())
-        awakeMenu.addItem(action("螢幕也保持亮著", checked: awake.keepDisplayOn) { KeepAwakeController.shared.keepDisplayOn.toggle() })
-        awakeItem.submenu = awakeMenu
-        menu.addItem(awakeItem)
-
-        // 音訊輸出與麥克風（啟用了「音訊切換」才有）
-        if settings.isInstalled(.audioSwitch) {
-            let audio = AudioSwitchController.shared
-            audio.refresh()
-            let outputItem = NSMenuItem(title: "音訊輸出", action: nil, keyEquivalent: "")
-            outputItem.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: nil)
-            let outputMenu = NSMenu()
-            for output in audio.outputs {
-                let id = output.id
-                outputMenu.addItem(action(output.name, checked: output.isCurrent) { AudioSwitchController.shared.select(id) })
-            }
-            outputItem.submenu = outputMenu
-            menu.addItem(outputItem)
-            if audio.micSupported {
-                let mic = action(audio.micTitle) { AudioSwitchController.shared.toggleMic() }
-                mic.image = NSImage(systemSymbolName: audio.micMuted ? "mic.slash" : "mic", accessibilityDescription: nil)
-                menu.addItem(mic)
-            }
-        }
-
-        // 鍵盤清潔（啟用了才有）
-        if settings.isInstalled(.keyboardCleaning) {
-            let seconds = settings.keyboardCleaningSeconds
-            let clean = action("開始鍵盤清潔") { [weak self] in
-                // 沒有「輔助使用」權限：跳出系統的詢問，並打開設定的權限頁，不要什麼都沒發生
-                guard !KeyboardCleaningController.shared.start(seconds: seconds) else { return }
-                ScrollDirection.requestTrust()
-                self?.openSettings?(.permissions)
-            }
-            clean.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)
-            menu.addItem(clean)
-        }
-
-        // 剪貼簿歷史（啟用了才有）
-        if settings.isInstalled(.clipboardHistory) {
-            let clip = NSMenuItem(title: "剪貼簿歷史", action: nil, keyEquivalent: "")
-            clip.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
-            let clipMenu = NSMenu()
-            let items = ClipboardHistoryController.shared.history.items
-            if items.isEmpty {
-                let empty = NSMenuItem(title: "還沒有記錄", action: nil, keyEquivalent: "")
-                empty.isEnabled = false
-                clipMenu.addItem(empty)
-            }
-            for text in items {
-                let item = action(ClipboardHistory.preview(text)) { ClipboardHistoryController.shared.restore(text) }
-                item.toolTip = String(text.prefix(500))
-                clipMenu.addItem(item)
-            }
-            if !items.isEmpty {
-                clipMenu.addItem(.separator())
-                clipMenu.addItem(action("清除歷史") { ClipboardHistoryController.shared.clear() })
-            }
-            clip.submenu = clipMenu
-            menu.addItem(clip)
-        }
-
-        // 擴充功能開關
-        menu.addItem(.separator())
-        let featuresItem = NSMenuItem(title: "擴充功能", action: nil, keyEquivalent: "")
-        featuresItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
-        let featuresMenu = NSMenu()
-        let xdrSupported = XDRBrightnessController.shared.checkSupport()
-        for feature in ExtensionFeature.allCases where feature != .quickMenu {
-            let on = settings.isInstalled(feature)
-            // 沒有支援的內建 XDR 螢幕時不能加入 XDR 增亮；已加入的仍列出來，可以移除
-            if feature == .xdrBrightness, !xdrSupported, !on { continue }
-            featuresMenu.addItem(action(feature.title, checked: on) { [weak settings] in settings?.setInstalled(feature, !on) })
-        }
-        featuresItem.submenu = featuresMenu
-        menu.addItem(featuresItem)
-
-        menu.addItem(.separator())
-        menu.addItem(action("設定…") { [weak self] in self?.openSettings?(nil) })
-        menu.addItem(action("結束\(AppEdition.appName)") { NSApp.terminate(nil) })
+        AudioSwitchController.shared.refresh()
+        let root = QuickMenuPanel(settings: settings, awake: .shared, audio: .shared,
+                                  clipboard: ClipboardHistoryController.shared.history.items,
+                                  close: { [weak self] in self?.popover?.closeNow() },
+                                  openSettings: { [weak self] section in
+                                      self?.popover?.closeNow(animated: false)
+                                      self?.openSettings?(section)
+                                  })
+        let hosting = NSHostingController(rootView: root)
+        hosting.sizingOptions = [.preferredContentSize]
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.delegate = self
+        popover.contentViewController = hosting
+        popover.contentSize = hosting.view.fittingSize
+        self.popover = popover
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.allowInFullScreen()
+        NSApp.activate()
+        popover.contentViewController?.view.window?.makeKey()
+        startOutsideClickMonitoring(button: button)
     }
 
-    /// 用閉包當動作的選單項目
-    private func action(_ title: String, checked: Bool = false, _ handler: @escaping @MainActor () -> Void) -> NSMenuItem {
-        let item = ClosureMenuItem(title: title, handler: handler)
-        item.state = checked ? .on : .off
-        return item
+    /// 點其他 App、桌面或本 App 其他視窗（電池、系統監控的圖示與面板）就收起來。
+    /// 面板本身與貓咪圖示交給原本的處理（再點一次圖示是收起）
+    private func startOutsideClickMonitoring(button: NSView) {
+        stopOutsideClickMonitoring()
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.popover?.closeNow() }
+        }) {
+            outsideClickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { [weak self, weak button] event in
+            guard let self, let popover = self.popover else { return event }
+            let inside = event.window === popover.contentViewController?.view.window || event.window === button?.window
+            if !inside { popover.closeNow() }
+            return event
+        }) {
+            outsideClickMonitors.append(local)
+        }
     }
-}
 
-private final class ClosureMenuItem: NSMenuItem {
-    private let handler: @MainActor () -> Void
-
-    init(title: String, handler: @escaping @MainActor () -> Void) {
-        self.handler = handler
-        super.init(title: title, action: #selector(run), keyEquivalent: "")
-        target = self
+    private func stopOutsideClickMonitoring() {
+        outsideClickMonitors.forEach(NSEvent.removeMonitor)
+        outsideClickMonitors.removeAll()
     }
 
-    @available(*, unavailable)
-    required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    @objc private func run() {
-        MainActor.assumeIsolated { handler() }
+    func popoverDidClose(_ notification: Notification) {
+        guard let closed = notification.object as? NSPopover else { return }
+        if closed === popover { stopOutsideClickMonitoring() }
+        DispatchQueue.main.async { [weak self] in
+            closed.contentViewController = nil
+            if self?.popover === closed { self?.popover = nil }
+        }
     }
 }

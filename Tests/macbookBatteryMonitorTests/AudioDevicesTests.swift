@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 
 struct AudioDevicesTests {
@@ -23,6 +24,16 @@ struct AudioDevicesTests {
         XCTAssertEqual(AudioDevices.mutePlan(hasMuteSwitch: false, volume: 0.6), .volume(restoreTo: 0.6))
         XCTAssertEqual(AudioDevices.mutePlan(hasMuteSwitch: false, volume: 0), .volume(restoreTo: 0.5))
         XCTAssertEqual(AudioDevices.mutePlan(hasMuteSwitch: false, volume: nil), .unsupported)
+    }
+
+    /// 裝置圖示依連接方式：內建、藍牙、螢幕、虛擬裝置各有圖示，不認得的用一般喇叭
+    func testDeviceSymbol() {
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeBuiltIn), "laptopcomputer")
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeBluetoothLE), "headphones")
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeHDMI), "display")
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeVirtual), "waveform")
+        XCTAssertEqual(AudioDevices.symbol(transport: 0), "hifispeaker")
+        XCTAssertEqual(AudioDevices.outputs([AudioDevices.Device(id: 1, name: "a", outputs: true, inputs: false, transport: kAudioDeviceTransportTypeHDMI)], current: nil).first?.transport, kAudioDeviceTransportTypeHDMI)
     }
 
     /// 只有需要「輔助使用」的擴充功能才列在權限頁的輔助使用底下

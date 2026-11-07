@@ -17,7 +17,7 @@ enum AudioDeviceReader {
         return ids.compactMap { id in
             guard let name = name(of: id) else { return nil }
             return AudioDevices.Device(id: id, name: name, outputs: hasStreams(id, kAudioObjectPropertyScopeOutput),
-                                       inputs: hasStreams(id, kAudioObjectPropertyScopeInput))
+                                       inputs: hasStreams(id, kAudioObjectPropertyScopeInput), transport: transport(of: id))
         }
     }
 
@@ -27,6 +27,13 @@ enum AudioDeviceReader {
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(id, &where_, 0, nil, &size, &name) == noErr, let name else { return nil }
         return name.takeRetainedValue() as String
+    }
+
+    private static func transport(of id: AudioDeviceID) -> UInt32 {
+        var where_ = address(kAudioDevicePropertyTransportType)
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(id, &where_, 0, nil, &size, &value) == noErr ? value : 0
     }
 
     private static func hasStreams(_ id: AudioDeviceID, _ scope: AudioObjectPropertyScope) -> Bool {

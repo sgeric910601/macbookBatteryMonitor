@@ -126,7 +126,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "點視窗的綠色按鈕改成填滿螢幕（不進全螢幕），再按一次還原"
         case .windowSnap: return "把視窗拖到螢幕邊緣或角落，放開後排成半邊、填滿或四分之一"
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
-        case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、音訊、麥克風、鍵盤清潔與擴充功能開關"
+        case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、麥克風、鍵盤清潔、音訊輸出與剪貼簿歷史"
         case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
         case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼工具標成機密的內容），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
         case .xdrBrightness: return "讓內建 XDR 螢幕額外增亮，亮度鍵到頂後可自動啟用；會增加耗電"

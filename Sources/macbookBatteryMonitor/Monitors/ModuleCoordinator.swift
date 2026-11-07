@@ -22,6 +22,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     /// 每次打開都建立新的，關閉後整個釋放
     private var popover: NSPopover?
     private var openKind: MonitorKind?
+    /// 從選單列圖示打開的面板：系統的 .transient 打開過選單（例如快捷選單）後常不會自己收起來，自己監聽面板外的點擊
+    private var outsideClickMonitors: [Any] = []
     private var topStream: TopStream?
     private var sleeping = false
     private var cpuAlert = SustainedAlert(duration: MonitorAlertRules.cpuDuration)
@@ -325,7 +327,33 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         popover.allowInFullScreen()
         NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
+        if behavior == .transient { startOutsideClickMonitoring(button: button) }
         startTop()
+    }
+
+    /// 點其他 App、桌面或本 App 其他視窗（電池面板、快捷選單的圖示等）就收起來。
+    /// 面板本身與打開它的圖示交給原本的處理（再點一次圖示是收起）
+    private func startOutsideClickMonitoring(button: NSView) {
+        stopOutsideClickMonitoring()
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.popover?.closeNow() }
+        }) {
+            outsideClickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { [weak self, weak button] event in
+            guard let self, let popover = self.popover else { return event }
+            let inside = event.window === popover.contentViewController?.view.window || event.window === button?.window
+            if !inside { popover.closeNow() }
+            return event
+        }) {
+            outsideClickMonitors.append(local)
+        }
+    }
+
+    private func stopOutsideClickMonitoring() {
+        outsideClickMonitors.forEach(NSEvent.removeMonitor)
+        outsideClickMonitors.removeAll()
     }
 
     /// CPU 與記憶體面板開著時，持續跑一個 top 更新程序排行（間隔同設定）
@@ -358,6 +386,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         guard let closed = notification.object as? NSPopover else { return }
         // 切換到另一個模組時，新面板已經接手；這裡只釋放舊的
         if closed === popover {
+            stopOutsideClickMonitoring()
             topStream?.stop()
             topStream = nil
             openKind = nil

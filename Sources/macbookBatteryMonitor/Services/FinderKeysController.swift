@@ -161,10 +161,10 @@ final class FinderKeysTap: @unchecked Sendable {
         var role: AnyObject?
         switch AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role) {
         case .success: break
-        // 逾時或 Finder 沒回應：和上面一樣當作在打字
-        case .cannotComplete: return true
         // 這個元件沒有 role：不是輸入欄位
-        default: return false
+        case .noValue, .attributeUnsupported: return false
+        // 查詢失敗或逾時：和上面一樣當作在打字
+        default: return true
         }
         return [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField"].contains(role as? String ?? "")
     }

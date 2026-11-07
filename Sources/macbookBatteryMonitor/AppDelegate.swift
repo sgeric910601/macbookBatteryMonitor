@@ -36,7 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 這個使用者的工作階段在前景。快速切換使用者後留在背景的攔截，會讓前景使用者的每個輸入都要等它逾時，
     /// 所以切到背景時停掉所有按鍵與滑鼠攔截，切回來再依設定開始
     private var sessionActive = true
-    /// 按鍵與滑鼠功能能不能運作：工作階段在前景，而且 EventTapAccess 沒有進入停用狀態
+    /// 會擋住輸入的按鍵與滑鼠功能能不能運作：工作階段在前景，而且 EventTapAccess 沒有進入停用狀態。
+    /// 只監聽的功能（Dock 點擊、視窗吸附、關閉最後視窗）不受停用影響，只看 sessionActive
     private var inputAllowed: Bool { sessionActive && !EventTapAccess.shared.isLost }
     private var mouseButtonsTrustTimer: Timer?
     private var lastWindowTrustTimer: Timer?
@@ -94,8 +95,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if freshInstall { askForAdminCPU() }
         Notifier.shared.setup()
         EventTapAccess.shared.announceIfRelaunched()
-        EventTapAccess.shared.onDisabled = { [weak self] in
-            KeyboardCleaningController.shared.stop()
+        EventTapAccess.shared.onStateChange = { [weak self] in
+            let paused = EventTapAccess.shared.isLost
+            if paused { KeyboardCleaningController.shared.stop() }
+            self?.ui.inputPaused = paused
             self?.applyInputFeatures()
         }
         // 藍牙權限還沒決定時 macOS 會跳出詢問（從舊版升級也會問這一次）；已經允許就直接在背景讀；拒絕過就不再問
@@ -320,9 +323,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// 「視窗與 Dock」的擴充功能：關閉最後視窗時結束 App、點 Dock 圖示縮到 Dock。
     /// 需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
     private func applyLastWindowQuit(prompt: Bool) {
-        let lastWindow = inputAllowed && settings.isInstalled(.lastWindowQuit), dock = inputAllowed && settings.isInstalled(.dockClick)
+        let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
         let green = inputAllowed && settings.isInstalled(.greenButton)
-        let snap = inputAllowed && settings.isInstalled(.windowSnap)
+        let snap = sessionActive && settings.isInstalled(.windowSnap)
         let finder = inputAllowed && settings.isInstalled(.finderKeys)
         let wanted = lastWindow || dock || green || snap || finder
         LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded

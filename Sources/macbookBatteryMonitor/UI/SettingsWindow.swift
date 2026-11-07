@@ -188,6 +188,14 @@ struct SettingsWindowView: View {
                         }
                     }
                     .padding(.bottom, 4)
+                    // 通知可能被關掉，所以每一頁都顯示：使用者才知道按鍵與滑鼠功能為什麼沒有作用
+                    if ui.inputPaused {
+                        Label("無法確認「輔助使用」權限，按鍵與滑鼠相關功能已暫停。請到系統設定 → 隱私權與安全性 →「輔助使用」（macOS 27 起叫「裝置控制和資料取用」）確認已允許\(AppEdition.appName)；權限恢復後會自動恢復，或重新開啟 App。",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     // 登入項目分頁沒有 SettingsView 的卡片，不放進去，否則隱藏的卡片之間的間距會把標題與內容撐開
                     if current != .startup {
                         SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater,

@@ -35,8 +35,7 @@ final class MouseButtonsController {
         guard port == nil else { return isRunning }
         let mask: CGEventMask = (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.otherMouseUp.rawValue)
         guard let port = EventTapAccess.shared.createTap(place: .headInsertEventTap,
-                                           mask: mask, callback: mouseButtonsCallback, userInfo: nil) else { return false }
-        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+                                           mask: mask, callback: mouseButtonsCallback, userInfo: nil, loop: CFRunLoopGetMain()) else { return false }
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in

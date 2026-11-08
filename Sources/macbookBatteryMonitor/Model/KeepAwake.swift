@@ -30,15 +30,19 @@ struct KeepAwake {
     private(set) var isActive = false
     /// 到期時間；nil 是直到關閉
     private(set) var until: Date?
+    /// 目前選的時間，讓畫面標出是哪一個；沒在防止休眠時為 nil
+    private(set) var duration: Duration?
 
     mutating func start(_ duration: Duration, now: Date) {
         isActive = true
+        self.duration = duration
         until = duration.seconds.map { now.addingTimeInterval($0) }
     }
 
     mutating func stop() {
         isActive = false
         until = nil
+        duration = nil
     }
 
     /// batteryPercent 為 nil：沒有電池（桌上型 Mac）

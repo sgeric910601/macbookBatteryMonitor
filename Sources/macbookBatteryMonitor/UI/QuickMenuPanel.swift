@@ -79,8 +79,7 @@ struct QuickMenuPanel: View {
                 QuickCardTitle("防止休眠時間", symbol: "timer", tint: .orange)
                 HStack(spacing: 6) {
                     ForEach(KeepAwake.Duration.allCases, id: \.self) { duration in
-                        // 只有「直到關閉」看得出是哪一個；其他時間的剩餘分鐘顯示在上面的大按鈕
-                        let selected = awake.state.isActive && duration == .indefinitely && awake.state.until == nil
+                        let selected = awake.state.duration == duration
                         Button { awake.start(duration) } label: {
                             Text(duration.title)
                                 .font(.caption.weight(.medium))

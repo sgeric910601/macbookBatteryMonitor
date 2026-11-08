@@ -9,12 +9,15 @@ struct KeepAwakeTests {
         XCTAssertTrue(!awake.isActive)
         awake.start(.hour1, now: now)
         XCTAssertTrue(awake.isActive)
+        XCTAssertTrue(awake.duration == .hour1)
         XCTAssertTrue(!awake.shouldStop(now: now.addingTimeInterval(3599), batteryPercent: 80, onBattery: true))
         XCTAssertTrue(awake.shouldStop(now: now.addingTimeInterval(3600), batteryPercent: 80, onBattery: true))
         awake.start(.indefinitely, now: now)
         XCTAssertTrue(!awake.shouldStop(now: now.addingTimeInterval(86400 * 30), batteryPercent: 80, onBattery: true))
+        XCTAssertTrue(awake.duration == .indefinitely)
         awake.stop()
         XCTAssertTrue(!awake.isActive)
+        XCTAssertTrue(awake.duration == nil)
     }
 
     /// 用電池而且電量到 10% 以下時停止；接著電源時不管電量

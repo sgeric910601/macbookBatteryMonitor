@@ -34,8 +34,6 @@ final class DockClickController {
     private var frontHistory: [(pid: pid_t, time: TimeInterval)] = []
     private var activationObserver: NSObjectProtocol?
     /// 長按是 Dock 的選單，不是點擊
-    /// 按下後超過這麼久才處理，就當成 Dock 可能已經動作了（Dock 在放開時才動作，最快的點擊也要約 50 ms）
-    private static let lateCallback: TimeInterval = 0.05
     private static let maxPressDuration: TimeInterval = 0.5
     /// 放開時 Dock 會請 App「重新打開」，App 會叫回一個縮下去的視窗：稍等一下再縮，讓那個要求先完成；
     /// 有些 App（例如 Qt 的 LINE）回應得更晚，過一陣子再把被叫回的縮回去一次
@@ -135,7 +133,8 @@ final class DockClickController {
             let front = DockClick.frontApp(at: time, history: frontHistory)
             let clicked = Self.dockApp(at: location)
             // 只有點到最前面那個 App 時才需要知道它的視窗狀態
-            let late = ProcessInfo.processInfo.systemUptime - time > Self.lateCallback
+            // Dock 放開才動作：處理時左鍵還按著就一定還沒叫回；已經放開就當成 Dock 可能已經動作了
+            let late = !CGEventSource.buttonState(.combinedSessionState, button: .left)
             let state = clicked != nil && clicked == front ? stateAtClick(of: front ?? 0, late: late) : (visible: false, minimizedByUs: false)
             let lag = Int((ProcessInfo.processInfo.systemUptime - time) * 1000)
             Self.log.debug("Dock 點擊：按下後 \(lag) ms 才處理，前景 \(front ?? 0)，點到 \(clicked ?? 0)，開著的視窗 \(state.visible)，我們縮的 \(state.minimizedByUs)")
@@ -156,7 +155,7 @@ final class DockClickController {
     }
 
     /// 按下那一刻的狀態（Dock 還沒動作）。有沒有開著的視窗問 WindowServer，不問 App，不會等
-    /// late：回呼比按下晚跑，Dock 可能已經叫回我們縮的視窗，這時叫回的那些不算「按下前開著的視窗」
+    /// late：回呼跑的時候左鍵已經放開，Dock 可能已經叫回我們縮的視窗，這時叫回的那些不算「按下前開著的視窗」
     private func stateAtClick(of pid: pid_t, late: Bool) -> (visible: Bool, minimizedByUs: Bool) {
         let recorded = minimizedByUs[pid] ?? []
         // 我們縮的視窗都已經不在 Dock 裡（使用者自己叫回了）：紀錄作廢

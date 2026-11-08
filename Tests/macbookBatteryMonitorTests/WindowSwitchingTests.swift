@@ -103,6 +103,29 @@ final class WindowSwitchingTests {
         XCTAssertTrue(!WindowCandidacy.rejectedByAccessibility(isStandard: false, minimized: true))
         XCTAssertTrue(!WindowCandidacy.rejectedByAccessibility(isStandard: true, minimized: false))
         XCTAssertTrue(!WindowCandidacy.rejectedByAccessibility(isStandard: nil, minimized: false))
+        checkFullscreenAccessories()
+    }
+
+    /// 全螢幕時 Safari 另外放在最上方的工具列不列；一般桌面上重疊的視窗、別的 App、並排的兩個全螢幕視窗照列
+    private func checkFullscreenAccessories() {
+        func window(_ id: UInt32, pid: Int32 = 1, _ rect: CGRect, fullscreen: Bool = true, space: UInt64 = 9) -> ServerWindowRecord {
+            var r = ServerWindowRecord(windowID: id, ownerPID: pid, orderedIn: true)
+            r.bounds = rect; r.spaces = [space]; r.onFullscreenSpace = fullscreen
+            return r
+        }
+        let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+        let toolbar = CGRect(x: 0, y: 30, width: 1920, height: 52)
+        XCTAssertEqual(WindowCandidacy.fullscreenAccessories([window(1, screen), window(2, toolbar)]), [2])
+        // 全螢幕時打開的設定、尋找等一般小視窗：照列
+        XCTAssertEqual(WindowCandidacy.fullscreenAccessories([window(1, screen), window(2, CGRect(x: 660, y: 340, width: 600, height: 400))]), [])
+        // 一般桌面上小視窗疊在大視窗裡：兩個都是真的視窗
+        XCTAssertEqual(WindowCandidacy.fullscreenAccessories([window(1, screen, fullscreen: false), window(2, toolbar, fullscreen: false)]), [])
+        // 別的 App、別的全螢幕 Space 的視窗不算
+        XCTAssertEqual(WindowCandidacy.fullscreenAccessories([window(1, screen), window(2, pid: 2, toolbar)]), [])
+        XCTAssertEqual(WindowCandidacy.fullscreenAccessories([window(1, screen), window(2, toolbar, space: 10)]), [])
+        // 分割顯示的兩個視窗互不包含
+        let left = CGRect(x: 0, y: 0, width: 960, height: 1080), right = CGRect(x: 960, y: 0, width: 960, height: 1080)
+        XCTAssertEqual(WindowCandidacy.fullscreenAccessories([window(1, left), window(2, right)]), [])
     }
 
     func testWindowServerBits() {

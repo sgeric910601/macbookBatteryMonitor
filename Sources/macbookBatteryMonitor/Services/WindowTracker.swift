@@ -178,7 +178,9 @@ final class WindowTracker {
         // 由前到後；沒畫在畫面上的視窗（縮到 Dock、隱藏、別的 Space、幻影）不在這份清單裡
         let stacking = SkyLight.onScreenFrontToBack()
         var windows: [SwitcherWindow] = []
-        for record in SkyLight.windows(in: allSpaces, ownedBy: Set(apps.keys)) {
+        let records = SkyLight.windows(in: allSpaces, ownedBy: Set(apps.keys))
+        let accessories = WindowCandidacy.fullscreenAccessories(records)
+        for record in records where !accessories.contains(record.windowID) {
             guard let app = apps[record.ownerPID], WindowCandidacy.of(record, visibleSpaces: currentSpaces) == .listed else { continue }
             let ax = cache[record.ownerPID]?[record.windowID]
             if WindowCandidacy.rejectedByAccessibility(isStandard: ax?.isStandard, minimized: record.minimized || ax?.isMinimized == true) { continue }

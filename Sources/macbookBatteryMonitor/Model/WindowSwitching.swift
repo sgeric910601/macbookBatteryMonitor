@@ -142,6 +142,25 @@ enum WindowCandidacy: Equatable {
     static func rejectedByAccessibility(isStandard: Bool?, minimized: Bool) -> Bool {
         isStandard == false && !minimized
     }
+
+    /// 全螢幕 Space 上的附屬視窗：例如 Safari 全螢幕時另外放在最上方的工具列。
+    /// 只認工具列的形狀：落在同一個 App、同一個全螢幕 Space 上另一個視窗裡，和它一樣寬、左緣對齊、高度不到四分之一。
+    /// 全螢幕時打開的設定、尋找等一般小視窗不是這個形狀，照列
+    static func fullscreenAccessories(_ records: [ServerWindowRecord]) -> Set<UInt32> {
+        let onFullscreen = records.filter { $0.onFullscreenSpace && $0.bounds.width > 0 && $0.bounds.height > 0 }
+        var accessories = Set<UInt32>()
+        for inner in onFullscreen {
+            let covered = onFullscreen.contains { outer in
+                outer.windowID != inner.windowID && outer.ownerPID == inner.ownerPID
+                    && !Set(outer.spaces).isDisjoint(with: inner.spaces)
+                    && outer.bounds.contains(inner.bounds) && outer.bounds != inner.bounds
+                    && inner.bounds.minX == outer.bounds.minX && inner.bounds.width == outer.bounds.width
+                    && inner.bounds.height < outer.bounds.height / 4
+            }
+            if covered { accessories.insert(inner.windowID) }
+        }
+        return accessories
+    }
 }
 
 /// 要列出哪些視窗

@@ -136,6 +136,12 @@ enum WindowCandidacy: Equatable {
         let onHiddenSpaceOnly = !record.spaces.isEmpty && visibleSpaces.isDisjoint(with: record.spaces)
         return onHiddenSpaceOnly ? .listed : .ghost
     }
+
+    /// 「輔助使用」明確說不是一般視窗（對話框、工具面板）時不列；沒有資料時相信 WindowServer。
+    /// 縮到 Dock 的視窗不看這一項：Safari 縮下去的視窗會回報成 AXDialog，而對話框本來就不能縮到 Dock
+    static func rejectedByAccessibility(isStandard: Bool?, minimized: Bool) -> Bool {
+        isStandard == false && !minimized
+    }
 }
 
 /// 要列出哪些視窗

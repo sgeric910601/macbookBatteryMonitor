@@ -181,8 +181,7 @@ final class WindowTracker {
         for record in SkyLight.windows(in: allSpaces, ownedBy: Set(apps.keys)) {
             guard let app = apps[record.ownerPID], WindowCandidacy.of(record, visibleSpaces: currentSpaces) == .listed else { continue }
             let ax = cache[record.ownerPID]?[record.windowID]
-            // 「輔助使用」明確說不是一般視窗（對話框、工具面板）就不列；沒有資料時相信 WindowServer
-            if let ax, !ax.isStandard { continue }
+            if WindowCandidacy.rejectedByAccessibility(isStandard: ax?.isStandard, minimized: record.minimized || ax?.isMinimized == true) { continue }
             let title = ax?.title.isEmpty == false ? ax!.title : record.name
             let spaces = record.spaces
             windows.append(SwitcherWindow(id: record.windowID, pid: record.ownerPID, appName: app.localizedName ?? "", bundleID: app.bundleIdentifier, title: title,

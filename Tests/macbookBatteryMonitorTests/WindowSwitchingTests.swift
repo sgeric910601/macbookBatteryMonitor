@@ -98,6 +98,11 @@ final class WindowSwitchingTests {
         XCTAssertEqual(candidacy(record(layer: 3, spaces: [1])), .ignored)
         XCTAssertEqual(candidacy(record(size: CGSize(width: 2, height: 66), spaces: [1])), .ignored)
         XCTAssertEqual(candidacy(record(id: 0, spaces: [1])), .ignored)
+        // 「輔助使用」說是對話框就不列，但縮到 Dock 的照列（Safari 縮下去的視窗回報成 AXDialog）；沒有資料時不擋
+        XCTAssertTrue(WindowCandidacy.rejectedByAccessibility(isStandard: false, minimized: false))
+        XCTAssertTrue(!WindowCandidacy.rejectedByAccessibility(isStandard: false, minimized: true))
+        XCTAssertTrue(!WindowCandidacy.rejectedByAccessibility(isStandard: true, minimized: false))
+        XCTAssertTrue(!WindowCandidacy.rejectedByAccessibility(isStandard: nil, minimized: false))
     }
 
     func testWindowServerBits() {

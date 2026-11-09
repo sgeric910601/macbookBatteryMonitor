@@ -133,8 +133,10 @@ final class DockClickController {
             let front = DockClick.frontApp(at: time, history: frontHistory)
             let clicked = Self.dockApp(at: location)
             // 只有點到最前面那個 App 時才需要知道它的視窗狀態
-            // Dock 放開才動作：處理時左鍵還按著就一定還沒叫回；已經放開就當成 Dock 可能已經動作了
-            let late = !CGEventSource.buttonState(.combinedSessionState, button: .left)
+            // Dock 放開才動作：左鍵已經放開，或按下之後放開過（使用者可能已經按了第二下），都當成 Dock 可能已經動作了
+            let lastUp = ProcessInfo.processInfo.systemUptime
+                - CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .leftMouseUp)
+            let late = !CGEventSource.buttonState(.combinedSessionState, button: .left) || lastUp > time
             let state = clicked != nil && clicked == front ? stateAtClick(of: front ?? 0, late: late) : (visible: false, minimizedByUs: false)
             let lag = Int((ProcessInfo.processInfo.systemUptime - time) * 1000)
             Self.log.debug("Dock 點擊：按下後 \(lag) ms 才處理，前景 \(front ?? 0)，點到 \(clicked ?? 0)，開著的視窗 \(state.visible)，我們縮的 \(state.minimizedByUs)")
@@ -155,7 +157,7 @@ final class DockClickController {
     }
 
     /// 按下那一刻的狀態（Dock 還沒動作）。有沒有開著的視窗問 WindowServer，不問 App，不會等
-    /// late：回呼跑的時候左鍵已經放開，Dock 可能已經叫回我們縮的視窗，這時叫回的那些不算「按下前開著的視窗」
+    /// late：回呼跑的時候左鍵已經放開或放開過，Dock 可能已經叫回我們縮的視窗，這時叫回的那些不算「按下前開著的視窗」
     private func stateAtClick(of pid: pid_t, late: Bool) -> (visible: Bool, minimizedByUs: Bool) {
         let recorded = minimizedByUs[pid] ?? []
         // 我們縮的視窗都已經不在 Dock 裡（使用者自己叫回了）：紀錄作廢

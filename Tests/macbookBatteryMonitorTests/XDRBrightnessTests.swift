@@ -1,0 +1,41 @@
+import Foundation
+
+final class XDRBrightnessTests {
+    func run() {
+        XCTAssertEqual(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 1, gain: 1.6, headroom: 1.2), 600)
+        XCTAssertEqual(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 0.5, gain: 1.2, headroom: 3.2), 300)
+        XCTAssertNil(XDRBrightnessPolicy.estimatedNits(sdrMaximum: nil, linearBrightness: 1, gain: 1.6, headroom: 2))
+        XCTAssertNil(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: .nan, gain: 1.6, headroom: 2))
+        XCTAssertNil(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 1, gain: 1.6, headroom: .nan))
+        XCTAssertNil(XDRBrightnessPolicy.estimatedNits(sdrMaximum: .infinity, linearBrightness: 1, gain: 1.6, headroom: 2))
+        XCTAssertNil(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: -0.1, gain: 1.6, headroom: 2))
+        var sequence = XDRBrightnessKeySequence()
+        XCTAssertTrue(sequence.consumeDown(code: 3, adjusted: true))
+        XCTAssertTrue(sequence.consumeDown(code: 3, adjusted: false))
+        XCTAssertTrue(sequence.consumeUp(code: 3))
+        XCTAssertTrue(!sequence.consumeDown(code: 3, adjusted: false))
+        XCTAssertTrue(!sequence.consumeUp(code: 3))
+        XCTAssertTrue(!sequence.shouldAdjustDown(code: 2, repeating: true))
+        XCTAssertTrue(sequence.shouldAdjustDown(code: 2, repeating: false))
+        // A press initially passed to macOS must keep its repeats and release.
+        XCTAssertTrue(!sequence.consumeDown(code: 2, adjusted: false))
+        XCTAssertTrue(!sequence.shouldAdjustDown(code: 2, repeating: true))
+        XCTAssertTrue(!sequence.consumeDown(code: 2, adjusted: true))
+        XCTAssertTrue(!sequence.consumeUp(code: 2))
+        XCTAssertTrue(sequence.shouldAdjustDown(code: 2, repeating: false))
+        XCTAssertEqual(XDRBrightnessPolicy.clamp(.nan), 1)
+        XCTAssertEqual(XDRBrightnessPolicy.clamp(10), 1.6)
+        XCTAssertEqual(XDRBrightnessPolicy.clamp(-1), 1)
+        XCTAssertTrue(XDRBrightnessPolicy.blockReason(supported: true, onAC: true, lowPower: false, hot: false, locked: true) != nil)
+        XCTAssertNil(XDRBrightnessPolicy.blockReason(supported: true, onAC: true, lowPower: false, hot: false))
+        XCTAssertTrue(XDRBrightnessPolicy.blockReason(supported: false, onAC: true, lowPower: false, hot: false) != nil)
+        XCTAssertTrue(XDRBrightnessPolicy.blockReason(supported: true, onAC: false, lowPower: false, hot: false) != nil)
+        XCTAssertTrue(XDRBrightnessPolicy.blockReason(supported: true, onAC: true, lowPower: true, hot: false) != nil)
+        XCTAssertTrue(XDRBrightnessPolicy.blockReason(supported: true, onAC: true, lowPower: false, hot: true) != nil)
+        XCTAssertNil(XDRBrightnessPolicy.keyGain(up: true, gain: 1, nativeBrightness: 0.5))
+        XCTAssertNil(XDRBrightnessPolicy.keyGain(up: false, gain: 1, nativeBrightness: 1))
+        XCTAssertEqual(XDRBrightnessPolicy.keyGain(up: true, gain: 1, nativeBrightness: 1), 1.05)
+        XCTAssertEqual(XDRBrightnessPolicy.keyGain(up: false, gain: 1.05, nativeBrightness: 1), 1)
+        XCTAssertEqual(XDRBrightnessPolicy.keyGain(up: true, gain: 1.6, nativeBrightness: 1), 1.6)
+    }
+}

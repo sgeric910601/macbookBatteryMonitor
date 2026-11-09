@@ -2,6 +2,73 @@ import AppKit
 import CPUPowerShared
 import UserNotifications
 
+if CommandLine.arguments.contains("--selftest-xdr") {
+    let passed = MainActor.assumeIsolated {
+        setvbuf(stdout, nil, _IOLBF, 0)
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        app.finishLaunching()
+        let control = XDRBrightnessController.shared
+        control.start()
+        print("XDR supported: \(control.supported)")
+        let id = control.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        let before = id.flatMap(XDRGammaSnapshot.capture)
+        control.enable()
+        let finish = Date().addingTimeInterval(4)
+        while Date() < finish { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        if CommandLine.arguments.contains("--xdr-visual"), control.enabled {
+            control.setGain(1.6)
+            let visualEnd = Date().addingTimeInterval(12)
+            while Date() < visualEnd { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        }
+        let activated = control.enabled && control.gain > 1 && control.renderingHealthy
+        var keyChanges = 0
+        if CommandLine.arguments.contains("--xdr-keys"), control.enabled {
+            control.setGain(1)
+            var lastGain = control.gain
+            var lastNative = XDRBrightnessKeys.nativeBrightness(id)
+            print("Brightness key test started for 35 seconds")
+            let keyEnd = Date().addingTimeInterval(35)
+            while Date() < keyEnd {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+                let native = XDRBrightnessKeys.nativeBrightness(id)
+                if control.gain != lastGain || native != lastNative {
+                    if control.gain != lastGain { keyChanges += 1 }
+                    print("Key update: gain=\(control.gain), native=\(native ?? -1)")
+                    lastGain = control.gain
+                    lastNative = native
+                }
+            }
+            print("Brightness key gain changes: \(keyChanges)")
+        }
+        if let id {
+            let nits = XDRLuminanceReader.estimatedNits(display: id, gain: control.gain,
+                headroom: Double(control.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1))
+            print("Estimated nits: \(nits.map(String.init) ?? "unavailable")")
+        }
+        print("Keys: \(control.keysStatus)")
+        print("Rendering: \(control.renderingStatus)")
+        print("EDR live: \(control.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 0), potential: \(control.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 0), native: \(XDRBrightnessKeys.nativeBrightness(id) ?? -1)")
+        print("XDR enabled: \(control.enabled), gain: \(control.gain), status: \(control.status)")
+        let boosted = id.flatMap(XDRGammaSnapshot.capture)
+        print("Gamma peak before: \(before?.red.max() ?? -1), boosted: \(boosted?.red.max() ?? -1)")
+        if let before, let boosted, before.red.count == boosted.red.count {
+            let mid = before.red.count / 2
+            print("Gamma midpoint before: \(before.red[mid]), boosted: \(boosted.red[mid])")
+        }
+        let restored = control.disable()
+        print("XDR restored: \(restored)")
+        guard let before, let after = id.flatMap(XDRGammaSnapshot.capture), before.red.count == after.red.count else { return false }
+        let delta = zip(before.red + before.green + before.blue, after.red + after.green + after.blue)
+            .map { abs($0 - $1) }.max() ?? 1
+        print("Gamma restoration max delta: \(delta)")
+        print("Rendering lifecycle check only; physical brightness requires visual verification")
+        return activated && restored && !control.enabled && delta < 0.005
+            && (!CommandLine.arguments.contains("--xdr-keys") || keyChanges > 0)
+    }
+    exit(passed ? 0 : 1)
+}
+
 // 開發用的自我測試多半在背景執行、最後被結束：輸出改成逐行寫出，才不會留在緩衝區裡遺失
 if CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest") }) {
     setvbuf(stdout, nil, _IOLBF, 0)

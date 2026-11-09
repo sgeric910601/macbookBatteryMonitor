@@ -358,3 +358,6 @@ clipboard.testSkipsBlankAndTrimsLong()
 clipboard.testSkipsConcealedContent()
 clipboard.testPreview()
 print("4 clipboard history tests passed")
+
+XDRBrightnessTests().run()
+print("XDR brightness policy tests passed")

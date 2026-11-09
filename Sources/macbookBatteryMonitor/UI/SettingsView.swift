@@ -99,6 +99,9 @@ struct SettingsView: View {
             }
             .settingsSection(.display, shown: section)
 
+            XDRBrightnessCard()
+                .settingsSection(.display, shown: section)
+
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     CardTitle("App 圖示", systemImage: "app.badge")

@@ -91,22 +91,12 @@ jobs:
       - name: 編譯並打包
         if: ${{ env.TAG != '' }}
         # 給人下載、也給 v1.7.2 起的一鍵更新用的 DMG（macOS 14 以上的通用版），檔名固定不帶版本號。
-        # 另附舊版一鍵更新認得的 zip：
-        #   - battery／status zip：每一版都附。v1.5.0～v1.6.2 只看最新版本，有這兩個檔案才能直接更新到最新版
-        #     （內容相同，只有 MBMEdition 不同，用來保留原本的系統監控設定；也是兩種晶片通用）
-        #   - 通用版 zip：只有過渡版 v1.7.2 附。v1.7.1 會看最近的版本，找得到 status zip 或 v1.7.2 的通用版 zip
+        # v2.0.0 起不再附舊版一鍵更新認得的 zip（v1.7.7 以前每一版都附 battery／status zip）：
+        # v1.7.1 會先更新到還有 zip 的 v1.7.7，v1.5.0～v1.6.2 只看最新版，要手動下載 DMG 安裝一次
         run: |
           ./build.sh universal
           Scripts/check-signature.sh build/macbookBatteryMonitor.app
           Scripts/make-dmg.sh build/macbookBatteryMonitor.app macbookBatteryMonitor.dmg
-          if [[ "$TAG" == v1.7.2 ]]; then
-            ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "macbookBatteryMonitor-${TAG}-macOS-universal.zip"
-          fi
-          for edition in battery status; do
-            ./build.sh "$edition"
-            Scripts/check-signature.sh build/macbookBatteryMonitor.app
-            ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "macbookBatteryMonitor-${TAG}-${edition}-macOS-arm64.zip"
-          done
       - name: 編譯並打包舊系統版本（macOS 12 起）
         if: ${{ env.TAG != '' }}
         # legacy-macos12 分支的版本號和這次發布相同時，才把它的 DMG 放進同一個 Release
@@ -128,15 +118,13 @@ jobs:
           ./build.sh legacy
           "$GITHUB_WORKSPACE/Scripts/check-signature.sh" build/macbookBatteryMonitor.app
           "$GITHUB_WORKSPACE/Scripts/make-dmg.sh" build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-macOS12.dmg"
-          if [[ "$TAG" == v1.7.2 ]]; then
-            ditto -c -k --sequesterRsrc --keepParent build/macbookBatteryMonitor.app "$GITHUB_WORKSPACE/macbookBatteryMonitor-${TAG}-macOS12.zip"
-          fi
       - name: 建立 Release
         if: ${{ env.TAG != '' }}
         run: |
-          # 一鍵更新會用這個校驗檔確認下載的 DMG（v1.7.1 是 zip）沒有損壞
+          # 一鍵更新會用這個校驗檔確認下載的 DMG 沒有損壞
           shopt -s nullglob
-          files=(macbookBatteryMonitor*.dmg macbookBatteryMonitor-"$TAG"-*.zip)
+          files=(macbookBatteryMonitor*.dmg)
+          (( ${#files[@]} )) || { echo "找不到要附上的 DMG"; exit 1; }
           shasum -a 256 "${files[@]}" > SHA256SUMS.txt
           # 建立草稿，由 Scripts/sign-release.sh 簽署後發布；v1.8.0-beta.1 這種 tag 標成預先發行版本，不會變成「最新版本」
           flags=(--draft)

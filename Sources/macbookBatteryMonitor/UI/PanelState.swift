@@ -65,6 +65,26 @@ final class PanelState: ObservableObject {
     @Published var scrollTrusted = false
     /// 捲動方向的事件攔截正在運作
     @Published var scrollRunning = false
+    /// 視窗切換的事件攔截正在運作
+    @Published var inputTapRunning = false
+    /// Shift 半形的按鍵攔截在運作
+    @Published var shiftRunning = false
+    /// ⌘Q／⌘W 防誤觸的按鍵攔截在運作
+    @Published var quitGuardRunning = false
+    /// 滑鼠側鍵的攔截在運作
+    @Published var mouseButtonsRunning = false
+    /// 關閉最後視窗時結束 App 在運作
+    @Published var lastWindowQuitRunning = false
+    /// 點 Dock 圖示縮到 Dock 在運作
+    @Published var dockClickRunning = false
+    /// 綠色按鈕放大在運作
+    @Published var greenButtonRunning = false
+    /// 視窗吸附在運作
+    @Published var windowSnapRunning = false
+    /// Finder 加強在運作
+    @Published var finderKeysRunning = false
+    /// 無法確認「輔助使用」權限，會擋住輸入的按鍵與滑鼠功能已暫停（EventTapAccess 停用中）
+    @Published var inputPaused = false
     /// 智慧充電頁的輸入：指定完成時間、每週排程的星期與時間
     @Published var chargingCustomDeadline = Date().addingTimeInterval(4 * 3600)
     @Published var chargingWeekdays: Set<Int> = [2, 3, 4, 5, 6]

@@ -255,6 +255,12 @@ private struct TopList: View {
                                 .monospacedDigit()
                         }
                         .font(.callout)
+                        .contextMenu {
+                            // 「Port 管理與結束程式」啟用時，App 可以從這裡正常結束
+                            if let path = p.appPath, AppSettings.shared.isInstalled(.portManager) {
+                                Button("結束「\(p.name)」…") { PortManager.confirmQuit(appPath: path, name: p.name) }
+                            }
+                        }
                     }
                 }
             }
@@ -621,6 +627,8 @@ private struct NetworkPanel: View {
                     MonitorChart(points: network.history.points, a: ("下載", .green), b: ("上傳", .orange), showsLegend: false)
                 }
             }
+            ConnectionStatusCard(status: NetworkStatusMonitor.shared)
+            if AppSettings.shared.isInstalled(.portManager) { PortsCard(manager: PortManager.shared) }
             Card {
                 VStack(alignment: .leading, spacing: 6) {
                     CardTitle("開機以來（目前的網路介面）", systemImage: "clock.arrow.circlepath")
@@ -632,6 +640,67 @@ private struct NetworkPanel: View {
                 SpeedTestCard(test: network.speedTest)
             }
         }
+    }
+}
+
+/// 監聽中的連接埠：打開面板時讀一次，可以重新整理、結束自己帳號的程式（會先確認）
+private struct PortsCard: View {
+    @ObservedObject var manager: PortManager
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    CardTitle("監聽中的連接埠", systemImage: "point.3.connected.trianglepath.dotted")
+                    Spacer()
+                    Button { manager.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                        .buttonStyle(.borderless)
+                        .help("重新整理")
+                        .accessibilityLabel("重新整理連接埠")
+                }
+                if manager.listeners.isEmpty {
+                    Text(manager.loading ? "讀取中…" : "沒有你的程式在監聽 TCP 連接埠").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(manager.listeners) { listener in
+                    HStack(spacing: 8) {
+                        Text("\(listener.port)").monospacedDigit().frame(width: 52, alignment: .leading)
+                        Text(listener.command).lineLimit(1).truncationMode(.middle)
+                        if listener.localOnly { Text("只限本機").font(.caption2).foregroundStyle(.secondary) }
+                        Spacer(minLength: 4)
+                        Button("結束") { manager.confirmTerminate(listener) }
+                            .controlSize(.small)
+                            .accessibilityLabel("結束 \(listener.command)（連接埠 \(listener.port)）")
+                    }
+                    .font(.callout)
+                }
+                Text("只列出你自己帳號的程式；結束前會先確認，並請程式正常結束。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear { manager.refresh() }
+    }
+}
+
+/// 連線狀態：VPN、低數據模式、按流量計費。面板打開時才監看，不連到外部伺服器
+private struct ConnectionStatusCard: View {
+    @ObservedObject var status: NetworkStatusMonitor
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 6) {
+                CardTitle("連線狀態", systemImage: "lock.shield")
+                InfoRow("VPN", status.vpnInterfaces.isEmpty ? "沒有連線" : "已連線（\(status.vpnInterfaces.joined(separator: "、"))）",
+                        tint: status.vpnInterfaces.isEmpty ? nil : .green)
+                ForEach(status.notes, id: \.self) { note in
+                    Label(note, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .onAppear { status.start() }
+        .onDisappear { status.stop() }
     }
 }
 

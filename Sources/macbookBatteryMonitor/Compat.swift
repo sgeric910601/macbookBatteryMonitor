@@ -33,6 +33,17 @@ extension NSApplication {
     }
 }
 
+extension NSRunningApplication {
+    /// activate() 要 macOS 14；舊系統用 activate(options:)
+    @discardableResult
+    func activateCompat() -> Bool {
+        if #available(macOS 14, *), !Compat.forceMacOS12Paths {
+            return activate()
+        }
+        return activate(options: [])
+    }
+}
+
 /// macOS 13 起可以設 sizingOptions，讓面板跟著 SwiftUI 內容大小改變；
 /// macOS 12 沒有，內容可能改變時（換頁、換分頁、資料更新）重新問 SwiftUI 內容的理想大小並更新 preferredContentSize。
 /// 不能用 view.fittingSize：面板打開後它會被現有的約束綁住，回報的是目前的大小
@@ -80,6 +91,15 @@ extension View {
     @ViewBuilder func bounceOnlyWhenScrollable() -> some View {
         if #available(macOS 13.3, *), !Compat.forceMacOS12Paths {
             scrollBounceBehavior(.basedOnSize)
+        } else {
+            self
+        }
+    }
+
+    /// scrollIndicators 要 macOS 13：舊系統照系統設定顯示捲軸
+    @ViewBuilder func hiddenScrollIndicators() -> some View {
+        if #available(macOS 13, *), !Compat.forceMacOS12Paths {
+            scrollIndicators(.never)
         } else {
             self
         }

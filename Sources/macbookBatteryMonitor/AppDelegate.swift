@@ -32,12 +32,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var refreshTimer: Timer?
     /// 等使用者允許「輔助使用」：允許了就開始分開設定捲動方向
     private var scrollTrustTimer: Timer?
+    private var quitGuardTrustTimer: Timer?
+    /// 這個使用者的工作階段在前景。快速切換使用者後留在背景的攔截，會讓前景使用者的每個輸入都要等它逾時，
+    /// 所以切到背景時停掉所有按鍵與滑鼠攔截，切回來再依設定開始
+    private var sessionActive = true
+    /// 會擋住輸入的按鍵與滑鼠功能能不能運作：工作階段在前景，而且 EventTapAccess 沒有進入停用狀態。
+    /// 只監聽的功能（Dock 點擊、視窗吸附、關閉最後視窗）不受停用影響，只看 sessionActive
+    private var inputAllowed: Bool { sessionActive && !EventTapAccess.shared.isLost }
+    private var mouseButtonsTrustTimer: Timer?
+    private var lastWindowTrustTimer: Timer?
+    private var shiftTrustTimer: Timer?
     /// 更新頻率慢於每秒時，下一次更新前 1 秒先讀變壓器輸入（見 BatteryReader.recordAdapterInput）
     private var adapterPreReadTimer: Timer?
     private var processTimer: Timer?
     private var timers: [Timer] = []
     /// 上次畫到選單列的內容，沒變就不重畫
     private var lastStatusKey = ""
+    private var chargingIconFlow: ChargingIconFlowView?
     private var sleeping = false
     private var powerTransitionTask: Task<Void, Never>?
 
@@ -65,7 +76,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.imagePosition = .imageTrailing
         }
 
-        settings.onChange = { [weak self] in self?.updateStatusItem() }
+        settings.onChange = { [weak self] in
+            self?.lastStatusKey = ""
+            self?.updateStatusItem()
+        }
         settings.onIntervalChange = { [weak self] in self?.applySampleInterval() }
         // 全新安裝：所有需要授權的東西都在第一次啟動時問完（系統監控、管理員 CPU 取樣、通知、藍牙）
         let freshInstall = settings.needsModeChoice
@@ -84,6 +98,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         if freshInstall { askForAdminCPU() }
         Notifier.shared.setup()
+        EventTapAccess.shared.announceIfRelaunched()
+        EventTapAccess.shared.onStateChange = { [weak self] in
+            let paused = EventTapAccess.shared.isLost
+            if paused { KeyboardCleaningController.shared.stop() }
+            self?.ui.inputPaused = paused
+            self?.applyInputFeatures()
+        }
         // 藍牙權限還沒決定時 macOS 會跳出詢問（從舊版升級也會問這一次）；已經允許就直接在背景讀；拒絕過就不再問
         if !BLEBatteryReader.denied { store.peripherals.startBluetoothLE() }
         // 用新版覆蓋 App 後，自訂的 App 圖示會消失，套回使用者選的顏色
@@ -116,6 +137,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.ui.scrollRunning = ScrollDirection.shared.isRunning
         }
         applyScrollDirection(prompt: false)
+        settings.onWindowSwitcherChange = { [weak self] in self?.applyWindowSwitcher(prompt: true) }
+        InputController.shared.onChange = { [weak self] in
+            self?.ui.scrollTrusted = ScrollDirection.trusted
+            self?.ui.inputTapRunning = InputController.shared.isRunning
+        }
+        applyWindowSwitcher(prompt: false)
+        settings.onInputSourceFixChange = { [weak self] in self?.applyInputSourceFix(prompt: true) }
+        applyInputSourceFix(prompt: false)
+        settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
+        settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
+        applyQuitGuard(prompt: false)
+        applyQuickMenu()
+        settings.onMouseButtonsChange = { [weak self] in self?.applyMouseButtons(prompt: true) }
+        applyMouseButtons(prompt: false)
+        settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
+        applyLastWindowQuit(prompt: false)
+        // 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
+        // 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。都沒啟用時什麼都不做
+        timers.append(repeating(every: 5) { delegate in
+            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
+            let shift = delegate.inputAllowed && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
+                && InputSourceFix.shared.isRunning
+            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
+            let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
+            guard features.contains(where: delegate.settings.isInstalled) else { return }
+            delegate.applyQuitGuard(prompt: false)
+            delegate.applyMouseButtons(prompt: false)
+            delegate.applyLastWindowQuit(prompt: false)
+        })
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -149,6 +199,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(sessionResigned), name: NSWorkspace.sessionDidResignActiveNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(sessionBecameActive), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil
+        )
+        KeepAwakeController.shared.battery = { [weak self] in
+            guard let s = self?.store.snapshot else { return (nil, false) }
+            return (s.percent, !s.externalConnected)
+        }
+        KeepAwakeController.shared.autoApps = settings.keepAwakeApps
+        settings.onKeepAwakeAppsChange = { [weak self] in
+            guard let self else { return }
+            KeepAwakeController.shared.autoApps = self.settings.keepAwakeApps
+        }
+        // 上次睡眠關掉藍牙、還沒等到醒來 App 就結束了：打開
+        applyBluetooth(bluetoothSleep.didLaunch())
         registerLoginItemIfNeeded()
         runPanelSelfTestIfRequested()
         runSizingSelfTestIfRequested()
@@ -233,11 +300,115 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+    /// 加入或移除擴充功能後，依新的狀態啟動或停止它；開關原本就關著的功能，加入時不會跳出權限詢問
+    private func applyFeature(_ feature: ExtensionFeature) {
+        switch feature {
+        case .scrollDirection: applyScrollDirection(prompt: true)
+        case .windowSwitcher: applyWindowSwitcher(prompt: true)
+        case .inputMethod: applyInputSourceFix(prompt: true)
+        case .quitGuard: applyQuitGuard(prompt: true)
+        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: applyLastWindowQuit(prompt: true)
+        case .mouseButtons: applyMouseButtons(prompt: true)
+        // 只在面板上多一個按鈕，加入或移除時面板自己會更新
+        case .audioSwitch: break
+        case .quickMenu: applyQuickMenu()
+        // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
+        case .portManager: break
+        case .clipboardHistory: applyQuickMenu()
+        case .keyboardCleaning:
+            // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
+            if settings.isInstalled(.keyboardCleaning) {
+                if !ScrollDirection.trusted { ScrollDirection.requestTrust() }
+            } else {
+                KeyboardCleaningController.shared.stop()
+            }
+        }
+    }
+
+    /// 「視窗與 Dock」的擴充功能：關閉最後視窗時結束 App、點 Dock 圖示縮到 Dock。
+    /// 需要「輔助使用」：剛加入時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    private func applyLastWindowQuit(prompt: Bool) {
+        let lastWindow = sessionActive && settings.isInstalled(.lastWindowQuit), dock = sessionActive && settings.isInstalled(.dockClick)
+        let green = inputAllowed && settings.isInstalled(.greenButton)
+        let snap = sessionActive && settings.isInstalled(.windowSnap)
+        let finder = inputAllowed && settings.isInstalled(.finderKeys)
+        let wanted = lastWindow || dock || green || snap || finder
+        LastWindowQuitController.shared.excluded = settings.lastWindowQuitExcluded
+        DockClickController.shared.mode = settings.dockClickMode
+        // 每一個都要呼叫到（不能用 && 短路）：前面一個沒權限失敗時，後面該停的也要停
+        let results = [LastWindowQuitController.shared.apply(enabled: lastWindow), DockClickController.shared.apply(enabled: dock),
+                       WindowMaximizeController.shared.apply(enabled: green), WindowSnapController.shared.apply(enabled: snap),
+                       FinderKeysController.shared.apply(enabled: finder)]
+        ui.finderKeysRunning = finder && FinderKeysController.shared.isRunning
+        let running = results.allSatisfy { $0 }
+        ui.windowSnapRunning = snap && WindowSnapController.shared.isRunning
+        ui.greenButtonRunning = green && WindowMaximizeController.shared.isRunning
+        ui.lastWindowQuitRunning = lastWindow && LastWindowQuitController.shared.isRunning
+        ui.dockClickRunning = dock && DockClickController.shared.isRunning
+        lastWindowTrustTimer?.invalidate()
+        lastWindowTrustTimer = nil
+        guard wanted, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        lastWindowTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyLastWindowQuit(prompt: false)
+        }
+    }
+
+    /// 選單列的貓咪快捷選單
+    private func applyQuickMenu() {
+        QuickMenuController.shared.apply(enabled: settings.isInstalled(.quickMenu), settings: settings) { [weak self] section in
+            self?.showSettings(section)
+        }
+        // 剪貼簿歷史只在快捷選單裡看得到、清得掉，沒開快捷選單時不記錄
+        ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory) && settings.isInstalled(.quickMenu))
+    }
+
+    /// 滑鼠側鍵。需要「輔助使用」：剛設定時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    private func applyMouseButtons(prompt: Bool) {
+        let installed = inputAllowed && settings.isInstalled(.mouseButtons)
+        let buttons = MouseButtons(back: installed ? settings.mouseBackButton : .none, forward: installed ? settings.mouseForwardButton : .none)
+        let running = MouseButtonsController.shared.apply(buttons)
+        ui.mouseButtonsRunning = buttons.isActive && MouseButtonsController.shared.isRunning
+        mouseButtonsTrustTimer?.invalidate()
+        mouseButtonsTrustTimer = nil
+        guard buttons.isActive, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        mouseButtonsTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyMouseButtons(prompt: false)
+        }
+    }
+
+    /// ⌘Q／⌘W 防誤觸。需要「輔助使用」：剛加入或打開時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
+    private func applyQuitGuard(prompt: Bool) {
+        let installed = inputAllowed && settings.isInstalled(.quitGuard)
+        let quit = installed && settings.quitGuardQuit, close = installed && settings.quitGuardClose
+        let running = QuitGuardController.shared.apply(quit: quit, close: close, duration: settings.quitGuardDuration)
+        ui.quitGuardRunning = (quit || close) && QuitGuardController.shared.isRunning
+        quitGuardTrustTimer?.invalidate()
+        quitGuardTrustTimer = nil
+        guard quit || close, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        quitGuardTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyQuitGuard(prompt: false)
+        }
+    }
+
     /// 滑鼠與觸控板分開的捲動方向。需要「輔助使用」權限：使用者剛打開開關時跳出系統的詢問，
     /// 之後每 2 秒檢查一次，允許了就開始（不用重開 App）；兩個開關都關掉就完全不攔截
     private func applyScrollDirection(prompt: Bool) {
-        let wanted = settings.scrollReverseMouse || settings.scrollReverseTrackpad
-        let running = ScrollDirection.shared.apply(reverseMouse: settings.scrollReverseMouse, reverseTrackpad: settings.scrollReverseTrackpad)
+        let installed = inputAllowed && settings.isInstalled(.scrollDirection)
+        let mouse = installed && settings.scrollReverseMouse
+        let trackpad = installed && settings.scrollReverseTrackpad
+        let linear = installed ? settings.scrollLinearLines : 0
+        let horizontalKey = installed ? settings.scrollHorizontalKey : .off
+        let smooth = installed && settings.scrollSmooth
+        let wanted = mouse || trackpad || linear > 0 || horizontalKey != .off || smooth
+        let running = ScrollDirection.shared.apply(reverseMouse: mouse, reverseTrackpad: trackpad,
+                                                   reverseHorizontal: settings.scrollReverseHorizontal, linearLines: linear,
+                                                   horizontalKey: horizontalKey, smooth: smooth)
         scrollTrustTimer?.invalidate()
         scrollTrustTimer = nil
         guard wanted, !running else { return }
@@ -245,6 +416,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         scrollTrustTimer = repeating(every: 2) { delegate in
             guard ScrollDirection.trusted else { return }
             delegate.applyScrollDirection(prompt: false)
+        }
+    }
+
+    /// 視窗切換同樣需要「輔助使用」；剛打開開關、還沒有權限時跳出系統的詢問，允許之後每 5 秒的檢查會自己開始
+    private func applyWindowSwitcher(prompt: Bool) {
+        let options = settings.switcher
+        InputTap.shared.setSwitcher(shortcuts: options.profiles.map(\.shortcut), vimKeys: options.vimKeys, releaseCommits: !options.keepOpenAfterRelease)
+        WindowSwitcher.shared.configure(options)
+        let wanted = inputAllowed && settings.windowSwitcher && settings.isInstalled(.windowSwitcher)
+        InputController.shared.apply(keys: wanted)
+        if prompt, wanted, !ScrollDirection.trusted { ScrollDirection.requestTrust() }
+    }
+
+    /// 中文輸入法：Caps Lock 不延遲（hidutil，不需權限）、按住 Shift 打半形（需要「輔助使用」，允許後每 2 秒檢查一次就開始）
+    private func applyInputSourceFix(prompt: Bool) {
+        InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
+        applyShiftHalfWidth(prompt: prompt)
+    }
+
+    private func applyShiftHalfWidth(prompt: Bool) {
+        let wanted = inputAllowed && settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
+        let running = InputSourceFix.shared.applyShift(wanted)
+        ui.shiftRunning = wanted && InputSourceFix.shared.isRunning
+        ui.scrollTrusted = ScrollDirection.trusted
+        shiftTrustTimer?.invalidate()
+        shiftTrustTimer = nil
+        guard wanted, !running else { return }
+        if prompt { ScrollDirection.requestTrust() }
+        shiftTrustTimer = repeating(every: 2) { delegate in
+            guard ScrollDirection.trusted else { return }
+            delegate.applyShiftHalfWidth(prompt: false)
         }
     }
 
@@ -403,10 +605,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // 結束或更新重啟前停止攔截；剛好按著 Shift 時，還排在主佇列的按鍵會被丟掉，不會晚到別的 App
+        InputSourceFix.shared.applyShift(false)
         store.adminCPU.stop()
         store.chargingWake.stop()
         store.history.save()
         monitors.stop()
+        AudioSwitchController.shared.restoreInputVolumes()
     }
 
     // MARK: - Refresh
@@ -483,6 +688,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func powerSourceChanged() {
         powerTransitionTask?.cancel()
         refresh()
+        // 低電量時沒有自動防止休眠；接上電源後要重新判斷，不用等 App 開關
+        KeepAwakeController.shared.updateAuto()
         powerTransitionTask = Task { [weak self] in
             for delay in [1, 2, 3] {
                 do { try await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000_000) } catch { return }
@@ -492,7 +699,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+    @objc private func sessionResigned() {
+        sessionActive = false
+        KeyboardCleaningController.shared.stop()
+        applyInputFeatures()
+    }
+
+    @objc private func sessionBecameActive() {
+        sessionActive = true
+        applyInputFeatures()
+    }
+
+    /// 依設定（與工作階段是否在前景）重新開始或停止所有按鍵與滑鼠攔截
+    private func applyInputFeatures() {
+        applyScrollDirection(prompt: false)
+        applyWindowSwitcher(prompt: false)
+        applyShiftHalfWidth(prompt: false)
+        applyQuitGuard(prompt: false)
+        applyLastWindowQuit(prompt: false)
+        applyMouseButtons(prompt: false)
+    }
+
     @objc private func willSleep() {
+        chargingIconFlow?.removeFromSuperview()
+        chargingIconFlow = nil
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統即將睡眠") }
         sleeping = true
         powerTransitionTask?.cancel()
@@ -500,13 +730,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         store.setProcessSampling(active: false)
         monitors.setSleeping(true)
         store.history.save()
+        // 只在有內建鍵盤的 Mac（有電池的筆電）關：桌上型 Mac 的藍牙鍵鼠閒置時會自己斷線，偵測不到就關掉，醒來只剩電源鍵
+        if settings.bluetoothOffDuringSleep, BluetoothPower.isAvailable, BatteryReader.hasBattery {
+            applyBluetooth(bluetoothSleep.willSleep(enabled: true, poweredOn: BluetoothPower.isOn,
+                                                   wakeInputConnected: BluetoothPower.wakeInputConnected(),
+                                                   lidClosed: BluetoothPower.lidClosedWithExternalDisplay()))
+        }
+    }
+
+    private lazy var bluetoothSleep = BluetoothSleep(turnedOff: settings.bluetoothTurnedOffForSleep)
+
+    private func applyBluetooth(_ action: BluetoothSleep.Action, attempt: Int = 1) {
+        // 先記下狀態再開關：開關途中 App 被結束，下次啟動仍知道要不要打開
+        settings.bluetoothTurnedOffForSleep = bluetoothSleep.turnedOff
+        switch action {
+        case .none: return
+        case .powerOff: BluetoothPower.setOn(false)
+        case .powerOn:
+            BluetoothPower.setOn(true)
+            // 剛醒來時藍牙控制器可能還沒準備好：每次送出 2 秒後確認（打開了就清掉標記），沒打開就再送，最多送 5 次；
+            // 5 次都沒打開時標記留著，下次醒來或啟動再試
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                MainActor.assumeIsolatedCompat {
+                    guard let self, !self.sleeping else { return }
+                    let next = self.bluetoothSleep.confirm(poweredOn: BluetoothPower.isOn)
+                    self.applyBluetooth(attempt < 5 ? next : .none, attempt: attempt + 1)
+                }
+            }
+        }
     }
 
     @objc private func didWake() {
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統已喚醒") }
         sleeping = false
+        applyBluetooth(bluetoothSleep.didWake())
         monitors.setSleeping(false)
         store.evaluateChargingPlan(.didWake)
+        // hidutil 的設定在睡眠後可能被重設
+        InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         refresh()
         store.peripherals.refresh()
         store.recordHistory()
@@ -530,6 +791,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
+        let flowActive = store.estimates?.state == .charging && settings.display != .percentOnly
+            && settings.chargingIconFlow && !settings.powerSavingActive && !sleeping
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if flowActive {
+            if chargingIconFlow == nil {
+                let flow = ChargingIconFlowView(frame: button.bounds)
+                button.addSubview(flow)
+                chargingIconFlow = flow
+            }
+            chargingIconFlow?.percent = store.snapshot?.percent ?? 0
+            chargingIconFlow?.inlinePercent = settings.display == .iconPercentAndTime
+            chargingIconFlow?.alphaValue = settings.chargingIconOpacity
+            chargingIconFlow?.needsLayout = true
+        } else {
+            chargingIconFlow?.removeFromSuperview()
+            chargingIconFlow = nil
+        }
         if store.snapshot == nil, let desktop = store.desktop, let watts = desktop.systemWatts {
             updateDesktopStatusItem(button, watts: watts)
             return
@@ -552,7 +830,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let inlinePercent = settings.display == .iconPercentAndTime
         button.imagePosition = inlinePercent ? .imageLeading : .imageTrailing
-        button.image = settings.display == .percentOnly ? nil : StatusIconRenderer.image(percent: s.percent, state: e.state, low: low, showsPercent: inlinePercent)
+        button.image = settings.display == .percentOnly ? nil : StatusIconRenderer.image(percent: s.percent, state: e.state,
+            low: low, showsPercent: inlinePercent, chargingColor: settings.chargingIconColor,
+            chargingTextColor: settings.chargingIconTextColor)
         let text: String
         switch settings.display {
         case .iconAndPercent:
@@ -576,6 +856,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)]
         )
         button.toolTip = tooltip(s, e)
+        chargingIconFlow?.needsLayout = true
     }
 
     private func tooltip(_ s: BatterySnapshot, _ e: Estimates) -> String {

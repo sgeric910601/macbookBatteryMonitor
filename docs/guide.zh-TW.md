@@ -38,10 +38,10 @@ macOS 選單列的電池與系統資訊 App。MacBook 的選單列直接顯示�
 | 你的 Mac | 下載檔（最新版） |
 |---|---|
 | macOS 14 以上（Apple 晶片或 Intel，MacBook 或桌上型） | [`macbookBatteryMonitor.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor.dmg)（通用版） |
-| macOS 12 或 13（Apple 晶片或 Intel） | [`macbookBatteryMonitor-macOS12.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor-macOS12.dmg)（舊系統版本） |
+| macOS 12 或 13（Apple 晶片或 Intel） | [`macbookBatteryMonitor-macOS12.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.7.7/macbookBatteryMonitor-macOS12.dmg)（舊系統版本，v1.7.7） |
 
-- 檔名固定不帶版本號，上面的連結永遠下載最新版；其他版本到 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
-- 舊系統版本給 macOS 12、13 的 Mac（例如 2015～2017 年的 MacBook，或用 OpenCore Legacy Patcher 升級的舊 Mac），功能和通用版相同。系統升級到 macOS 14 以後，一鍵更新會自動換成通用版
+- 通用版的檔名固定不帶版本號，上面的連結永遠下載最新版；其他版本到 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
+- 舊系統版本給 macOS 12、13 的 Mac（例如 2015～2017 年的 MacBook，或用 OpenCore Legacy Patcher 升級的舊 Mac），目前停在 v1.7.7，還沒有 v2.0.0 的新功能。系統升級到 macOS 14 以後，一鍵更新會自動換成通用版
 - 已經在用 v1.7.2 以後的版本：不用下載，到設定 → 更新按「一鍵更新」
 - v2.0.0 起 Release 不再附 zip：v1.7.1 會先一鍵更新到 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；v1.5.0～v1.6.2 的一鍵更新只認得 zip，請下載上面的 DMG 安裝一次
 
@@ -711,8 +711,8 @@ App 圖示的貓咪是 `Resources/icon-cat.png`（照片去背），充電墊、
 
 ## 致謝
 
-- [@melvin0kuo](https://github.com/melvin0kuo)：動畫電力流向、分層硬體功耗、功率感測備援、選單列圖示內百分比、滿電穩定顯示與管理員 CPU 取樣（#1、#2、#4～#7），智慧充電、充電排程與每日回顧的構想（#13）
-- [@liaw-boy](https://github.com/liaw-boy)：外接磁碟、風扇與溫度、1x 螢幕的選單列圖示對齊、充電上限滑桿併入資訊卡的版面構想、點面板外面關閉與只在使用電池時省電（#8～#10、#12），網路測速、記憶體與磁碟共用一個圖示（#15、#16），登入項目頁（#20），中文輸入法的 Caps Lock 不延遲與 Shift 半形（#21），取代 Cmd+Tab 的視窗切換（#19），擴充功能與功能管理頁：防止休眠、睡眠時關閉藍牙、音訊切換、監控警示、設定備份與權限頁、捲動選項與滑鼠側鍵、鍵盤清潔、⌘Q／⌘W 防誤觸、Finder 加強、視窗與 Dock 工具、貓咪快捷選單、Port 管理與剪貼簿歷史（#24），失去輔助使用權限時放掉攔截、按下時判斷的 Dock 點擊、用系統「填滿」的綠色按鈕與 Caps Lock 還原自己的延遲（#26）
+- [@melvin0kuo](https://github.com/melvin0kuo)：動畫電力流向、分層硬體功耗、功率感測備援、選單列圖示內百分比、滿電穩定顯示與管理員 CPU 取樣（#1、#2、#4～#7），智慧充電、充電排程與每日回顧的構想（#13），選單列充電圖示自訂（#27），說明文件重整與貓咪動畫插圖（#28）
+- [@liaw-boy](https://github.com/liaw-boy)：外接磁碟、風扇與溫度、1x 螢幕的選單列圖示對齊、充電上限滑桿併入資訊卡的版面構想、點面板外面關閉與只在使用電池時省電（#8～#10、#12），網路測速、記憶體與磁碟共用一個圖示（#15、#16），登入項目頁（#20），中文輸入法的 Caps Lock 不延遲與 Shift 半形（#21），取代 Cmd+Tab 的視窗切換（#19），擴充功能與功能管理頁：防止休眠、睡眠時關閉藍牙、音訊切換、監控警示、設定備份與權限頁、捲動選項與滑鼠側鍵、鍵盤清潔、⌘Q／⌘W 防誤觸、Finder 加強、視窗與 Dock 工具、貓咪快捷選單、Port 管理與剪貼簿歷史（#24），失去輔助使用權限時放掉攔截、按下時判斷的 Dock 點擊、用系統「填滿」的綠色按鈕與 Caps Lock 還原自己的延遲（#26），視窗切換列出縮到 Dock 的 Safari 視窗、略過全螢幕的工具列（#29）
 
 ## 授權
 

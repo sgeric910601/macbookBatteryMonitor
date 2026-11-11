@@ -27,6 +27,8 @@ final class WindowTracker {
     private var refreshAgain = Set<pid_t>()
     private var recency = WindowRecency()
     private var workspaceTokens: [NSObjectProtocol] = []
+    /// 自己的視窗不用「輔助使用」追蹤（不問自己），改聽 AppKit 的通知
+    private var keyWindowToken: NSObjectProtocol?
     private(set) var isRunning = false
 
     private static let notifications = [
@@ -55,9 +57,16 @@ final class WindowTracker {
                 MainActor.assumeIsolated { if let app { self?.activated(app) } }
             },
         ]
+        // 設定視窗也列在切換器裡：沒有最近使用記錄的話會排到所有視窗後面，從它切換會跳過下一層
+        keyWindowToken = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] note in
+            guard let window = note.object as? NSWindow, window.windowNumber > 0 else { return }
+            let id = UInt32(window.windowNumber)
+            MainActor.assumeIsolated { self?.recency.focus(id) }
+        }
         let me = ProcessInfo.processInfo.processIdentifier
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && app.processIdentifier != me { track(app) }
         if let front = NSWorkspace.shared.frontmostApplication { activated(front) }
+        if NSApp.isActive, let key = NSApp.keyWindow, key.windowNumber > 0 { recency.focus(UInt32(key.windowNumber)) }
         Self.log.notice("開始追蹤視窗")
     }
 
@@ -66,6 +75,8 @@ final class WindowTracker {
         isRunning = false
         for token in workspaceTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         workspaceTokens = []
+        if let keyWindowToken { NotificationCenter.default.removeObserver(keyWindowToken) }
+        keyWindowToken = nil
         for pid in Array(observers.keys) { untrack(pid) }
         cache = [:]
         Self.log.notice("停止追蹤視窗")
@@ -178,11 +189,12 @@ final class WindowTracker {
         // 由前到後；沒畫在畫面上的視窗（縮到 Dock、隱藏、別的 Space、幻影）不在這份清單裡
         let stacking = SkyLight.onScreenFrontToBack()
         var windows: [SwitcherWindow] = []
-        for record in SkyLight.windows(in: allSpaces, ownedBy: Set(apps.keys)) {
+        let records = SkyLight.windows(in: allSpaces, ownedBy: Set(apps.keys))
+        let accessories = WindowCandidacy.fullscreenAccessories(records)
+        for record in records where !accessories.contains(record.windowID) {
             guard let app = apps[record.ownerPID], WindowCandidacy.of(record, visibleSpaces: currentSpaces) == .listed else { continue }
             let ax = cache[record.ownerPID]?[record.windowID]
-            // 「輔助使用」明確說不是一般視窗（對話框、工具面板）就不列；沒有資料時相信 WindowServer
-            if let ax, !ax.isStandard { continue }
+            if WindowCandidacy.rejectedByAccessibility(isStandard: ax?.isStandard, minimized: record.minimized || ax?.isMinimized == true) { continue }
             let title = ax?.title.isEmpty == false ? ax!.title : record.name
             let spaces = record.spaces
             windows.append(SwitcherWindow(id: record.windowID, pid: record.ownerPID, appName: app.localizedName ?? "", bundleID: app.bundleIdentifier, title: title,

@@ -14,6 +14,9 @@ let package = Package(
             path: "Sources/macbookBatteryMonitor",
             linkerSettings: [
                 .linkedFramework("IOKit"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .linkedFramework("QuartzCore"),
                 .linkedFramework("ServiceManagement"),
                 .linkedFramework("UserNotifications"),
                 .linkedFramework("SystemConfiguration"),

@@ -66,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        XDRBrightnessController.shared.start()
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(statusItemClicked(_:))
@@ -561,6 +562,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        XDRBrightnessController.shared.disable()
         // 結束或更新重啟前停止攔截；剛好按著 Shift 時，還排在主佇列的按鍵會被丟掉，不會晚到別的 App
         InputSourceFix.shared.applyShift(false)
         store.adminCPU.stop()
@@ -573,6 +575,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Refresh
 
     private func refresh() {
+        XDRBrightnessController.shared.reconcile()
         store.refresh()
         // 接電狀態改變且設定為「只在使用電池時省電」時，這裡會重排計時器；桌上型 Mac 一律視為接著電源
         if let s = store.snapshot {

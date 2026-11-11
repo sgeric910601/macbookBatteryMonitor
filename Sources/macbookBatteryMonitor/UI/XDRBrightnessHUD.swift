@@ -2,6 +2,8 @@ import AppKit
 import SwiftUI
 import Observation
 
+private let xdrHUDSize = CGSize(width: 290, height: 62)
+
 @MainActor @Observable
 private final class XDRBrightnessHUDState {
     var gain = 1.0
@@ -18,42 +20,43 @@ private struct XDRBrightnessHUDView: View {
     let state: XDRBrightnessHUDState
 
     var body: some View {
-        HStack(spacing: 13) {
-            Image(systemName: "sun.max.fill")
-                .font(.system(size: 23, weight: .medium))
-            VStack(spacing: 7) {
-                HStack {
-                    Text("XDR 亮度").font(.system(size: 12, weight: .medium))
-                    Spacer(minLength: 8)
-                    if let nits = state.nits {
-                        Text("估算 \(nits) nits")
-                            .font(.system(size: 12, weight: .semibold)).monospacedDigit()
-                    } else {
-                        Text("\(Int((state.gain * 100).rounded()))%")
-                            .font(.system(size: 12, weight: .semibold)).monospacedDigit()
-                    }
+        VStack(spacing: 5) {
+            HStack {
+                Text("XDR 亮度").font(.system(size: 12, weight: .medium))
+                Spacer(minLength: 8)
+                if let nits = state.nits {
+                    Text("估算 \(nits) nits")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                } else {
+                    Text("\(Int((state.gain * 100).rounded()))%")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
                 }
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.primary.opacity(0.16))
-                        Capsule().fill(Color.primary)
-                            .frame(width: geometry.size.width * state.progress)
-                    }
-                }
-                .frame(height: 5)
-                .animation(.easeOut(duration: 0.1), value: state.gain)
-                .accessibilityLabel("XDR 增亮")
-                .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
+            }
+            HStack(spacing: 10) {
+                Image(systemName: "sun.min.fill")
+                    .foregroundStyle(.secondary)
+                Slider(value: .constant(state.progress), in: 0...1)
+                    .controlSize(.small)
+                    .tint(Color.primary)
+                    .accessibilityLabel("XDR 增亮")
+                    .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
+                Image(systemName: "sun.max.fill")
+            }
+            .font(.system(size: 13, weight: .medium))
+            .frame(height: 20)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
+        .frame(width: xdrHUDSize.width, height: xdrHUDSize.height)
+        .background {
+            if #available(macOS 26.0, *) {
+                Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 24, style: .continuous).fill(.ultraThinMaterial)
             }
         }
-        .padding(.horizontal, 18)
-        .frame(width: 320, height: 72)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        }
         .opacity(state.shown ? 1 : 0)
+        .animation(.easeOut(duration: 0.1), value: state.gain)
         .animation(.easeOut(duration: 0.18), value: state.shown)
     }
 }
@@ -70,7 +73,7 @@ final class XDRBrightnessHUD {
         state.gain = XDRBrightnessPolicy.clamp(gain, maximum: maximumGain)
         state.nits = nits
         if panel == nil {
-            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 320, height: 72),
+            let panel = NSPanel(contentRect: NSRect(origin: .zero, size: xdrHUDSize),
                 styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.isOpaque = false
             panel.backgroundColor = .clear
@@ -88,9 +91,10 @@ final class XDRBrightnessHUD {
         let frame = screen.visibleFrame
         let origin: NSPoint
         if #available(macOS 26.0, *) {
-            origin = NSPoint(x: frame.maxX - 338, y: frame.maxY - 90)
+            origin = NSPoint(x: screen.frame.maxX - xdrHUDSize.width - 10,
+                             y: frame.maxY - xdrHUDSize.height - 10)
         } else {
-            origin = NSPoint(x: frame.midX - 160, y: frame.minY + 100)
+            origin = NSPoint(x: screen.frame.midX - xdrHUDSize.width / 2, y: frame.minY + 100)
         }
         panel.setFrameOrigin(origin)
         state.shown = true

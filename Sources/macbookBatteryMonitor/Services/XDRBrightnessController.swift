@@ -50,7 +50,7 @@ final class XDRBrightnessController {
     var supported: Bool { screen != nil && maximumGain > 1 }
     var renderingHealthy: Bool { surface?.visible == true && (surface?.completedFrames ?? 0) > 0 }
     var renderingStatus: String {
-        "visible=\(surface?.visible ?? false), submitted=\(surface?.renderedFrames ?? 0), completed=\(surface?.completedFrames ?? 0)"
+        "visible=\(surface?.visible ?? false), submitted=\(surface?.renderedFrames ?? 0), completed=\(surface?.completedFrames ?? 0), HUD \(hud.geometryStatus)"
     }
     var keysStatus: String { keys?.status ?? "亮度鍵自動啟用已關閉" }
 
@@ -61,6 +61,7 @@ final class XDRBrightnessController {
         automaticActivation = UserDefaults.standard.object(forKey: Self.automaticActivationKey) as? Bool ?? true
         refreshDisplayLimits()
         updateKeyMonitoring()
+        if let screen { hud.prepareAlignment(on: screen) }
         Self.log.notice("Automatic XDR: \(self.automaticActivation, privacy: .public), keys: \(self.keysStatus, privacy: .public)")
         observers.append(DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
@@ -205,6 +206,7 @@ final class XDRBrightnessController {
         switch action {
         case .system:
             hud.hide()
+            if let screen { hud.prepareAlignment(on: screen, afterNativeKey: true) }
             return false
         case .activate(let value):
             if let reason = unavailableReason { status = reason; return false }

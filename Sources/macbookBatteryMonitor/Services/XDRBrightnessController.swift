@@ -1,6 +1,5 @@
 import AppKit
 import Observation
-import IOKit.ps
 
 struct XDRGammaSnapshot {
     var display: CGDirectDisplayID
@@ -81,10 +80,7 @@ final class XDRBrightnessController {
     private var unavailableReason: String? {
         let session = CGSessionCopyCurrentDictionary() as? [String: Any]
         let locked = session == nil || session?["CGSSessionScreenIsLocked"] as? Bool == true
-        let info = IOPSCopyPowerSourcesInfo().takeRetainedValue()
-        let power = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String?
         return XDRBrightnessPolicy.blockReason(supported: supported,
-            onAC: power == kIOPSACPowerValue,
             lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled || AppSettings.shared.powerSavingActive,
             hot: [.serious, .critical].contains(ProcessInfo.processInfo.thermalState), locked: locked)
     }

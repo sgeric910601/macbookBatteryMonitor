@@ -194,11 +194,16 @@ final class FinderKeysTap: @unchecked Sendable {
         guard Self.watchedKeys.contains(code), KeyLayout.usKeyCode(Int(code), character: KeyboardLetters.shared.letter(at: Int(code))) != nil,
               !IsSecureEventInputEnabled(), let finder = locked({ finder }) else { return pass }
         let flags = event.flags
+        let command = flags.contains(.maskCommand)
+        // 只有 ⌘X／⌘C／⌘V 和不按 ⌘ 的 F2 可能改寫：改檔名時打一般的 x、c、v 不做「輔助使用」查詢，打字不會卡
+        guard command != (code == Int64(FinderKeys.f2Key)) else { return pass }
         let editing = Self.editingText(finder)
+        // 剪貼簿的變更次數要問另一個程序：在鎖外面讀，主執行緒不會等在鎖上
+        let change = NSPasteboard.general.changeCount
         let action = locked {
-            logic.keyDown(keyCode: Int(code), command: flags.contains(.maskCommand),
+            logic.keyDown(keyCode: Int(code), command: command,
                           otherModifiers: !flags.intersection([.maskShift, .maskControl, .maskAlternate]).isEmpty,
-                          finderFront: true, editingText: editing, pasteboardChange: NSPasteboard.general.changeCount)
+                          finderFront: true, editingText: editing, pasteboardChange: change)
         }
         guard case let .remap(newCode, option) = action else { return pass }
         Self.post(Int64(newCode), down: true, flags: flags, option: option)

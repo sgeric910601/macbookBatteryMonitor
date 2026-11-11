@@ -297,7 +297,7 @@ The system integration uses private macOS functions, all loaded at run time and 
 
 Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
 
-- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch
+- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch. Virtual devices that cannot be the default output (for example Background Music's "UI Sounds" device for system alerts) are not listed, as in the system Sound menu
 - **Mute microphone**: uses the device's mute switch, or, if there is no switch, the menu says "輸入音量調到 0" (set input volume to 0) and the volume is restored when unmuted or when the app quits. A meeting app's automatic gain may turn it back up, so use the meeting app's own mute for such devices. The button shows a crossed-out microphone while muted
 - **Permission**: uses the public Core Audio API and needs no permission; devices are read only when the menu opens
 
@@ -324,7 +324,7 @@ Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu,
 - **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
 - **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
 - **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
-- The menu can clear the history; no permission needed
+- The panel can clear the history; it stays open and the list empties; no permission needed
 
 ## Ports and quitting processes
 
@@ -337,14 +337,16 @@ Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings 
 
 ## Cat quick menu
 
-Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar with:
+Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar. Clicking it opens a panel with:
 
-- **Keep awake**: pick a duration, stop, or keep the display on too; the title shows the time left while active
-- **Audio output** and **mute microphone**
-- **Start keyboard cleaning** (when keyboard cleaning mode is on)
-- **Extension features**: turn each one on or off directly
-- **Settings…** and **Quit**
-- The menu reads the current state only when it opens and does nothing otherwise; no permission needed
+- **Three large buttons**: keep awake (with the time left), mute microphone (with the audio switcher on) and start keyboard cleaning (with keyboard cleaning mode on)
+- **Keep-awake duration**: 30 min, 1 h, 2 h or until turned off, with the running one highlighted; the display can stay on too
+- **Audio output**: the same device list as the audio switcher; click one to switch
+- **Clipboard history** (when on): the last 5 items, click one to put it back on the clipboard; clearing keeps the panel open
+- **功能管理** (manage features): switches the panel to an extension features page where each feature has its own switch; "返回" (back) or Esc returns. A feature that needs Accessibility opens the permissions page if it is not allowed yet. The cat quick menu itself is turned off in Settings, since turning it off here would remove the panel
+- **Settings** and **Quit** at the bottom
+- Clicking outside closes the panel; the battery and system monitor panels also close when you click elsewhere or on another menu bar icon
+- The panel reads the current state only when it opens and does nothing otherwise; no permission needed
 
 ## Finder shortcuts
 

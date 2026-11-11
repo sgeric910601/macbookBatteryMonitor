@@ -1,5 +1,11 @@
 import Foundation
 
+enum XDRBrightnessKeyAction: Equatable {
+    case system
+    case activate(Double)
+    case adjust(Double)
+}
+
 enum XDRBrightnessPolicy {
     static func estimatedNits(sdrMaximum: Double?, linearBrightness: Double?, gain: Double, headroom: Double) -> Int? {
         guard let sdrMaximum, let linearBrightness,
@@ -20,6 +26,15 @@ enum XDRBrightnessPolicy {
         return nil
     }
 
+    static func keyAction(up: Bool, gain: Double, active: Bool, automatic: Bool,
+                          nativeBrightness: Float?) -> XDRBrightnessKeyAction {
+        guard active || automatic else { return .system }
+        guard let value = keyGain(up: up, gain: active ? gain : 1, nativeBrightness: nativeBrightness) else {
+            return .system
+        }
+        return active ? .adjust(value) : .activate(value)
+    }
+
     /// nil 表示交給系統；只有在一般亮度到頂或已有額外增亮時才接管。
     static func keyGain(up: Bool, gain: Double, nativeBrightness: Float?) -> Double? {
         guard gain > 1.001 || (up && (nativeBrightness ?? 0) >= 0.99) else { return nil }
@@ -28,21 +43,32 @@ enum XDRBrightnessPolicy {
 
 }
 
-/// 每次實體按壓維持相同歸屬，避免系統只收到部分事件。
+/// 記住原生按下事件的去向，跨過上限後可接管 repeat，仍將放開事件送回系統。
 struct XDRBrightnessKeySequence {
-    private var ownership: [Int: Bool] = [:]
+    private struct Press {
+        let sentDownToSystem: Bool
+        let allowsAdjustment: Bool
+        var consuming: Bool
+    }
+    private var presses: [Int: Press] = [:]
 
     func shouldAdjustDown(code: Int, repeating: Bool) -> Bool {
-        ownership[code] ?? !repeating
+        presses[code]?.allowsAdjustment ?? !repeating
     }
 
-    mutating func consumeDown(code: Int, adjusted: Bool) -> Bool {
-        if let consumed = ownership[code] { return consumed }
-        ownership[code] = adjusted
-        return adjusted
+    mutating func consumeDown(code: Int, adjusted: Bool, repeating: Bool) -> Bool {
+        if var press = presses[code] {
+            if press.allowsAdjustment && adjusted { press.consuming = true }
+            presses[code] = press
+            return press.consuming
+        }
+        let consumed = adjusted && !repeating
+        presses[code] = Press(sentDownToSystem: !consumed, allowsAdjustment: !repeating, consuming: consumed)
+        return consumed
     }
 
     mutating func consumeUp(code: Int) -> Bool {
-        ownership.removeValue(forKey: code) ?? false
+        guard let press = presses.removeValue(forKey: code) else { return false }
+        return !press.sentDownToSystem
     }
 }

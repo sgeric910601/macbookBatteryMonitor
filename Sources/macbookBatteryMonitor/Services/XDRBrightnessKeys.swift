@@ -13,7 +13,13 @@ final class XDRBrightnessKeys {
     init(adjust: @escaping (Bool) -> Bool) { self.adjust = adjust }
 
     func start() {
-        guard AXIsProcessTrusted() else { status = "亮度鍵需要輔助使用權限；滑桿仍可使用"; return }
+        guard AXIsProcessTrusted() else {
+            if tap != nil { stop() }
+            status = "亮度鍵需要輔助使用權限；滑桿仍可使用"
+            return
+        }
+        if let tap, CFMachPortIsValid(tap), CGEvent.tapIsEnabled(tap: tap) { return }
+        stop()
         let pointer = Unmanaged.passUnretained(self).toOpaque()
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
             options: .defaultTap, eventsOfInterest: CGEventMask(1 << 14), callback: { _, type, event, info in
@@ -35,7 +41,7 @@ final class XDRBrightnessKeys {
                         let repeating = (key.data1 & 1) != 0
                         let shouldAdjust = owner.sequence.shouldAdjustDown(code: code, repeating: repeating)
                         let adjusted = shouldAdjust && owner.adjust(code == 2)
-                        if owner.sequence.consumeDown(code: code, adjusted: adjusted) { return nil }
+                        if owner.sequence.consumeDown(code: code, adjusted: adjusted, repeating: repeating) { return nil }
                     }
                     if state == 0xB, owner.sequence.consumeUp(code: code) { return nil }
                     return Unmanaged.passUnretained(event)

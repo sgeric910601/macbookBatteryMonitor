@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import OSLog
 
 struct XDRGammaSnapshot {
     var display: CGDirectDisplayID
@@ -24,6 +25,9 @@ final class XDRBrightnessController {
     private(set) var preparing = false
     private(set) var gain = 1.0
     private(set) var status = "未開啟"
+    private(set) var automaticActivation = true
+    private static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "XDR")
+    private static let automaticActivationKey = "xdrAutomaticActivation"
     @ObservationIgnored private var displayID: CGDirectDisplayID?
     @ObservationIgnored private var screenFrame: NSRect?
     @ObservationIgnored private var surface: XDRSurface?
@@ -46,11 +50,15 @@ final class XDRBrightnessController {
     var renderingStatus: String {
         "visible=\(surface?.visible ?? false), submitted=\(surface?.renderedFrames ?? 0), completed=\(surface?.completedFrames ?? 0)"
     }
-    var keysStatus: String { keys?.status ?? "開啟增亮後連動亮度鍵" }
+    var keysStatus: String { keys?.status ?? "亮度鍵自動啟用已關閉" }
 
     func start() {
-        guard !started, Bundle.main.bundleIdentifier == "com.kuan.batterymonitor" else { return }
+        guard !started, Bundle.main.bundleIdentifier == "com.kuan.batterymonitor",
+              !CommandLine.arguments.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--screenshots") }) else { return }
         started = true
+        automaticActivation = UserDefaults.standard.object(forKey: Self.automaticActivationKey) as? Bool ?? true
+        updateKeyMonitoring()
+        Self.log.notice("Automatic XDR: \(self.automaticActivation, privacy: .public), keys: \(self.keysStatus, privacy: .public)")
         observers.append(DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
         ) { [weak self] _ in
@@ -65,7 +73,28 @@ final class XDRBrightnessController {
         }
     }
 
+    func setAutomaticActivation(_ allowed: Bool) {
+        automaticActivation = allowed
+        UserDefaults.standard.set(allowed, forKey: Self.automaticActivationKey)
+        updateKeyMonitoring()
+    }
+
+    private func updateKeyMonitoring() {
+        guard started, supported, automaticActivation || enabled else {
+            keys?.stop()
+            keys = nil
+            return
+        }
+        if keys == nil { keys = XDRBrightnessKeys { [weak self] up in self?.handleKey(up: up) ?? false } }
+        keys?.start()
+    }
+
     func reconcile() {
+        updateKeyMonitoring()
+        reconcileActiveState()
+    }
+
+    private func reconcileActiveState() {
         guard enabled else { return }
         if let reason = unavailableReason { disable(reason: reason) }
         else if let deadline, Date() >= deadline { disable(reason: "30 分鐘已到，已還原亮度") }
@@ -85,7 +114,7 @@ final class XDRBrightnessController {
             hot: [.serious, .critical].contains(ProcessInfo.processInfo.thermalState), locked: locked)
     }
 
-    func enable() {
+    func enable(initialGain: Double = 1.15) {
         guard !enabled, !preparing else { return }
         guard Bundle.main.bundleIdentifier == "com.kuan.batterymonitor",
               !CommandLine.arguments.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--screenshots") }) else {
@@ -96,9 +125,10 @@ final class XDRBrightnessController {
         if NSWorkspace.shared.runningApplications.contains(where: { conflicts.contains($0.bundleIdentifier ?? "") }) {
             status = "請先退出其他亮度／色彩增強工具"; return
         }
+        let requestedGain = XDRBrightnessPolicy.clamp(initialGain)
         guard let screen,
               let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
-              let surface = XDRSurface(screen: screen) else {
+              let surface = XDRSurface(screen: screen, gain: requestedGain) else {
             status = "無法建立 EDR 畫面"; return
         }
         displayID = id
@@ -123,10 +153,10 @@ final class XDRBrightnessController {
                 if screen.maximumExtendedDynamicRangeColorComponentValue > 1.01,
                    surface.completedFrames > 0, surface.visible {
                     preparing = false
-                    setGain(1.15)
+                    setGain(requestedGain)
                     guard enabled else { return }
-                    keys = XDRBrightnessKeys { [weak self] up in self?.handleKey(up: up) ?? false }
-                    keys?.start()
+                    updateKeyMonitoring()
+                    Self.log.notice("XDR activated, gain: \(self.gain, privacy: .public)")
                     return
                 }
             }
@@ -135,7 +165,7 @@ final class XDRBrightnessController {
     }
 
     func setGain(_ value: Double) {
-        reconcile()
+        reconcileActiveState()
         guard enabled, !preparing, surface != nil else { return }
         let requested = XDRBrightnessPolicy.clamp(value)
         surface?.setGain(requested)
@@ -149,15 +179,32 @@ final class XDRBrightnessController {
     }
 
     private func handleKey(up: Bool) -> Bool {
-        guard enabled, !preparing else { return false }
-        reconcile()
-        guard enabled, let value = XDRBrightnessPolicy.keyGain(up: up, gain: gain,
-            nativeBrightness: XDRBrightnessKeys.nativeBrightness(displayID)) else {
+        guard !preparing else { return false }
+        reconcileActiveState()
+        let id = displayID ?? screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        let action = XDRBrightnessPolicy.keyAction(up: up, gain: gain, active: enabled,
+            automatic: automaticActivation, nativeBrightness: XDRBrightnessKeys.nativeBrightness(id))
+        switch action {
+        case .system:
             hud.hide()
             return false
+        case .activate(let value):
+            if let reason = unavailableReason { status = reason; return false }
+            let token = UUID()
+            generation = token
+            preparing = true
+            status = "正在準備 XDR…"
+            Task { [weak self] in
+                guard let self, generation == token else { return }
+                preparing = false
+                guard automaticActivation else { status = "已取消自動增亮"; return }
+                enable(initialGain: value)
+            }
+            return true
+        case .adjust(let value):
+            setGain(value)
+            return true
         }
-        setGain(value)
-        return true
     }
 
     @discardableResult
@@ -165,7 +212,6 @@ final class XDRBrightnessController {
         generation = UUID()
         hud.hide()
         safetyTimer?.invalidate(); safetyTimer = nil
-        keys?.stop(); keys = nil
         surface?.stop(); surface = nil
         displayID = nil
         screenFrame = nil
@@ -174,6 +220,7 @@ final class XDRBrightnessController {
         gain = 1
         deadline = nil
         status = reason
+        updateKeyMonitoring()
         return true
     }
 }

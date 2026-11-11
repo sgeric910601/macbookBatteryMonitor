@@ -12,7 +12,7 @@ final class XDRSurface: NSObject, MTKViewDelegate {
     private(set) var completedFrames = 0
     var visible: Bool { window.isVisible }
 
-    init?(screen: NSScreen) {
+    init?(screen: NSScreen, gain: Double = 1.15) {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return nil }
         self.queue = queue
         window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
@@ -28,7 +28,8 @@ final class XDRSurface: NSObject, MTKViewDelegate {
         view.colorPixelFormat = .rgba16Float
         view.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)
         view.preferredFramesPerSecond = 5
-        view.clearColor = MTLClearColor(red: 1.15, green: 1.15, blue: 1.15, alpha: 1)
+        let initialGain = XDRBrightnessPolicy.clamp(gain)
+        view.clearColor = MTLClearColor(red: initialGain, green: initialGain, blue: initialGain, alpha: 1)
         guard let layer = view.layer as? CAMetalLayer else { return nil }
         layer.isOpaque = false
         layer.wantsExtendedDynamicRangeContent = true

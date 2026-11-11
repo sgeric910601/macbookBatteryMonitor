@@ -38,4 +38,14 @@ struct WindowMaximizeTests {
         memory.forget(window: 2)
         XCTAssertEqual(memory.toggle(window: 2, frame: screen, visible: screen), screen)
     }
+
+    /// 只有點在視窗左上角紅黃綠按鈕那一塊才去問 App；其他地方（網頁內容、工具列右邊、另一個螢幕的視窗內容）都不問
+    func testTrafficLightZone() {
+        let window = CGRect(x: -38, y: -1080, width: 1200, height: 800)
+        XCTAssertTrue(WindowMaximize.isNearTrafficLights(CGPoint(x: -38 + 70, y: -1080 + 14), window: window))
+        XCTAssertTrue(WindowMaximize.isNearTrafficLights(CGPoint(x: -38 + 75, y: -1080 + 40), window: window))
+        XCTAssertTrue(!WindowMaximize.isNearTrafficLights(CGPoint(x: -38 + 600, y: -1080 + 14), window: window))
+        XCTAssertTrue(!WindowMaximize.isNearTrafficLights(CGPoint(x: -38 + 70, y: -1080 + 400), window: window))
+        XCTAssertTrue(!WindowMaximize.isNearTrafficLights(CGPoint(x: -38 - 5, y: -1080 + 14), window: window))
+    }
 }

@@ -34,9 +34,14 @@ final class PortManager {
 
     /// 確認後送出 SIGTERM（讓程式有機會收尾）；擁有者或名稱和清單上的不一樣就不送
     func confirmTerminate(_ listener: PortList.Listener) {
-        guard PortList.canTerminate(pid: listener.pid, uid: listener.uid, myUID: Int(getuid()), myPID: getpid()),
-              // 確認對話框開著時清單可能重新整理過：用列出這一筆時記下的啟動時間比對
-              let expectedStart = startTimes[listener.pid] else { return }
+        guard PortList.canTerminate(pid: listener.pid, uid: listener.uid, myUID: Int(getuid()), myPID: getpid()) else {
+            return Self.cannotTerminate(listener, "這是系統、其他帳號或本 App 自己的程式，不能從這裡結束。")
+        }
+        // 確認對話框開著時清單可能重新整理過：用列出這一筆時記下的啟動時間比對
+        guard let expectedStart = startTimes[listener.pid] else {
+            refresh()
+            return Self.cannotTerminate(listener, "查不到這個程式的資料，它可能已經結束了。清單已重新整理。")
+        }
         let alert = NSAlert()
         alert.messageText = "結束「\(listener.command)」？"
         alert.informativeText = "它正在監聽連接埠 \(listener.port)（PID \(listener.pid)）。會先請它正常結束，還沒存的資料可能會不見。"
@@ -46,16 +51,19 @@ final class PortManager {
         guard let owner = Self.owner(of: listener.pid), owner.uid == listener.uid, owner.name == listener.command,
               owner.started == expectedStart else {
             refresh()
-            return
+            return Self.cannotTerminate(listener, "它已經結束，或這個 PID 換成了別的程式，所以沒有結束任何程式。清單已重新整理。")
         }
         if kill(listener.pid, SIGTERM) != 0 {
-            let alreadyGone = errno == ESRCH
-            let failed = NSAlert()
-            failed.messageText = "無法結束「\(listener.command)」"
-            failed.informativeText = alreadyGone ? "它已經結束了。" : "沒有權限結束這個程式。"
-            failed.runModal()
+            Self.cannotTerminate(listener, errno == ESRCH ? "它已經結束了。" : "沒有權限結束這個程式。")
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { MainActor.assumeIsolated { PortManager.shared.refresh() } }
+    }
+
+    private static func cannotTerminate(_ listener: PortList.Listener, _ reason: String) {
+        let alert = NSAlert()
+        alert.messageText = "無法結束「\(listener.command)」"
+        alert.informativeText = reason
+        alert.runModal()
     }
 
     /// 這個 PID 現在的擁有者、程式名稱（lsof 的 c 欄位是 15 個字元以內的程式名稱，這裡同樣取 comm）與啟動時間（微秒）

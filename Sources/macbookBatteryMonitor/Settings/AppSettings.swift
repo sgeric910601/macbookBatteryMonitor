@@ -143,6 +143,19 @@ final class AppSettings {
         if let apps = values[Keys.keepAwakeApps] as? [String], !apps.isEmpty, apps != (defaults.stringArray(forKey: Keys.keepAwakeApps) ?? []) {
             turnsOn.append("指定 App 執行時防止休眠（\(apps.count) 個 App）")
         }
+        // 不是開關的設定：從「不處理／關閉」變成有作用，一樣會開始攔截滑鼠。用和讀設定時同樣的解讀，無效的值算關閉。
+        // 只有所屬的擴充功能匯入後是加入的才會作用
+        let options: [(ExtensionFeature, String, String, (Any?) -> Bool)] = [
+            (.mouseButtons, Keys.mouseBackButton, "滑鼠第 4 鍵", { MouseButtons.Action(stored: $0 as? String) != .none }),
+            (.mouseButtons, Keys.mouseForwardButton, "滑鼠第 5 鍵", { MouseButtons.Action(stored: $0 as? String) != .none }),
+            (.scrollDirection, Keys.scrollLinearLines, "滑鼠滾輪固定捲動行數", { ScrollLinear.valid($0 as? Int ?? 0) != 0 }),
+            (.scrollDirection, Keys.scrollHorizontalKey, "按住修飾鍵左右捲動", { ScrollHorizontalKey(stored: $0 as? String) != .off }),
+        ]
+        for (feature, key, title, isOn) in options
+        where values[feature.installedKey] as? Bool ?? isInstalled(feature)
+            && values[key] != nil && isOn(values[key]) && !isOn(defaults.object(forKey: key)) {
+            turnsOn.append(title)
+        }
         return (values, turnsOn)
     }
 

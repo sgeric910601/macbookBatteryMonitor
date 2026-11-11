@@ -448,7 +448,7 @@ struct SettingsView: View {
                         CardTitle("中文輸入法", systemImage: "keyboard")
                         SwitchRow("Caps Lock 切換中英不延遲", isOn: binding(\.capsLockNoDelay))
                         SwitchRow("按住 Shift 打半形英文與符號", isOn: binding(\.shiftHalfWidth))
-                        Text("macOS 為了防誤觸，Caps Lock 要按住一下才切換；打開後按一下就切。注音等中文輸入法按住 Shift 打字會變全形「Ａ」「！」「，」；打開後按住 Shift 時和英文鍵盤一樣全部打出半形，放開 Shift 就繼續打中文（Shift + 逗號、句號會是 < >，中文標點請改用其他方式打）。關掉「不延遲」後要重新開機才恢復原本的延遲。")
+                        Text("macOS 為了防誤觸，Caps Lock 要按住一下才切換；打開後按一下就切（只對外接鍵盤有效：macOS 27.2 實測，使用系統的「大寫鎖定鍵切換輸入法」時，內建鍵盤由 macOS 自己判斷）。注音等中文輸入法按住 Shift 打字會變全形「Ａ」「！」「，」；打開後按住 Shift 時和英文鍵盤一樣全部打出半形，放開 Shift 就繼續打中文（Shift + 逗號、句號會是 < >，中文標點請改用其他方式打）。關掉「不延遲」時恢復系統預設的延遲。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

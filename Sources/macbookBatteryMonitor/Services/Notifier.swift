@@ -132,6 +132,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
              kind: Self.updateKind)
     }
 
+    /// EventTapAccess：失去「輔助使用」權限時重新開啟了 App
+    func notifyTapAccessRelaunched() {
+        post(title: "已重新開啟\(AppEdition.appName)",
+             body: "「輔助使用」權限被移除，為了不讓滑鼠和鍵盤卡住，已停止攔截並重新開啟。重新允許權限後功能會自動恢復。")
+    }
+
+    /// EventTapAccess：重新開啟後又偵測到、或無法重新開啟，攔截暫停到又建得起來
+    func notifyTapAccessDisabled() {
+        post(title: "滑鼠與鍵盤相關功能已暫停",
+             body: "無法確認「輔助使用」權限，為了不讓滑鼠和鍵盤卡住，已停止攔截。權限恢復後會自動恢復，或重新開啟\(AppEdition.appName)。")
+    }
+
     func sendTest() {
         post(title: AppEdition.appName, body: "通知功能正常 👍")
     }

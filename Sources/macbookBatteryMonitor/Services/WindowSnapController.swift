@@ -46,7 +46,12 @@ final class WindowSnapController {
             | (1 << CGEventType.leftMouseUp.rawValue)
         guard let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .listenOnly,
                                            eventsOfInterest: mask, callback: windowSnapCallback, userInfo: nil) else { return false }
-        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+        // 攔截剛好被作廢時建不出來源
+        guard let source = CFMachPortCreateRunLoopSource(nil, port, 0) as CFRunLoopSource? else {
+            CFMachPortInvalidate(port)
+            return false
+        }
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
         self.port = port
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
@@ -61,7 +66,10 @@ final class WindowSnapController {
     /// 系統暫停攔截時重新打開；失效（例如權限被撤銷又給回）時重建
     private func keepAlive() {
         guard let port else { return }
-        if !CFMachPortIsValid(port) {
+        // 權限被撤銷：重新打開只會一直被系統逾時暫停，整台 Mac 的輸入跟著卡。停掉，權限回來後由 AppDelegate 每 5 秒的檢查重新開始
+        if !AXIsProcessTrusted() {
+            stop()
+        } else if !CFMachPortIsValid(port) {
             stop()
             apply(enabled: true)
         } else if !CGEvent.tapIsEnabled(tap: port) {
@@ -82,7 +90,7 @@ final class WindowSnapController {
     }
 
     fileprivate func reenable() {
-        if let port { CGEvent.tapEnable(tap: port, enable: true) }
+        if let port, AXIsProcessTrusted() { CGEvent.tapEnable(tap: port, enable: true) }
     }
 
     fileprivate func handle(_ type: CGEventType, location: CGPoint) {

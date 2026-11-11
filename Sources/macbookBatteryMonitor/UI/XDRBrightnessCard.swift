@@ -19,10 +19,14 @@ struct XDRBrightnessCard: View {
                 .disabled(!control.supported)
                 HStack {
                     Text("增亮倍率")
-                    Slider(value: Binding(get: { control.gain }, set: { control.setGain($0) }), in: 1...1.6, step: 0.05)
-                        .disabled(!control.enabled || control.preparing)
+                    Slider(value: Binding(get: { control.gain }, set: { control.setGain($0) }), in: 1...max(1.05, control.maximumGain), step: 0.05)
+                        .disabled(!control.enabled || control.preparing || control.maximumGain <= 1)
                     Text("\(Int((control.gain * 100).rounded()))%")
                         .monospacedDigit().frame(width: 46, alignment: .trailing)
+                }
+                if let target = control.targetNits {
+                    Text("峰值目標上限 \(target) nits，實際亮度由系統 EDR 餘裕決定。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Text(control.status).font(.callout).foregroundStyle(.secondary)
                 Text(control.keysStatus).font(.caption).foregroundStyle(.secondary)

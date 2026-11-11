@@ -28,7 +28,7 @@ final class XDRSurface: NSObject, MTKViewDelegate {
         view.colorPixelFormat = .rgba16Float
         view.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)
         view.preferredFramesPerSecond = 5
-        let initialGain = XDRBrightnessPolicy.clamp(gain)
+        let initialGain = XDRBrightnessPolicy.clamp(gain, maximum: XDRBrightnessPolicy.absoluteMaximumGain)
         view.clearColor = MTLClearColor(red: initialGain, green: initialGain, blue: initialGain, alpha: 1)
         guard let layer = view.layer as? CAMetalLayer else { return nil }
         layer.isOpaque = false
@@ -47,7 +47,7 @@ final class XDRSurface: NSObject, MTKViewDelegate {
     }
 
     func setGain(_ value: Double) {
-        let gain = XDRBrightnessPolicy.clamp(value)
+        let gain = XDRBrightnessPolicy.clamp(value, maximum: XDRBrightnessPolicy.absoluteMaximumGain)
         view.clearColor = MTLClearColor(red: gain, green: gain, blue: gain, alpha: 1)
         view.draw()
     }

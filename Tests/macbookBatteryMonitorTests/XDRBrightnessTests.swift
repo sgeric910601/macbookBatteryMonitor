@@ -2,6 +2,14 @@ import Foundation
 
 final class XDRBrightnessTests {
     func run() {
+        XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: 500, peakHDR: 1600, potentialHeadroom: 16), 3.2)
+        XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: 600, peakHDR: 1600, potentialHeadroom: 2), 2)
+        XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: nil, peakHDR: 1600, potentialHeadroom: 16), 1.6)
+        XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: 500, peakHDR: .infinity, potentialHeadroom: 16), 1.6)
+        XCTAssertEqual(XDRBrightnessPolicy.clamp(10, maximum: 3.2), 3.2)
+        XCTAssertEqual(XDRBrightnessPolicy.keyGain(up: true, gain: 3.2, nativeBrightness: 1, maximum: 3.2), 3.2)
+        XCTAssertEqual(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 1, gain: 3.2, headroom: 3.2), 1600)
+        XCTAssertEqual(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 1, gain: 3.2, headroom: 2), 1000)
         XCTAssertEqual(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 1, gain: 1.6, headroom: 1.2), 600)
         XCTAssertEqual(XDRBrightnessPolicy.estimatedNits(sdrMaximum: 500, linearBrightness: 0.5, gain: 1.2, headroom: 3.2), 300)
         XCTAssertNil(XDRBrightnessPolicy.estimatedNits(sdrMaximum: nil, linearBrightness: 1, gain: 1.6, headroom: 2))

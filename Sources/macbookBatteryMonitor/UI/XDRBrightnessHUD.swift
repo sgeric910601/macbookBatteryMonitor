@@ -5,6 +5,11 @@ import Observation
 @MainActor @Observable
 private final class XDRBrightnessHUDState {
     var gain = 1.0
+    var maximumGain = 1.6
+    var progress: Double {
+        guard maximumGain > 1 else { return 0 }
+        return min(1, max(0, (gain - 1) / (maximumGain - 1)))
+    }
     var nits: Int?
     var shown = false
 }
@@ -32,7 +37,7 @@ private struct XDRBrightnessHUDView: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.primary.opacity(0.16))
                         Capsule().fill(Color.primary)
-                            .frame(width: geometry.size.width * min(1, max(0, (state.gain - 1) / 0.6)))
+                            .frame(width: geometry.size.width * state.progress)
                     }
                 }
                 .frame(height: 5)
@@ -59,9 +64,10 @@ final class XDRBrightnessHUD {
     private var panel: NSPanel?
     private var hideTask: Task<Void, Never>?
 
-    func show(screen: NSScreen, gain: Double, nits: Int?) {
+    func show(screen: NSScreen, gain: Double, maximumGain: Double, nits: Int?) {
         hideTask?.cancel()
-        state.gain = XDRBrightnessPolicy.clamp(gain)
+        state.maximumGain = maximumGain
+        state.gain = XDRBrightnessPolicy.clamp(gain, maximum: maximumGain)
         state.nits = nits
         if panel == nil {
             let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 320, height: 72),

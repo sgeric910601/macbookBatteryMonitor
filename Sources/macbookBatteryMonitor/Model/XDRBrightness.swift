@@ -7,16 +7,31 @@ enum XDRBrightnessKeyAction: Equatable {
 }
 
 enum XDRBrightnessPolicy {
+    static let absoluteMaximumGain = 16.0
+
+    static func maximumGain(sdrMaximum: Double?, peakHDR: Double?, potentialHeadroom: Double) -> Double {
+        guard potentialHeadroom.isFinite, potentialHeadroom >= 1 else { return 1 }
+        guard let sdrMaximum, let peakHDR,
+              sdrMaximum.isFinite, sdrMaximum > 0, sdrMaximum <= 10_000,
+              peakHDR.isFinite, peakHDR > 0, peakHDR <= 10_000 else {
+            return min(1.6, potentialHeadroom)
+        }
+        return min(absoluteMaximumGain, potentialHeadroom, max(1, peakHDR / sdrMaximum))
+    }
+
     static func estimatedNits(sdrMaximum: Double?, linearBrightness: Double?, gain: Double, headroom: Double) -> Int? {
         guard let sdrMaximum, let linearBrightness,
               sdrMaximum.isFinite, sdrMaximum > 0, sdrMaximum <= 10_000,
               linearBrightness.isFinite, (0...1).contains(linearBrightness),
               gain.isFinite, headroom.isFinite, headroom >= 1 else { return nil }
-        let effectiveGain = min(clamp(gain), headroom)
+        let effectiveGain = clamp(gain, maximum: headroom)
         return Int((sdrMaximum * linearBrightness * effectiveGain).rounded())
     }
 
-    static func clamp(_ gain: Double) -> Double { gain.isFinite ? min(1.6, max(1, gain)) : 1 }
+    static func clamp(_ gain: Double, maximum: Double = 1.6) -> Double {
+        let limit = maximum.isFinite ? min(absoluteMaximumGain, max(1, maximum)) : 1
+        return gain.isFinite ? min(limit, max(1, gain)) : 1
+    }
 
     static func blockReason(supported: Bool, lowPower: Bool, hot: Bool, locked: Bool = false) -> String? {
         if locked { return "解鎖並開啟螢幕後才能啟用增亮" }
@@ -27,18 +42,18 @@ enum XDRBrightnessPolicy {
     }
 
     static func keyAction(up: Bool, gain: Double, active: Bool, automatic: Bool,
-                          nativeBrightness: Float?) -> XDRBrightnessKeyAction {
+                          nativeBrightness: Float?, maximum: Double = 1.6) -> XDRBrightnessKeyAction {
         guard active || automatic else { return .system }
-        guard let value = keyGain(up: up, gain: active ? gain : 1, nativeBrightness: nativeBrightness) else {
+        guard let value = keyGain(up: up, gain: active ? gain : 1, nativeBrightness: nativeBrightness, maximum: maximum) else {
             return .system
         }
         return active ? .adjust(value) : .activate(value)
     }
 
     /// nil 表示交給系統；只有在一般亮度到頂或已有額外增亮時才接管。
-    static func keyGain(up: Bool, gain: Double, nativeBrightness: Float?) -> Double? {
+    static func keyGain(up: Bool, gain: Double, nativeBrightness: Float?, maximum: Double = 1.6) -> Double? {
         guard gain > 1.001 || (up && (nativeBrightness ?? 0) >= 0.99) else { return nil }
-        return clamp((gain * 100 + (up ? 5 : -5)).rounded() / 100)
+        return clamp((gain * 100 + (up ? 5 : -5)).rounded() / 100, maximum: maximum)
     }
 
 }

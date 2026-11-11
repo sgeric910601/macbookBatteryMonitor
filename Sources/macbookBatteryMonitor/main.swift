@@ -14,14 +14,14 @@ if CommandLine.arguments.contains("--selftest-xdr") {
         let id = control.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         let before = id.flatMap(XDRGammaSnapshot.capture)
         let automaticTest = CommandLine.arguments.contains("--xdr-auto")
-        print("Automatic XDR: \(control.automaticActivation)")
+        print("Automatic XDR: \(control.automaticActivation), maximum gain: \(control.maximumGain), peak target: \(control.targetNits ?? 0)")
         if !automaticTest {
             control.enable()
             let finish = Date().addingTimeInterval(4)
             while Date() < finish { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
         }
         if CommandLine.arguments.contains("--xdr-visual"), control.enabled {
-            control.setGain(1.6)
+            control.setGain(control.maximumGain)
             let visualEnd = Date().addingTimeInterval(12)
             while Date() < visualEnd { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
         }

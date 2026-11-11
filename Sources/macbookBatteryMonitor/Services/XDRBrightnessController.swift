@@ -24,6 +24,8 @@ final class XDRBrightnessController {
     private(set) var enabled = false
     private(set) var preparing = false
     private(set) var gain = 1.0
+    private(set) var maximumGain = 1.6
+    private(set) var targetNits: Int?
     private(set) var status = "未開啟"
     private(set) var automaticActivation = true
     private static let log = Logger(subsystem: "com.kuan.batterymonitor", category: "XDR")
@@ -45,7 +47,7 @@ final class XDRBrightnessController {
             return CGDisplayIsBuiltin(id) != 0 && $0.maximumPotentialExtendedDynamicRangeColorComponentValue > 1
         }
     }
-    var supported: Bool { screen != nil }
+    var supported: Bool { screen != nil && maximumGain > 1 }
     var renderingHealthy: Bool { surface?.visible == true && (surface?.completedFrames ?? 0) > 0 }
     var renderingStatus: String {
         "visible=\(surface?.visible ?? false), submitted=\(surface?.renderedFrames ?? 0), completed=\(surface?.completedFrames ?? 0)"
@@ -57,6 +59,7 @@ final class XDRBrightnessController {
               !CommandLine.arguments.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--screenshots") }) else { return }
         started = true
         automaticActivation = UserDefaults.standard.object(forKey: Self.automaticActivationKey) as? Bool ?? true
+        refreshDisplayLimits()
         updateKeyMonitoring()
         Self.log.notice("Automatic XDR: \(self.automaticActivation, privacy: .public), keys: \(self.keysStatus, privacy: .public)")
         observers.append(DistributedNotificationCenter.default().addObserver(
@@ -89,7 +92,21 @@ final class XDRBrightnessController {
         keys?.start()
     }
 
+    private func refreshDisplayLimits() {
+        guard let screen,
+              let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+            maximumGain = 1.6
+            targetNits = nil
+            return
+        }
+        let potential = Double(screen.maximumPotentialExtendedDynamicRangeColorComponentValue)
+        maximumGain = XDRLuminanceReader.maximumGain(display: id, potentialHeadroom: potential)
+        targetNits = XDRLuminanceReader.targetNits(display: id, potentialHeadroom: potential)
+        if enabled && gain > maximumGain { setGain(maximumGain) }
+    }
+
     func reconcile() {
+        refreshDisplayLimits()
         updateKeyMonitoring()
         reconcileActiveState()
     }
@@ -120,12 +137,13 @@ final class XDRBrightnessController {
               !CommandLine.arguments.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--screenshots") }) else {
             status = "僅在正式打包 App 中開啟"; return
         }
+        refreshDisplayLimits()
         if let reason = unavailableReason { status = reason; return }
         let conflicts = ["fyi.lunar.Lunar", "com.niklasr22.BrightIntosh", "me.guillaumeb.CosmicNitor"]
         if NSWorkspace.shared.runningApplications.contains(where: { conflicts.contains($0.bundleIdentifier ?? "") }) {
             status = "請先退出其他亮度／色彩增強工具"; return
         }
-        let requestedGain = XDRBrightnessPolicy.clamp(initialGain)
+        let requestedGain = XDRBrightnessPolicy.clamp(initialGain, maximum: maximumGain)
         guard let screen,
               let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
               let surface = XDRSurface(screen: screen, gain: requestedGain) else {
@@ -167,13 +185,13 @@ final class XDRBrightnessController {
     func setGain(_ value: Double) {
         reconcileActiveState()
         guard enabled, !preparing, surface != nil else { return }
-        let requested = XDRBrightnessPolicy.clamp(value)
+        let requested = XDRBrightnessPolicy.clamp(value, maximum: maximumGain)
         surface?.setGain(requested)
         gain = requested
         if let screen, let displayID {
             let nits = XDRLuminanceReader.estimatedNits(display: displayID, gain: requested,
                 headroom: screen.maximumExtendedDynamicRangeColorComponentValue)
-            hud.show(screen: screen, gain: requested, nits: nits)
+            hud.show(screen: screen, gain: requested, maximumGain: maximumGain, nits: nits)
         }
         status = requested > 1 ? "增亮設定 \(Int((requested * 100).rounded()))%（實際效果由系統限制）" : "一般亮度；到頂後可再按亮度增加鍵"
     }
@@ -183,7 +201,7 @@ final class XDRBrightnessController {
         reconcileActiveState()
         let id = displayID ?? screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         let action = XDRBrightnessPolicy.keyAction(up: up, gain: gain, active: enabled,
-            automatic: automaticActivation, nativeBrightness: XDRBrightnessKeys.nativeBrightness(id))
+            automatic: automaticActivation, nativeBrightness: XDRBrightnessKeys.nativeBrightness(id), maximum: maximumGain)
         switch action {
         case .system:
             hud.hide()

@@ -7,8 +7,6 @@ struct QuickMenuPanel: View {
     let settings: AppSettings
     let awake: KeepAwakeController
     let audio: AudioSwitchController
-    /// 剪貼簿歷史不是 Observable：打開面板時的內容
-    let clipboard: [String]
     var close: () -> Void
     var openSettings: (SettingsSection?) -> Void
 
@@ -18,6 +16,8 @@ struct QuickMenuPanel: View {
     private var showsMic: Bool { showsAudio && audio.micSupported }
     private var showsCleaning: Bool { settings.isInstalled(.keyboardCleaning) }
     private var showsClipboard: Bool { settings.isInstalled(.clipboardHistory) }
+    /// 直接讀最新的歷史：面板開著時複製或清除，清單會跟著更新
+    private var clipboard: [String] { ClipboardHistoryController.shared.history.items }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -126,8 +126,8 @@ struct QuickMenuPanel: View {
                     Spacer()
                     if !clipboard.isEmpty {
                         Button {
+                            // 清除後面板留著，清單變回空的
                             ClipboardHistoryController.shared.clear()
-                            close()
                         } label: {
                             Label("清除", systemImage: "trash")
                                 .font(.caption)

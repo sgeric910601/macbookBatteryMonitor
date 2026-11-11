@@ -63,7 +63,6 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
         guard let settings else { return }
         AudioSwitchController.shared.refresh()
         let root = QuickMenuPanel(settings: settings, awake: .shared, audio: .shared,
-                                  clipboard: ClipboardHistoryController.shared.history.items,
                                   close: { [weak self] in self?.popover?.closeNow() },
                                   openSettings: { [weak self] section in
                                       self?.popover?.closeNow(animated: false)

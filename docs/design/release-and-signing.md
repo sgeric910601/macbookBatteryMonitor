@@ -11,7 +11,7 @@
 
 - `legacy-macos12` 把 macOS 13／14 才有的寫法（Observation、Swift Charts、Grid、SMAppService 等）換成相容寫法，其他程式和 `main` 相同。每次發布前合併 `main`；在新系統上加 `--macos12-paths` 啟動，可以強制走 macOS 12 的寫法測試
 - 兩邊的識別碼都是 `com.kuan.batterymonitor`，用同一張憑證簽，所以舊系統版本換成通用版時權限也保留
-- `Info.plist` 的 `MBMEdition` 記錄是哪一種打包（`universal`、`legacy`，以及給舊版一鍵更新的 `battery`、`status`）。從 v1.6.x 更新上來時，App 用它保留原本的系統監控設定
+- `Info.plist` 的 `MBMEdition` 記錄是哪一種打包（`universal`、`legacy`，以及 v1.7.7 以前給舊版一鍵更新的 `battery`、`status`）。從 v1.6.x 更新上來時，App 用它保留原本的系統監控設定
 
 ## GitHub Actions（`.github/workflows/build.yml`）
 
@@ -21,7 +21,8 @@
 - **簽署並正式發布**：草稿使用者與一鍵更新都看不到。發布者在自己的 Mac 上執行 `Scripts/sign-release.sh v<版本>` 才正式發布（見下面的「更新簽章」）
 - `Info.plist` 帶 `MBMPrerelease`（例如 `beta.1`）時，tag 是 `v<版本>-beta.1`，標成預先發行版本，不會變成「最新版本」
 - `legacy-macos12` 的版本號（含 Beta 序號）和這次發布相同時，才一起打包舊系統版本。所以要先推 `legacy-macos12`，再推 `main`
-- 每一版附上：兩個 DMG、`…-<tag>-battery-macOS-arm64.zip`、`…-<tag>-status-macOS-arm64.zip`（給 v1.5.0～v1.6.2 與 v1.7.1 通用版的一鍵更新；內容和通用版相同，只有 `MBMEdition` 不同）、`SHA256SUMS.txt`。過渡版 v1.7.2 另附通用版與 macOS 12 版的 zip（給 v1.7.1）
+- 每一版附上：兩個 DMG、`SHA256SUMS.txt`。v2.0.0 起不再附 zip：v1.7.1 讀最近 20 個 Release，會先更新到還有 zip 的 v1.7.7（舊系統版本是 v1.7.2）；v1.5.0～v1.6.2 只看最新版，要手動下載 DMG 安裝一次
+- v1.7.7 以前另附 `…-<tag>-battery-macOS-arm64.zip`、`…-<tag>-status-macOS-arm64.zip`（給 v1.5.0～v1.6.2 與 v1.7.1 通用版的一鍵更新；內容和通用版相同，只有 `MBMEdition` 不同）。過渡版 v1.7.2 另附通用版與 macOS 12 版的 zip（給 v1.7.1）
 - 檔名固定不帶版本號，`releases/latest/download/<檔名>` 永遠是最新版。不要改 DMG 檔名，也不要改 tag 格式（`vX.Y.Z`）：舊版的一鍵更新靠它們找檔案
 
 ## DMG（`Scripts/make-dmg.sh`）

@@ -42,8 +42,8 @@ macOS 選單列的電池與系統資訊 App。MacBook 的選單列直接顯示�
 
 - 檔名固定不帶版本號，上面的連結永遠下載最新版；其他版本到 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
 - 舊系統版本給 macOS 12、13 的 Mac（例如 2015～2017 年的 MacBook，或用 OpenCore Legacy Patcher 升級的舊 Mac），功能和通用版相同。系統升級到 macOS 14 以後，一鍵更新會自動換成通用版
-- 已經在用 v1.5.0 以後的版本：不用下載，到設定 → 更新按「一鍵更新」
-- Release 裡另外附的 zip 是給舊版一鍵更新用的，內容和 DMG 相同，不需要下載
+- 已經在用 v1.7.2 以後的版本：不用下載，到設定 → 更新按「一鍵更新」
+- v2.0.0 起 Release 不再附 zip：v1.7.1 會先一鍵更新到 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；v1.5.0～v1.6.2 的一鍵更新只認得 zip，請下載上面的 DMG 安裝一次
 
 ## 安裝
 
@@ -443,8 +443,9 @@ macOS 的「自然捲動」是滑鼠和觸控板共用一個設定：觸控板�
 - App 不在可寫入的位置（例如由系統管理員安裝）時無法一鍵更新，會提示到 GitHub 手動下載
 
 **舊版本怎麼更新上來**：
-- 每個 Release 都附上舊版一鍵更新認得的檔案；
-- v1.5.0 以後的版本都能直接一鍵更新到最新版，只有 v1.7.1 的舊系統版本要先經過過渡版 v1.7.2；
+- v1.7.2 以後的版本都能直接一鍵更新到最新版；
+- v1.7.1 會先一鍵更新到還附有 zip 的 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；
+- v1.5.0～v1.6.2 只看最新版裡的 zip，v2.0.0 起 Release 不再附，要手動下載 DMG 安裝一次；
 - v1.4.1 以前沒有一鍵更新，要手動下載一次。
 
 ## 桌上型 Mac
@@ -604,7 +605,7 @@ M1 MacBook Air 實測 CPU 使用率：
 
 ## 舊版本
 
-舊版本保留在 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)，但都有已知問題，最新版已經全部修正。v1.5.0 以後的版本可以直接一鍵更新到最新版。想省電的話，請用最新版的「只看電池」，再開省電模式或調慢更新頻率，不要改用舊版。
+舊版本保留在 [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)，但都有已知問題，最新版已經全部修正。v1.7.2 以後的版本可以直接一鍵更新到最新版。想省電的話，請用最新版的「只看電池」，再開省電模式或調慢更新頻率，不要改用舊版。
 
 | 版本 | 主要新增 |
 |---|---|
@@ -636,7 +637,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build.sh
 - 不指定版本就是最新的開發版；要編某一版，先 `git checkout v1.7.3`（或其他 tag）
 - `build.sh` 一次編出兩種架構，並拿掉執行檔的本地符號（`strip -x`，全域符號保留，當機報告仍看得到函式名稱）；只裝 Command Line Tools、無法一次編兩種架構時，自動改編這台電腦的架構
 - 簽章：鑰匙圈裡有被信任的「macbookBatteryMonitor Signing」憑證時用它簽，沒有就用 ad-hoc 簽章，最後一行會印出用了哪一種。自己編的版本是 ad-hoc 簽章，「輔助使用」等權限要自己允許一次，換成發布的版本時要再允許一次
-- `./build.sh battery`、`./build.sh status` 打包給舊版一鍵更新用的 App（內容相同，只有 `MBMEdition` 不同）
+- `./build.sh battery`、`./build.sh status` 打包給舊版一鍵更新用的 App（內容相同，只有 `MBMEdition` 不同；v1.7.7 以前的 Release 才有附）
 - 舊系統版本在 `legacy-macos12` 分支，用法相同
 
 ## 開發

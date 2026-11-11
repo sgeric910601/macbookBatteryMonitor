@@ -41,8 +41,8 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 
 - The file names never change, so the links above always download the latest version; other versions are on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
 - The older macOS build is for Macs on macOS 12 or 13 (for example 2015–2017 MacBooks, or older Macs upgraded with OpenCore Legacy Patcher) and has the same features. After the system is upgraded to macOS 14, one-click update switches to the universal build by itself
-- Already on v1.5.0 or later: no download needed, use Settings → Update → "一鍵更新" (one-click update)
-- The extra zips attached to each release are for older versions' one-click updates; they contain the same app as the DMG and you don't need them
+- Already on v1.7.2 or later: no download needed, use Settings → Update → "一鍵更新" (one-click update)
+- Releases no longer include zips from v2.0.0: v1.7.1 first updates to v1.7.7 (v1.7.2 for the older macOS build) with one click, then one more click brings it to the latest version; one-click update in v1.5.0–v1.6.2 only understands zips, so download the DMG above and install it once
 
 ## Install
 
@@ -442,8 +442,9 @@ Settings → Update checks GitHub for new versions; when there is one, click "�
 - If the app isn't in a writable location (for example installed by an administrator), one-click update can't work and points you to GitHub instead
 
 **Updating from older versions**:
-- every release includes the files older one-click updaters look for;
-- v1.5.0 and later update straight to the latest version, except the v1.7.1 older macOS build, which goes through the bridge release v1.7.2 first;
+- v1.7.2 and later update straight to the latest version;
+- v1.7.1 first updates to v1.7.7, the last release with zips (v1.7.2 for the older macOS build), then one more click brings it to the latest version;
+- v1.5.0–v1.6.2 only look for zips in the latest release, which no longer includes them from v2.0.0, so these need one manual DMG download;
 - v1.4.1 and earlier have no one-click update and need one manual download.
 
 ## Desktop Macs
@@ -603,7 +604,7 @@ CPU usage measured on an M1 MacBook Air:
 
 ## Older versions
 
-Older versions stay on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases), but all have known bugs that the latest version fixes. v1.5.0 and later can update straight to the latest version. If you want to save power, use the latest version with battery only plus power saving mode or a slower update interval instead of an older version.
+Older versions stay on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases), but all have known bugs that the latest version fixes. v1.7.2 and later can update straight to the latest version. If you want to save power, use the latest version with battery only plus power saving mode or a slower update interval instead of an older version.
 
 | Version | Main additions |
 |---|---|
@@ -634,7 +635,7 @@ cd macbookBatteryMonitor
 - Without a checkout you get the latest development version; to build a release, `git checkout v1.7.3` (or another tag) first
 - `build.sh` builds both architectures at once and strips local symbols from the executable (`strip -x`; global symbols stay, so crash reports still show function names); with only the Command Line Tools, when both architectures can't be built at once, it builds for this Mac's architecture
 - Signing: it signs with the "macbookBatteryMonitor Signing" certificate when a trusted one is in the keychain, otherwise ad-hoc; the last line says which. Your own builds are ad-hoc signed, so allow Accessibility and the other permissions yourself once, and again after switching to a released build
-- `./build.sh battery` and `./build.sh status` package the apps for older versions' one-click updates (same content, only `MBMEdition` differs)
+- `./build.sh battery` and `./build.sh status` package the apps for older versions' one-click updates (same content, only `MBMEdition` differs; attached to releases up to v1.7.7 only)
 - The older macOS build is on the `legacy-macos12` branch and builds the same way
 
 ## Development

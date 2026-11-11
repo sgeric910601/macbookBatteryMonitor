@@ -22,60 +22,71 @@ private struct XDRBrightnessHUDView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                Image(systemName: "sun.max.fill")
-                    .font(.system(size: 27, weight: .regular))
-                    .frame(width: 27)
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.22))
-                        Path { path in
-                            let segmentWidth = (geometry.size.width - 15) / 16
-                            for index in 0..<16 {
-                                path.addRect(CGRect(x: CGFloat(index) * (segmentWidth + 1), y: 0,
-                                                    width: segmentWidth, height: geometry.size.height))
-                            }
-                        }
-                        .fill(Color.white)
-                        .mask(alignment: .leading) {
-                            Rectangle().frame(width: geometry.size.width * state.progress)
-                        }
-                    }
-                    .clipShape(Capsule())
-                }
-                .frame(height: 4)
-                .accessibilityLabel("XDR 增亮")
-                .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
-            }
-            .foregroundStyle(Color.white)
-            .padding(.leading, 24)
-            .padding(.trailing, 31)
-            .frame(width: xdrHUDSize.width, height: 66)
-            .background {
-                if #available(macOS 26.0, *) {
-                    Color.clear.glassEffect(.clear, in: Capsule())
-                } else {
-                    Capsule().fill(.ultraThinMaterial)
-                }
-            }
-            Group {
-                if let nits = state.nits {
-                    Text("估算 \(nits) nits")
-                } else {
-                    Text("XDR \(Int((state.gain * 100).rounded()))%")
-                }
-            }
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(Color.white.opacity(0.9))
-            .padding(.horizontal, 9)
-            .frame(height: 20)
-            .background(.ultraThinMaterial, in: Capsule())
+            meter
+            caption
         }
         .frame(width: xdrHUDSize.width, height: xdrHUDSize.height)
         .environment(\.colorScheme, .dark)
         .opacity(state.shown ? 1 : 0)
         .animation(.easeOut(duration: 0.1), value: state.gain)
         .animation(.easeOut(duration: 0.18), value: state.shown)
+    }
+
+    private var meter: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sun.max.fill")
+                .font(.system(size: 27, weight: .regular))
+                .frame(width: 27)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.22))
+                    Path { path in
+                        let segmentWidth = (geometry.size.width - 15) / 16
+                        for index in 0..<16 {
+                            path.addRect(CGRect(x: CGFloat(index) * (segmentWidth + 1), y: 0,
+                                                width: segmentWidth, height: geometry.size.height))
+                        }
+                    }
+                    .fill(Color.white)
+                    .mask(alignment: .leading) {
+                        Rectangle().frame(width: geometry.size.width * state.progress)
+                    }
+                }
+                .clipShape(Capsule())
+            }
+            .frame(height: 4)
+            .accessibilityLabel("XDR 增亮")
+            .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
+        }
+        .foregroundStyle(Color.white)
+        .padding(.leading, 24)
+        .padding(.trailing, 31)
+        .frame(width: xdrHUDSize.width, height: 66)
+        .background(hudBackground)
+    }
+
+    @ViewBuilder
+    private var hudBackground: some View {
+        if #available(macOS 26.0, *) {
+            Color.clear.glassEffect(.clear, in: Capsule())
+        } else {
+            Capsule().fill(.ultraThinMaterial)
+        }
+    }
+
+    private var caption: some View {
+        Group {
+            if let nits = state.nits {
+                Text("估算 \(nits) nits")
+            } else {
+                Text("XDR \(Int((state.gain * 100).rounded()))%")
+            }
+        }
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        .foregroundStyle(Color.white.opacity(0.9))
+        .padding(.horizontal, 9)
+        .frame(height: 20)
+        .background(.ultraThinMaterial, in: Capsule())
     }
 }
 

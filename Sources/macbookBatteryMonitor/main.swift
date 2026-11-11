@@ -4,6 +4,13 @@ import UserNotifications
 
 if CommandLine.arguments.contains("--selftest-xdr") {
     let passed = MainActor.assumeIsolated {
+        runXDRSelftest(arguments: CommandLine.arguments)
+    }
+    exit(passed ? 0 : 1)
+}
+
+@MainActor
+private func runXDRSelftest(arguments: [String]) -> Bool {
         setvbuf(stdout, nil, _IOLBF, 0)
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
@@ -13,21 +20,21 @@ if CommandLine.arguments.contains("--selftest-xdr") {
         print("XDR supported: \(control.supported)")
         let id = control.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         let before = id.flatMap(XDRGammaSnapshot.capture)
-        let automaticTest = CommandLine.arguments.contains("--xdr-auto")
+        let automaticTest = arguments.contains("--xdr-auto")
         print("Automatic XDR: \(control.automaticActivation), maximum gain: \(control.maximumGain), peak target: \(control.targetNits ?? 0)")
         if !automaticTest {
             control.enable()
             let finish = Date().addingTimeInterval(4)
             while Date() < finish { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
         }
-        if CommandLine.arguments.contains("--xdr-visual"), control.enabled {
+        if arguments.contains("--xdr-visual"), control.enabled {
             control.setGain(control.maximumGain)
             let visualEnd = Date().addingTimeInterval(12)
             while Date() < visualEnd { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
         }
         var activated = control.enabled && control.gain > 1 && control.renderingHealthy
         var keyChanges = 0
-        if automaticTest || (CommandLine.arguments.contains("--xdr-keys") && control.enabled) {
+        if automaticTest || (arguments.contains("--xdr-keys") && control.enabled) {
             if !automaticTest { control.setGain(1) }
             var lastActive = control.enabled
             var lastGain = control.gain
@@ -71,9 +78,7 @@ if CommandLine.arguments.contains("--selftest-xdr") {
         print("Gamma restoration max delta: \(delta)")
         print("Rendering lifecycle check only; physical brightness requires visual verification")
         return activated && restored && !control.enabled && delta < 0.005
-            && (!(automaticTest || CommandLine.arguments.contains("--xdr-keys")) || keyChanges > 0)
-    }
-    exit(passed ? 0 : 1)
+            && (!(automaticTest || arguments.contains("--xdr-keys")) || keyChanges > 0)
 }
 
 // 開發用的自我測試多半在背景執行、最後被結束：輸出改成逐行寫出，才不會留在緩衝區裡遺失

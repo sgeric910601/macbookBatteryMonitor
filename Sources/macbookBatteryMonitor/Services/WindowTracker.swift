@@ -90,6 +90,8 @@ final class WindowTracker {
         var observer: AXObserver?
         guard AXObserverCreate(pid, trackerCallback, &observer) == .success, let observer else { return }
         let element = AXUIElementCreateApplication(pid)
+        // 在主執行緒上註冊：App 卡住時最多等 0.2 秒（和「關閉最後視窗」一樣），不拖住選單列與切換器
+        AXUIElementSetMessagingTimeout(element, 0.2)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         for name in Self.notifications { AXObserverAddNotification(observer, element, name as CFString, refcon) }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)

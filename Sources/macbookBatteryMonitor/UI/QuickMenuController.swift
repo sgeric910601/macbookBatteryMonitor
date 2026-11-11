@@ -12,6 +12,8 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
     private var settings: AppSettings?
     private var openSettings: ((SettingsSection?) -> Void)?
     private var popover: NSPopover?
+    /// 面板顯示哪一頁；每次打開都從主畫面開始
+    private let state = QuickMenuState()
     private var outsideClickMonitors: [Any] = []
 
     func apply(enabled: Bool, settings: AppSettings, openSettings: @escaping (SettingsSection?) -> Void) {
@@ -62,7 +64,8 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
     private func showPopover(from button: NSView) {
         guard let settings else { return }
         AudioSwitchController.shared.refresh()
-        let root = QuickMenuPanel(settings: settings, awake: .shared, audio: .shared,
+        state.page = .main
+        let root = QuickMenuPanel(settings: settings, state: state, awake: .shared, audio: .shared,
                                   close: { [weak self] in self?.popover?.closeNow() },
                                   openSettings: { [weak self] section in
                                       self?.popover?.closeNow(animated: false)

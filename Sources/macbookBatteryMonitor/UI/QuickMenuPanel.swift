@@ -1,10 +1,19 @@
 import AppKit
 import SwiftUI
 
+/// 面板顯示哪一頁：只裝 Command Line Tools 時不能用 @State，放在控制器持有的物件裡
+@MainActor
+@Observable
+final class QuickMenuState {
+    enum Page { case main, features }
+    var page: Page = .main
+}
+
 /// 貓咪快捷面板：常用操作的捷徑。沒啟用的功能整塊不顯示。
 /// 只裝 Command Line Tools 時不能用 @State，狀態都從各控制器讀
 struct QuickMenuPanel: View {
     let settings: AppSettings
+    let state: QuickMenuState
     let awake: KeepAwakeController
     let audio: AudioSwitchController
     var close: () -> Void
@@ -20,6 +29,14 @@ struct QuickMenuPanel: View {
     private var clipboard: [String] { ClipboardHistoryController.shared.history.items }
 
     var body: some View {
+        Group {
+            if state.page == .features { featuresPage } else { mainPage }
+        }
+        .padding(14)
+        .frame(width: 340)
+    }
+
+    private var mainPage: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
                 awakeTile
@@ -31,8 +48,62 @@ struct QuickMenuPanel: View {
             if showsClipboard { clipboardCard }
             footer
         }
-        .padding(14)
-        .frame(width: 340)
+    }
+
+    // MARK: - 擴充功能頁
+
+    /// 快捷選單本身不列：在這裡關掉，面板和貓咪圖示會一起消失
+    private var panelFeatures: [ExtensionFeature] { ExtensionFeature.allCases.filter { $0 != .quickMenu } }
+
+    private var featureGroups: [String] {
+        panelFeatures.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+    }
+
+    private var featuresPage: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button {
+                    state.page = .main
+                } label: {
+                    Label("返回", systemImage: "chevron.left")
+                        .font(.callout.weight(.medium))
+                }
+                .buttonStyle(.borderless)
+                .keyboardShortcut(.cancelAction)
+                Spacer()
+                Text("擴充功能")
+                    .font(.headline)
+                Spacer()
+                // 和左邊的「返回」等寬，標題置中
+                Label("返回", systemImage: "chevron.left").font(.callout.weight(.medium)).hidden()
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(featureGroups, id: \.self) { group in
+                        Card {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(group)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                ForEach(panelFeatures.filter { $0.group == group }) { feature in
+                                    FeatureRow(feature: feature, settings: settings)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 440)
+            HStack {
+                Text("需要「輔助使用」的功能，打開時會詢問權限")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("更多設定…") { openSettings(.features) }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+            }
+        }
     }
 
     // MARK: - 大按鈕
@@ -165,7 +236,7 @@ struct QuickMenuPanel: View {
     private var footer: some View {
         HStack(spacing: 10) {
             Button {
-                openSettings(.features)
+                state.page = .features
             } label: {
                 HStack(spacing: 7) {
                     IconTile(symbol: "square.grid.2x2.fill", tint: .indigo, size: 22)
@@ -179,7 +250,7 @@ struct QuickMenuPanel: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help("啟用或停用擴充功能")
+            .help("在面板裡啟用或停用擴充功能")
             Spacer()
             FooterIcon(symbol: "gearshape.fill", help: "設定") { openSettings(nil) }
             FooterIcon(symbol: "power", help: "結束\(AppEdition.appName)") { NSApp.terminate(nil) }
@@ -265,6 +336,31 @@ private struct QuickTile: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(title)，\(detail)")
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// 擴充功能頁的一列：圖示、名稱、背景會做什麼、開關
+private struct FeatureRow: View {
+    let feature: ExtensionFeature
+    let settings: AppSettings
+
+    var body: some View {
+        HStack(spacing: 8) {
+            IconTile(symbol: feature.symbol, tint: .indigo, size: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(feature.title)
+                    .font(.callout)
+                Text(feature.badge)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .help(feature.detail)
+            Spacer()
+            Toggle(feature.title, isOn: Binding(get: { settings.isInstalled(feature) }, set: { settings.setInstalled(feature, $0) }))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+        }
     }
 }
 

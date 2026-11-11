@@ -12,10 +12,9 @@ enum XDRBrightnessPolicy {
 
     static func clamp(_ gain: Double) -> Double { gain.isFinite ? min(1.6, max(1, gain)) : 1 }
 
-    static func blockReason(supported: Bool, onAC: Bool, lowPower: Bool, hot: Bool, locked: Bool = false) -> String? {
+    static func blockReason(supported: Bool, lowPower: Bool, hot: Bool, locked: Bool = false) -> String? {
         if locked { return "解鎖並開啟螢幕後才能啟用增亮" }
         if !supported { return "需要支援 EDR 的內建 XDR 螢幕" }
-        if !onAC { return "接上電源後才能啟用增亮" }
         if lowPower { return "省電模式中不啟用增亮" }
         if hot { return "系統溫度偏高，已還原亮度" }
         return nil

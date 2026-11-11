@@ -27,11 +27,11 @@ struct XDRBrightnessCard: View {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                     }
                 }
-                Text("只支援內建 XDR 螢幕，須接電。亮度鍵到頂後進入增亮，降低時先退出增亮；沒有按鍵權限時可用滑桿。")
+                Text("支援內建 XDR 螢幕，接電或電池供電皆可使用。亮度鍵到頂後進入增亮，降低時先退出增亮；沒有按鍵權限時可用滑桿。")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("增亮時顯示浮動亮度提示。nits 依系統螢幕規格與線性亮度估算，實際輸出受 EDR 餘裕限制。")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("會增加耗電並影響 HDR 高光與色彩。睡眠、拔電、省電、溫度偏高或 30 分鐘後自動還原；重啟不自動開啟。結束 App 時覆蓋層會一併移除。")
+                Text("會增加耗電並影響 HDR 高光與色彩。睡眠、省電、溫度偏高或 30 分鐘後自動還原；重啟不自動開啟。結束 App 時覆蓋層會一併移除。")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

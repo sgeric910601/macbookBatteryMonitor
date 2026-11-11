@@ -22,60 +22,86 @@ private struct XDRBrightnessHUDView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                Image(systemName: "sun.max.fill")
-                    .font(.system(size: 27, weight: .regular))
-                    .frame(width: 27)
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.22))
-                        Path { path in
-                            let segmentWidth = (geometry.size.width - 15) / 16
-                            for index in 0..<16 {
-                                path.addRect(CGRect(x: CGFloat(index) * (segmentWidth + 1), y: 0,
-                                                    width: segmentWidth, height: geometry.size.height))
-                            }
-                        }
-                        .fill(Color.white)
-                        .mask(alignment: .leading) {
-                            Rectangle().frame(width: geometry.size.width * state.progress)
-                        }
-                    }
-                    .clipShape(Capsule())
-                }
-                .frame(height: 4)
-                .accessibilityLabel("XDR 增亮")
-                .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
-            }
-            .foregroundStyle(Color.white)
-            .padding(.leading, 24)
-            .padding(.trailing, 31)
-            .frame(width: xdrHUDSize.width, height: 66)
-            .background {
-                if #available(macOS 26.0, *) {
-                    Color.clear.glassEffect(.clear, in: Capsule())
-                } else {
-                    Capsule().fill(.ultraThinMaterial)
-                }
-            }
-            Group {
-                if let nits = state.nits {
-                    Text("估算 \(nits) nits")
-                } else {
-                    Text("XDR \(Int((state.gain * 100).rounded()))%")
-                }
-            }
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(Color.white.opacity(0.9))
-            .padding(.horizontal, 9)
-            .frame(height: 20)
-            .background(.ultraThinMaterial, in: Capsule())
+            capsule
+            nitsBadge
         }
         .frame(width: xdrHUDSize.width, height: xdrHUDSize.height)
         .environment(\.colorScheme, .dark)
         .opacity(state.shown ? 1 : 0)
         .animation(.easeOut(duration: 0.1), value: state.gain)
         .animation(.easeOut(duration: 0.18), value: state.shown)
+    }
+
+    private var capsule: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sun.max.fill")
+                .font(.system(size: 27, weight: .regular))
+                .frame(width: 27)
+            XDRBrightnessSegments(progress: state.progress)
+                .frame(height: 4)
+                .accessibilityLabel("XDR 增亮")
+                .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
+        }
+        .foregroundStyle(Color.white)
+        .padding(.leading, 24)
+        .padding(.trailing, 31)
+        .frame(width: xdrHUDSize.width, height: 66)
+        .background { capsuleBackground }
+    }
+
+    @ViewBuilder private var capsuleBackground: some View {
+        // 執行階段 availability 無法讓舊 SDK 認得新 API，另以編譯器版本隔離。
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            Color.clear.glassEffect(.clear, in: Capsule())
+        } else {
+            Capsule().fill(.ultraThinMaterial)
+        }
+        #else
+        Capsule().fill(.ultraThinMaterial)
+        #endif
+    }
+
+    private var nitsBadge: some View {
+        Text(nitsText)
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .foregroundStyle(Color.white.opacity(0.9))
+            .padding(.horizontal, 9)
+            .frame(height: 20)
+            .background(.ultraThinMaterial, in: Capsule())
+    }
+
+    private var nitsText: String {
+        if let nits = state.nits { return "估算 \(nits) nits" }
+        return "XDR \(Int((state.gain * 100).rounded()))%"
+    }
+}
+
+private struct XDRBrightnessSegments: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.22))
+                segments(in: geometry.size)
+                    .fill(Color.white)
+                    .mask(alignment: .leading) {
+                        Rectangle().frame(width: geometry.size.width * progress)
+                    }
+            }
+            .clipShape(Capsule())
+        }
+    }
+
+    private func segments(in size: CGSize) -> Path {
+        let segmentWidth: CGFloat = (size.width - 15) / 16
+        return Path { path in
+            for index in 0..<16 {
+                let x: CGFloat = CGFloat(index) * (segmentWidth + 1)
+                path.addRect(CGRect(x: x, y: 0, width: segmentWidth, height: size.height))
+            }
+        }
     }
 }
 

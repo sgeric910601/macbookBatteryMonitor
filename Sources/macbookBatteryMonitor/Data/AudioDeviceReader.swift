@@ -16,7 +16,8 @@ enum AudioDeviceReader {
         guard AudioObjectGetPropertyData(system, &where_, 0, nil, &size, &ids) == noErr else { return [] }
         return ids.compactMap { id in
             guard let name = name(of: id) else { return nil }
-            return AudioDevices.Device(id: id, name: name, outputs: hasStreams(id, kAudioObjectPropertyScopeOutput),
+            // 不能選成預設輸出的裝置（例如某些音訊工具給系統提示音用的虛擬裝置）不列出，和系統的聲音選單一樣
+            return AudioDevices.Device(id: id, name: name, outputs: hasStreams(id, kAudioObjectPropertyScopeOutput) && canBeDefaultOutput(id),
                                        inputs: hasStreams(id, kAudioObjectPropertyScopeInput), transport: transport(of: id))
         }
     }
@@ -27,6 +28,14 @@ enum AudioDeviceReader {
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(id, &where_, 0, nil, &size, &name) == noErr, let name else { return nil }
         return name.takeRetainedValue() as String
+    }
+
+    /// 讀不到時當成可以，免得把正常的裝置藏起來
+    private static func canBeDefaultOutput(_ id: AudioDeviceID) -> Bool {
+        var where_ = address(kAudioDevicePropertyDeviceCanBeDefaultDevice, kAudioObjectPropertyScopeOutput)
+        var value: UInt32 = 1
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(id, &where_, 0, nil, &size, &value) != noErr || value != 0
     }
 
     private static func transport(of id: AudioDeviceID) -> UInt32 {

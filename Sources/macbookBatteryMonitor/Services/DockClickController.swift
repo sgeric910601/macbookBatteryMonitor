@@ -30,6 +30,10 @@ final class DockClickController {
     private var press: Press?
     /// 每次按下加一：第二次縮小前使用者又點了，就不再把叫回的視窗縮回去
     private var clicks = 0
+    /// 最近一次縮小是哪個 App、第幾次按下、那次縮了哪些視窗：雙擊不算縮小，第二下只叫回這些（之前縮的照舊留在 Dock）
+    private var lastMinimize: (pid: pid_t, generation: Int, windows: Set<UInt32>)?
+    /// 雙擊的第一下是第幾次按下
+    private var doubleClickOf: Int?
     /// 切換 App 的紀錄（收到通知的時間），用來找出按下那一刻最前面的 App
     private var frontHistory: [(pid: pid_t, time: TimeInterval)] = []
     private var activationObserver: NSObjectProtocol?
@@ -126,6 +130,7 @@ final class DockClickController {
         case .leftMouseDown:
             press = nil
             clicks &+= 1
+            if clickState >= 2 { doubleClickOf = clicks &- 1 }
             // ⌘ 點（在 Finder 顯示）、⌥ 點（隱藏其他）等 Dock 自己的操作不插手；
             // 雙擊背景 App 的圖示時，第二下它已經在最前面，不能當成「再點一次最前面的 App」
             guard !modified, clickState <= 1, Self.nearScreenEdge(location) else { return }
@@ -143,6 +148,12 @@ final class DockClickController {
             press = Press(location: location, time: time, front: front, clicked: clicked,
                           visible: state.visible, minimizedByUs: state.minimizedByUs)
         case .leftMouseUp:
+            // 雙擊不算縮小：第二下放開時把第一下縮的叫回（Dock 自己只會叫回一個，早晚都沒關係）
+            if clickState >= 2, let last = lastMinimize, last.generation == clicks &- 1 {
+                lastMinimize = nil
+                Self.log.debug("雙擊：叫回第一下縮的 \(last.windows.count) 個視窗")
+                restore(last.windows, of: last.pid)
+            }
             guard let press else { return }
             self.press = nil
             let distance = hypot(location.x - press.location.x, location.y - press.location.y)
@@ -161,7 +172,7 @@ final class DockClickController {
     private func stateAtClick(of pid: pid_t, late: Bool) -> (visible: Bool, minimizedByUs: Bool) {
         let recorded = minimizedByUs[pid] ?? []
         // 我們縮的視窗都已經不在 Dock 裡（使用者自己叫回了）：紀錄作廢
-        let ours = recorded.filter { Self.isMinimized($0.element) }
+        let ours = recorded.filter { Self.isMinimized($0.element) != false }
         minimizedByUs[pid] = ours.isEmpty ? nil : ours
         let excluded = late ? recorded : ours
         let visible = DockClick.hasVisibleWindow(Self.screenWindows(), pid: pid, excluding: Set(excluded.map(\.id)))
@@ -183,17 +194,23 @@ final class DockClickController {
         case .minimize:
             let generation = clicks
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay) {
-                MainActor.assumeIsolated { DockClickController.shared.minimize(pid) }
+                MainActor.assumeIsolated {
+                    // 還沒縮就雙擊了：不縮
+                    guard DockClickController.shared.doubleClickOf != generation else { return }
+                    DockClickController.shared.minimize(pid, generation: generation)
+                }
             }
+            lastMinimize = (pid, generation, [])
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay + Self.reopenGrace) {
                 MainActor.assumeIsolated {
+                    let controller = DockClickController.shared
                     // 使用者又點了一下（可能就是要叫回）：不再縮
-                    guard DockClickController.shared.clicks == generation else { return }
-                    DockClickController.shared.minimizeRestored(pid)
+                    guard controller.clicks == generation else { return }
+                    controller.minimizeRestored(pid)
                 }
             }
         case .restore:
-            for window in minimizedByUs.removeValue(forKey: pid) ?? [] where Self.isMinimized(window.element) {
+            for window in minimizedByUs.removeValue(forKey: pid) ?? [] where Self.isMinimized(window.element) != false {
                 AXUIElementSetAttributeValue(window.element, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
             }
             app.activate()
@@ -201,12 +218,22 @@ final class DockClickController {
     }
 
     /// 縮下所有一般視窗；有焦點的最後縮，叫回時它也最後回來、在最上面
-    private func minimize(_ pid: pid_t) {
+    /// 雙擊的第二下：只叫回指定的視窗，並移出紀錄
+    private func restore(_ ids: Set<UInt32>, of pid: pid_t) {
+        guard !ids.isEmpty, let recorded = minimizedByUs[pid] else { return }
+        for window in recorded where ids.contains(window.id) && Self.isMinimized(window.element) != false {
+            AXUIElementSetAttributeValue(window.element, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+        }
+        let rest = recorded.filter { !ids.contains($0.id) }
+        minimizedByUs[pid] = rest.isEmpty ? nil : rest
+    }
+
+    private func minimize(_ pid: pid_t, generation: Int) {
         guard port != nil else { return }
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 0.3)
         var targets = Self.windows(of: pid).filter {
-            Self.attribute($0, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole && !Self.isMinimized($0)
+            Self.attribute($0, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole && Self.isMinimized($0) != true
         }
         if let focused = Self.attribute(app, kAXFocusedWindowAttribute), CFGetTypeID(focused) == AXUIElementGetTypeID(),
            let index = targets.firstIndex(where: { CFEqual($0, focused as! AXUIElement) }) {
@@ -214,15 +241,18 @@ final class DockClickController {
         }
         guard !targets.isEmpty else { return }
         for window in targets { AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanTrue) }
-        // 和之前縮下去、還沒叫回的合併，「再點一次」才全部叫得回來
-        let merged = (minimizedByUs[pid] ?? []).filter { Self.isMinimized($0.element) } + targets.map { ($0, AX.windowID(of: $0) ?? 0) }
-        minimizedByUs[pid] = merged
+        let added = targets.map { ($0, AX.windowID(of: $0) ?? 0) }
+        let addedIDs = Set(added.map(\.1))
+        if lastMinimize?.generation == generation { lastMinimize?.windows = addedIDs }
+        // 和之前縮下去、還沒叫回的合併，「再點一次」才全部叫得回來；這次又縮到的不重複記
+        let earlier = (minimizedByUs[pid] ?? []).filter { !addedIDs.contains($0.id) && Self.isMinimized($0.element) != false }
+        minimizedByUs[pid] = earlier + added
     }
 
     /// 剛縮下去又被 App 晚到的「重新打開」叫回的視窗，再縮一次
     private func minimizeRestored(_ pid: pid_t) {
         guard port != nil else { return }
-        for window in minimizedByUs[pid] ?? [] where !Self.isMinimized(window.element) {
+        for window in minimizedByUs[pid] ?? [] where Self.isMinimized(window.element) == false {
             Self.log.debug("縮下去的視窗又被叫回，再縮一次")
             AXUIElementSetAttributeValue(window.element, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
         }
@@ -309,8 +339,15 @@ final class DockClickController {
         return windows
     }
 
-    private static func isMinimized(_ window: AXUIElement) -> Bool {
-        attribute(window, kAXMinimizedAttribute) as? Bool ?? false
+    /// nil：問不到（那個 App 很慢或沒回應、逾時）。問不到不能當成沒縮，否則還縮著的視窗會被移出紀錄、再也叫不回來
+    /// 視窗已經關掉（invalidUIElement）算沒縮，紀錄會作廢
+    private static func isMinimized(_ window: AXUIElement) -> Bool? {
+        var value: AnyObject?
+        switch AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &value) {
+        case .success: return value as? Bool
+        case .invalidUIElement: return false
+        default: return nil
+        }
     }
 }
 

@@ -13,18 +13,23 @@ if CommandLine.arguments.contains("--selftest-xdr") {
         print("XDR supported: \(control.supported)")
         let id = control.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         let before = id.flatMap(XDRGammaSnapshot.capture)
-        control.enable()
-        let finish = Date().addingTimeInterval(4)
-        while Date() < finish { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        let automaticTest = CommandLine.arguments.contains("--xdr-auto")
+        print("Automatic XDR: \(control.automaticActivation)")
+        if !automaticTest {
+            control.enable()
+            let finish = Date().addingTimeInterval(4)
+            while Date() < finish { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        }
         if CommandLine.arguments.contains("--xdr-visual"), control.enabled {
             control.setGain(1.6)
             let visualEnd = Date().addingTimeInterval(12)
             while Date() < visualEnd { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
         }
-        let activated = control.enabled && control.gain > 1 && control.renderingHealthy
+        var activated = control.enabled && control.gain > 1 && control.renderingHealthy
         var keyChanges = 0
-        if CommandLine.arguments.contains("--xdr-keys"), control.enabled {
-            control.setGain(1)
+        if automaticTest || (CommandLine.arguments.contains("--xdr-keys") && control.enabled) {
+            if !automaticTest { control.setGain(1) }
+            var lastActive = control.enabled
             var lastGain = control.gain
             var lastNative = XDRBrightnessKeys.nativeBrightness(id)
             print("Brightness key test started for 35 seconds")
@@ -32,9 +37,11 @@ if CommandLine.arguments.contains("--selftest-xdr") {
             while Date() < keyEnd {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.1))
                 let native = XDRBrightnessKeys.nativeBrightness(id)
-                if control.gain != lastGain || native != lastNative {
+                if control.enabled && control.gain > 1 && control.renderingHealthy { activated = true }
+                if control.gain != lastGain || native != lastNative || control.enabled != lastActive {
                     if control.gain != lastGain { keyChanges += 1 }
-                    print("Key update: gain=\(control.gain), native=\(native ?? -1)")
+                    print("Key update: active=\(control.enabled), gain=\(control.gain), native=\(native ?? -1)")
+                    lastActive = control.enabled
                     lastGain = control.gain
                     lastNative = native
                 }
@@ -64,7 +71,7 @@ if CommandLine.arguments.contains("--selftest-xdr") {
         print("Gamma restoration max delta: \(delta)")
         print("Rendering lifecycle check only; physical brightness requires visual verification")
         return activated && restored && !control.enabled && delta < 0.005
-            && (!CommandLine.arguments.contains("--xdr-keys") || keyChanges > 0)
+            && (!(automaticTest || CommandLine.arguments.contains("--xdr-keys")) || keyChanges > 0)
     }
     exit(passed ? 0 : 1)
 }

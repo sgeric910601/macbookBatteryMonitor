@@ -28,12 +28,17 @@ struct QuickMenuPanel: View {
     /// 直接讀最新的歷史：面板開著時複製或清除，清單會跟著更新
     private var clipboard: [String] { ClipboardHistoryController.shared.history.items }
 
+    /// 擴充功能頁疊在主畫面上、用主畫面的大小：切換時面板大小不變。主畫面在背後只佔位置，看不到也點不到
     var body: some View {
-        Group {
-            if state.page == .features { featuresPage } else { mainPage }
-        }
-        .padding(14)
-        .frame(width: 340)
+        mainPage
+            .opacity(state.page == .main ? 1 : 0)
+            .allowsHitTesting(state.page == .main)
+            .accessibilityHidden(state.page != .main)
+            .overlay {
+                if state.page == .features { featuresPage }
+            }
+            .padding(14)
+            .frame(width: 340)
     }
 
     private var mainPage: some View {
@@ -93,7 +98,6 @@ struct QuickMenuPanel: View {
                     }
                 }
             }
-            .frame(maxHeight: 440)
             HStack {
                 Text("需要「輔助使用」的功能，打開時會詢問權限")
                     .font(.caption)
@@ -104,6 +108,7 @@ struct QuickMenuPanel: View {
                     .font(.caption)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - 大按鈕

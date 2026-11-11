@@ -121,13 +121,13 @@ xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app
 **選單列圖示自訂**：在「設定 → 顯示項目」選白色／黑色／自動百分比，搭配原生綠、預設色票或自訂色盤。底色不透明度與充電流光可分別調整；填色維持實際電量比例。
 
 <details>
-<summary>展開 main 分支的其他可選工具</summary>
+<summary>展開其他擴充功能</summary>
 
 | 類型 | 功能與指南 |
 | :--- | :--- |
-| 電源與裝置 | [防止休眠與擴充管理](docs/guide.zh-TW.md#擴充功能)、[音訊切換](docs/guide.zh-TW.md#音訊切換)、[監控警示](docs/guide.zh-TW.md#監控警示) |
-| 輸入與操作 | [滑鼠／觸控板捲動](docs/guide.zh-TW.md#滑鼠與觸控板的捲動方向)、[滑鼠側鍵](docs/guide.zh-TW.md#滑鼠側鍵)、[鍵盤清潔](docs/guide.zh-TW.md#鍵盤清潔模式)、[中文輸入法](docs/guide.zh-TW.md#中文輸入法) |
-| 視窗與桌面 | [視窗切換](docs/guide.zh-TW.md#視窗切換)、[視窗吸附](docs/guide.zh-TW.md#視窗吸附)、[貓咪快捷選單](docs/guide.zh-TW.md#貓咪快捷選單) |
+| 電源與裝置 | [防止休眠與擴充管理](docs/guide.zh-TW.md#擴充功能)、[睡眠時關閉藍牙](docs/guide.zh-TW.md#特色)、[音訊切換](docs/guide.zh-TW.md#音訊切換)、[監控警示](docs/guide.zh-TW.md#監控警示) |
+| 輸入與操作 | [滑鼠／觸控板捲動](docs/guide.zh-TW.md#滑鼠與觸控板的捲動方向)、[滑鼠側鍵](docs/guide.zh-TW.md#滑鼠側鍵)、[鍵盤清潔](docs/guide.zh-TW.md#鍵盤清潔模式)、[中文輸入法](docs/guide.zh-TW.md#中文輸入法)、[⌘Q／⌘W 防誤觸](docs/guide.zh-TW.md#qw-防誤觸)、[Finder 加強](docs/guide.zh-TW.md#finder-加強) |
+| 視窗與桌面 | [視窗切換](docs/guide.zh-TW.md#視窗切換)、[視窗吸附](docs/guide.zh-TW.md#視窗吸附)、[綠色按鈕放大](docs/guide.zh-TW.md#綠色按鈕放大)、[點 Dock 圖示縮到 Dock](docs/guide.zh-TW.md#點-dock-圖示縮到-dock)、[關閉最後視窗時結束 App](docs/guide.zh-TW.md#關閉最後視窗時結束-app)、[貓咪快捷選單](docs/guide.zh-TW.md#貓咪快捷選單) |
 | 管理與維護 | [登入項目](docs/guide.zh-TW.md#登入項目)、[設定備份與權限](docs/guide.zh-TW.md#設定備份與權限)、[Port 管理](docs/guide.zh-TW.md#port-管理與結束程式)、[剪貼簿歷史](docs/guide.zh-TW.md#剪貼簿歷史) |
 
 這些工具依需要開啟；詳細的機型、權限與系統版本限制都保留在指南中。

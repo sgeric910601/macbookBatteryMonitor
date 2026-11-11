@@ -34,6 +34,8 @@ struct QuickMenuPanel: View {
             .opacity(state.page == .main ? 1 : 0)
             .allowsHitTesting(state.page == .main)
             .accessibilityHidden(state.page != .main)
+            // 也拿掉鍵盤焦點：開著「完整鍵盤控制」時，Tab 不會跳到看不見的按鈕
+            .disabled(state.page != .main)
             .overlay {
                 if state.page == .features { featuresPage }
             }
@@ -91,7 +93,7 @@ struct QuickMenuPanel: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                 ForEach(panelFeatures.filter { $0.group == group }) { feature in
-                                    FeatureRow(feature: feature, settings: settings)
+                                    FeatureRow(feature: feature, settings: settings, openPermissions: { openSettings(.permissions) })
                                 }
                             }
                         }
@@ -99,7 +101,7 @@ struct QuickMenuPanel: View {
                 }
             }
             HStack {
-                Text("需要「輔助使用」的功能，打開時會詢問權限")
+                Text("需要權限而還沒允許的功能，打開時會帶你到權限頁")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -348,6 +350,8 @@ private struct QuickTile: View {
 private struct FeatureRow: View {
     let feature: ExtensionFeature
     let settings: AppSettings
+    /// 系統的權限詢問會讓面板收起來：還沒允許時直接帶到設定的權限頁，不要什麼都沒發生
+    var openPermissions: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -361,7 +365,10 @@ private struct FeatureRow: View {
             }
             .help(feature.detail)
             Spacer()
-            Toggle(feature.title, isOn: Binding(get: { settings.isInstalled(feature) }, set: { settings.setInstalled(feature, $0) }))
+            Toggle(feature.title, isOn: Binding(get: { settings.isInstalled(feature) }, set: { on in
+                settings.setInstalled(feature, on)
+                if on, feature.needsAccessibility, !AXIsProcessTrusted() { openPermissions() }
+            }))
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()

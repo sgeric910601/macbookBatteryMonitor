@@ -10,6 +10,9 @@ struct FinderKeys {
 
     static let xKey = 7, cKey = 8, vKey = 9, f2Key = 120, returnKey = 36
 
+    /// 可能被改寫的只有 ⌘X／⌘C／⌘V 和不按 ⌘ 的 F2：其他（例如改檔名時打一般的 x、c、v）不必問 Finder 焦點在哪
+    static func mayRewrite(keyCode: Int, command: Bool) -> Bool { command != (keyCode == f2Key) }
+
     private(set) var pendingCut = false
     /// 剪下時拷貝完成後的剪貼簿變更次數；之後不一樣就代表又複製了別的
     private var cutPasteboard: Int?

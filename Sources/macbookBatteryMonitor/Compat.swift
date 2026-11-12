@@ -148,6 +148,7 @@ enum SymbolCompat {
         "battery.75percent": "battery.75", "battery.100percent": "battery.100", "battery.100percent.bolt": "battery.100.bolt",
         "gauge.with.dots.needle.33percent": "speedometer", "thermometer.medium": "thermometer",
         "bolt.badge.clock": "clock",
+        "accessibility": "figure.stand", "cat": "pawprint",
     ]
     private static var resolved: [String: String] = [:]
 

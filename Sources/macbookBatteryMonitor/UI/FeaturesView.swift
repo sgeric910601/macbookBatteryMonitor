@@ -42,7 +42,7 @@ struct FeatureManagerView: View {
 
     private func row(_ feature: ExtensionFeature) -> some View {
         return HStack(spacing: 12) {
-            Image(systemName: feature.symbol)
+            Image(systemName: SymbolCompat.name(feature.symbol))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)

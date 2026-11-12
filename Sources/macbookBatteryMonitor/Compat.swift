@@ -96,6 +96,19 @@ extension View {
         }
     }
 
+    /// onContinuousHover 要 macOS 13：滑鼠在上面移動時呼叫；舊系統只在滑鼠移進來時呼叫一次
+    @ViewBuilder func onHoverMove(_ action: @escaping () -> Void) -> some View {
+        if #available(macOS 13, *), !Compat.forceMacOS12Paths {
+            onContinuousHover { phase in
+                if case .active = phase { action() }
+            }
+        } else {
+            onHover { inside in
+                if inside { action() }
+            }
+        }
+    }
+
     /// scrollIndicators 要 macOS 13：舊系統照系統設定顯示捲軸
     @ViewBuilder func hiddenScrollIndicators() -> some View {
         if #available(macOS 13, *), !Compat.forceMacOS12Paths {

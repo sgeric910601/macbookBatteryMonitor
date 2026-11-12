@@ -331,39 +331,11 @@ private struct SwitcherView: View {
         let grid = model.grid
         ScrollViewReader { proxy in
             ScrollView(grid.scrolls ? .vertical : []) {
-                VStack(spacing: grid.spacing) {
-                    ForEach(Array(grid.rows.enumerated()), id: \.offset) { _, row in
-                        HStack(spacing: grid.spacing) {
-                            ForEach(row, id: \.self) { index in
-                                if model.items.indices.contains(index) {
-                                    let item = model.items[index]
-                                    tile(item, selected: index == model.selected, grid: grid, size: CGSize(width: grid.widths[index], height: grid.tileHeight))
-                                        .id(item.id)
-                                        .onContinuousHover { phase in
-                                            if case .active = phase, mouseMoved() { model.select(index) }
-                                        }
-                                        .onTapGesture { pick(index) }
-                                        .accessibilityElement(children: .ignore)
-                                        .accessibilityLabel(item.accessibilityDescription)
-                                        .accessibilityAddTraits(index == model.selected ? [.isButton, .isSelected] : .isButton)
-                                        .accessibilityAction { pick(index) }
-                                        .accessibilityAction(named: "關閉視窗") { act(.close, item) }
-                                        .accessibilityAction(named: "縮到 Dock") { act(.minimize, item) }
-                                        .accessibilityAction(named: "全螢幕") { act(.fullscreen, item) }
-                                }
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(SwitcherLayout.padding)
+                rows(grid)
             }
             .hiddenScrollIndicators()
             .onChange(of: model.selected) { selected in
-                guard model.items.indices.contains(selected) else { return }
-                proxy.scrollTo(model.items[selected].id)
-                WindowSwitcher.shared.updatePreview()
-                WindowSwitcher.shared.announceSelection()
+                scroll(to: selected, proxy: proxy)
             }
         }
         .background(reduceTransparency ? AnyShapeStyle(Color(nsColor: .windowBackgroundColor)) : AnyShapeStyle(.regularMaterial),
@@ -379,6 +351,46 @@ private struct SwitcherView: View {
                     .padding(.bottom, 4)
             }
         }
+    }
+
+    // 舊系統分支用的 Xcode 推不出整段 body 的型別，拆成幾個函式
+
+    private func rows(_ grid: SwitcherLayout.Grid) -> some View {
+        VStack(spacing: grid.spacing) {
+            ForEach(Array(grid.rows.enumerated()), id: \.offset) { _, row in
+                HStack(spacing: grid.spacing) {
+                    ForEach(row, id: \.self) { index in
+                        cell(index, grid: grid)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(SwitcherLayout.padding)
+    }
+
+    @ViewBuilder private func cell(_ index: Int, grid: SwitcherLayout.Grid) -> some View {
+        if model.items.indices.contains(index) {
+            let item = model.items[index]
+            tile(item, selected: index == model.selected, grid: grid, size: CGSize(width: grid.widths[index], height: grid.tileHeight))
+                .id(item.id)
+                .onHoverMove { if mouseMoved() { model.select(index) } }
+                .onTapGesture { pick(index) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(item.accessibilityDescription)
+                .accessibilityAddTraits(index == model.selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction { pick(index) }
+                .accessibilityAction(named: "關閉視窗") { act(.close, item) }
+                .accessibilityAction(named: "縮到 Dock") { act(.minimize, item) }
+                .accessibilityAction(named: "全螢幕") { act(.fullscreen, item) }
+        }
+    }
+
+    private func scroll(to selected: Int, proxy: ScrollViewProxy) {
+        guard model.items.indices.contains(selected) else { return }
+        proxy.scrollTo(model.items[selected].id)
+        WindowSwitcher.shared.updatePreview()
+        WindowSwitcher.shared.announceSelection()
     }
 }
 

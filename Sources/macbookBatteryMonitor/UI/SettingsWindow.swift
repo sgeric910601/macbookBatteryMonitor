@@ -333,7 +333,7 @@ struct IconTile: View {
             .font(.system(size: size * 0.52, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(tint.gradient))
+            .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(tint.softGradient))
             .accessibilityHidden(true)
     }
 }

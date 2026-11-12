@@ -24,7 +24,10 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Peripheral batteries**: Bluetooth keyboards, mice and trackpads (including Logitech, Razer and other Bluetooth LE devices) and the left bud, right bud and case of AirPods, each with its own low-battery notification
 - **System monitors**: CPU/GPU (with fans and temperatures), memory, disks (including external drives and drive health) and network (with a speed test), one menu bar icon each, or one shared icon for memory and disk; one switch turns them all off
 - **Separate mouse and trackpad scroll directions**: for example natural scrolling on the trackpad and the traditional direction on the mouse wheel
+- **Login items**: lists the apps, agents and daemons that start at login, shows what each one is and where it comes from, and lets you clear the user-level config files an uninstalled app left behind; system-level items are view-only
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
+- **Keep awake**: the cup at the bottom right of the panel keeps the Mac awake for 30 minutes, 1 hour, 2 hours or until turned off, optionally with the display on too, and shows the time left. It stops by itself on battery at 10% or below. You can also list apps in Settings → 監控與省電 that keep the system awake while any of them runs (the display still sleeps), released when they all quit; it only listens for apps launching and quitting, with no polling. Uses the public power management API; quitting the app releases it
+- **Bluetooth off during sleep** (laptops only; on a desktop Mac idle Bluetooth keyboards and mice disconnect by themselves, so turning Bluetooth off would leave only the power button to wake it): turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, and in clamshell mode (lid closed, running on an external display; simply closing the lid to sleep still turns it off), so the Mac can still be woken. After waking it checks that Bluetooth really came back on and retries if not (up to 5 times, then again on the next wake or launch). Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
 - **No Xcode needed**: the Command Line Tools are enough to build it
@@ -34,12 +37,12 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 | Your Mac | Download (latest) |
 |---|---|
 | macOS 14 or later (Apple silicon or Intel, MacBook or desktop) | [`macbookBatteryMonitor.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor.dmg) (universal) |
-| macOS 12 or 13 (Apple silicon or Intel) | [`macbookBatteryMonitor-macOS12.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor-macOS12.dmg) (older macOS build) |
+| macOS 12 or 13 (Apple silicon or Intel) | [`macbookBatteryMonitor-macOS12.dmg`](https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.7.7/macbookBatteryMonitor-macOS12.dmg) (older macOS build, v1.7.7) |
 
-- The file names never change, so the links above always download the latest version; other versions are on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
-- The older macOS build is for Macs on macOS 12 or 13 (for example 2015–2017 MacBooks, or older Macs upgraded with OpenCore Legacy Patcher) and has the same features. After the system is upgraded to macOS 14, one-click update switches to the universal build by itself
-- Already on v1.5.0 or later: no download needed, use Settings → Update → "一鍵更新" (one-click update)
-- The extra zips attached to each release are for older versions' one-click updates; they contain the same app as the DMG and you don't need them
+- The universal build's file name never changes, so its link above always downloads the latest version; other versions are on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
+- The older macOS build is for Macs on macOS 12 or 13 (for example 2015–2017 MacBooks, or older Macs upgraded with OpenCore Legacy Patcher). It stays at v1.7.7 for now, without the features added in v2.0.0. After the system is upgraded to macOS 14, one-click update switches to the universal build by itself
+- Already on v1.7.2 or later: no download needed, use Settings → Update → "一鍵更新" (one-click update)
+- Releases no longer include zips from v2.0.0: v1.7.1 first updates to v1.7.7 (v1.7.2 for the older macOS build) with one click, then one more click brings it to the latest version; one-click update in v1.5.0–v1.6.2 only understands zips, so download the DMG above and install it once
 
 ## Install
 
@@ -105,6 +108,7 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
   - NVMe drives keep their own record of how much of their rated life is used and how much has been read and written since they were made. Every Apple silicon Mac's internal drive is NVMe, as are most Intel Macs from 2016 on and Thunderbolt enclosures. Health is 100% minus the life used (3% used means 97%), the totals are the drive's lifetime totals, and power-on time is listed too, with an extra line if there are media errors. When the drive reports a critical warning or its spare blocks fall below the threshold, health shows a red "異常，建議立即備份" (failing, back up now)
   - Drives without that record (internal drives that aren't NVMe, such as a 2015 MacBook Air's, and most USB enclosures) show the SMART "正常／異常" (OK / failing) status, and totals since boot (since connected for external disks)
 - **Network**: the menu bar shows upload and download speed; the panel shows the current interface (Wi-Fi, Ethernet) and IP, a speed chart and totals since boot
+  - **Connection status**: whether a VPN is connected (a tunnel interface with a usable address; the system's own utun interfaces do not count), plus the system's Low Data Mode and metered network flags (for example a phone hotspot). It only looks at local interfaces and the system network path, watches only while the panel is open, and contacts no outside server
   - **Speed test**: off by default so it isn't started by accident; after turning on 「在網路面板顯示測速」 (show speed test in the network panel) in Settings → Monitoring & power saving, press 「開始測速」 (start test) at the bottom of the panel to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
 - Child processes (such as browser tabs) are merged into their app
 
@@ -132,16 +136,21 @@ The bell to the right of each device sets its low-battery notification: off, or 
 
 Click the gear at the bottom right of the panel, or "設定…" (Settings…) in the menu bar icon's right-click menu. While it's open the app shows up in the Dock and ⌘Tab, so you can find it again after visiting System Settings; ⌘W closes it. The sections on the left:
 
-| Section | Contents |
-|---|---|
-| 一般 (General) | App icon color, notification thresholds, launch at login |
-| 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, system monitor master switch and each monitor, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
-| 充電 (Charging) | Charge limit slider, smart charging |
-| 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
-| 周邊設備 (Peripherals) | Each device's low-battery notification |
-| 滑鼠與觸控板 (Mouse & trackpad) | Separate scroll directions |
-| 更新 (Update) | One-click update, automatic checks and new-version notifications |
+| Group | Section | Contents |
+|---|---|---|
+| 基本 (Basic) | 一般 (General) | App icon color, notification thresholds, launch at login, settings backup (export, import) |
+| | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
+| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
+| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
+| | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
+| 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
+| | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
+| | 周邊設備 (Peripherals) | Each device's low-battery notification, and the external displays, USB and Thunderbolt devices connected right now (built-in parts and USB hubs are left out; read only when the page opens) |
+| 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
+| | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
+| | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, Finder shortcuts, quit when the last window closes, click a Dock icon to minimize |
+| | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
+| 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
 Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens Update, and the gear in a monitor panel opens Monitoring & power saving.
 
@@ -210,13 +219,37 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 - **Where it sits**: "浮在視窗上方" (above windows) or "放在桌布上" (on the wallpaper, at the desktop icon level, so windows cover it). It shows on every desktop but not in full-screen apps
 - The bubble is a separate window that ignores the mouse and hugs the pet (below it when there's no room above), so it never blocks what's underneath
 
+## Extension features
+
+Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you turn it on in Settings → 功能管理 (feature management), and can be turned off again:
+
+- **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
+- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports and clipboard history need no permission
+- **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
+- **Not extension features, always there**: the keep-awake button in the panel, the connection status (VPN, Low Data Mode) in the network panel, the connected-devices list on the peripherals page, and the permissions page and settings backup in Settings. None needs a permission, and each reads only while its panel or page is open
+- **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
+- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history
+
+## Settings backup and permissions
+
+- **Settings backup**: Settings → 一般 → "設定備份" (settings backup) exports the settings to a file you can import on another Mac or after reinstalling. Only known settings with the right types are read and the file size is limited; admin CPU sampling, precise wake (turn them on again on the new Mac), your own photo and the peripherals' low-battery thresholds are not included. If importing would turn on anything that is off now (extension features, Bluetooth off during sleep, keeping awake for chosen apps), it lists those first and asks you to confirm. Imported settings take effect after the app reopens
+- **Permissions**: Settings → 權限 (permissions) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which features that are on use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
+
+## Monitor alerts
+
+"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+
 ## Mouse and trackpad scroll directions
 
 macOS's "natural scrolling" is one setting for both mouse and trackpad: if you like natural scrolling on the trackpad, the mouse wheel flips too. Settings → Mouse & trackpad separates them:
 
 - **"滑鼠滾輪反向"** (reverse mouse wheel): reverses regular mouse wheels and Magic Mouse
 - **"觸控板反向"** (reverse trackpad): reverses only the trackpad
-- **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad, including the momentum after lifting your fingers; everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Vertical and horizontal scrolling are reversed together. Turning the wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum
+- **"滑鼠滾輪每格"** (lines per wheel notch): "照系統加速" (system acceleration) by default; "固定 1／3／5 行" (fixed 1/3/5 lines) makes every notch of a regular mouse wheel scroll exactly that many lines, however fast you spin it (a slow scroll that carries only fractional lines or pixels counts as one notch). The trackpad and Magic Mouse are not affected, and it works together with reversing
+- **"滑鼠滾輪平滑捲動"** (smooth mouse wheel scrolling): off by default; when on, each notch of a regular mouse wheel glides over about 0.15 s, fast then slow, instead of jumping, like a trackpad. Turning the other way mid-glide switches direction at once, and the frame timer only runs while gliding. The trackpad and Magic Mouse are not affected, and it works with the options above. Scrolls with lines but no pixel amount (from remote desktop or virtual machine apps) are passed on unchanged
+- **"滾輪改成左右捲動"** (wheel scrolls sideways): off by default; choose "按住 Shift／Option／Control" (hold Shift/Option/Control) and a regular mouse wheel scrolls horizontally while that key is held, even in apps without that built in. The key is removed from the event afterwards so apps that turn Shift+wheel sideways themselves do not turn it back. The trackpad is not affected
+- **"左右捲動也反向"** (reverse horizontal scrolling too): on by default, reversing vertical and horizontal scrolling together; turn it off to reverse only vertical scrolling
+- **How it tells them apart**: scrolling with two or more fingers on the trackpad counts as trackpad, including the momentum after lifting your fingers; everything else (wheels, Magic Mouse one-finger scrolling) counts as mouse. Turning the wheel while trackpad momentum is still gliding follows the mouse setting for the wheel and keeps the trackpad setting for the rest of the momentum
 - **No bouncing back in web pages**: reversed trackpad and Magic Mouse scrolls are replaced with newly created events, so the raw deltas web pages use for momentum are reversed too
 - **Permission**: needs Accessibility. Turning a switch on asks you to enable "電池與系統監控" in System Settings → Privacy & Security → Accessibility; it starts working within seconds, no relaunch needed, and stays allowed after updates and reinstalls
 - **Status**: the settings page shows the real state. "運作中" (working) means scroll events are being intercepted, "啟動中…" (starting) means permission is there and it starts shortly; without permission it shows an orange note and "打開輔助使用設定" (open Accessibility settings)
@@ -232,6 +265,157 @@ This usually happens after updating from v1.7.3 or earlier: the "電池與系統
 2. Select "電池與系統監控" in the list and click "−" below it to remove it (even if its switch still looks on)
 3. Click "+", choose `macbookBatteryMonitor` in Applications, click Open and make sure its switch is on
 4. Back in the app's settings the status turns to "運作中" (working) within seconds, no relaunch needed
+
+## Window switcher
+
+Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) in Settings → Window switching, and Cmd+Tab lists the windows of every app (not just apps), most recently used first:
+
+- **Using it**: hold the modifier and press Tab for the next window, Shift to go back, release to switch; a quick tap goes straight back to the previous window. Arrow keys move, Esc cancels; on the selected window press W to close, M to minimize, F for full screen, H to hide the app, Q to quit it
+- **Settings**: up to 9 shortcuts, each with its own appearance (thumbnails, app icons, titles), size and which windows to list (Space, screen, minimized, hidden, full screen, apps without windows); optionally keep the switcher open after releasing the modifier and confirm with Return; apps on the exception list are never listed
+- **Windows on another Space**: picking one brings its app forward so macOS moves to a Space with the app's windows, then raises the window once it is on screen. This relies on "When switching to an application, switch to a Space with open windows for the application" in System Settings → Desktop & Dock (on by default); with it off, picking a window on another Space does not move there
+- **Accessibility (required)**: needed to intercept the shortcut, read window titles and perform window actions. Without it the settings page shows an orange note and "打開輔助使用設定" (open Accessibility settings); it starts working within seconds after you allow it. If the permission is revoked the interception stops and the status no longer shows "運作中" (working)
+- **Screen Recording (optional)**: only used for window thumbnails and the preview. Without it you get app icons and titles only, everything else works; while capturing, macOS shows its screen capture indicator in the menu bar. Turning off "切換時更新視窗縮圖" (refresh thumbnails while switching) or picking the app icon or title appearance avoids capturing
+- **Privacy**: window titles are never logged or uploaded; with the switch off no keys are intercepted
+
+The system integration uses private macOS functions, all loaded at run time and disabled if missing; their sources are listed in [docs/design/window-server-provenance.md](docs/design/window-server-provenance.md) (Chinese).
+
+## Audio switcher
+
+Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
+
+- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch
+- **Mute microphone**: uses the device's mute switch, or, if there is no switch, the menu says "輸入音量調到 0" (set input volume to 0) and the volume is restored when unmuted or when the app quits. A meeting app's automatic gain may turn it back up, so use the meeting app's own mute for such devices. The button shows a crossed-out microphone while muted
+- **Permission**: uses the public Core Audio API and needs no permission; devices are read only when the menu opens
+
+## Mouse side buttons
+
+Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:
+
+- **Only those two, only when set**: a button left at "不處理" (do nothing), and the left, right and middle buttons, go to apps as usual
+- **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor; Mission Control works over any app
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is off or both buttons do nothing
+
+## Keyboard cleaning mode
+
+Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
+
+- **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown (held-down autorepeat does not), it always ends after at most 5 minutes, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
+- **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
+- **Permission**: needs Accessibility; the keyboard is only intercepted while cleaning
+
+## Clipboard history
+
+Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu:
+
+- **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
+- **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
+- **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
+- The menu can clear the history; no permission needed
+
+## Ports and quitting processes
+
+Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings → 功能管理 and:
+
+- **Listening ports**: the network panel lists the TCP ports your own processes listen on, the program and whether it is local only; read when the panel opens or on refresh (with the built-in `lsof`, fixed arguments, no shell)
+- **Quit a process**: "結束" (quit) next to a port asks first, then asks the process to exit (SIGTERM); right before sending it re-checks the PID's owner, name and start time, so a reused PID is never hit, even by a program with the same name (such as `node`); you are told if it cannot be quit
+- **Quit an app**: right-click an app in the CPU or memory list to quit it like ⌘Q; apps still ask about unsaved documents
+- **Limits**: only your own account's processes are shown or can be quit, never system processes; no permission needed
+
+## Cat quick menu
+
+Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar with:
+
+- **Keep awake**: pick a duration, stop, or keep the display on too; the title shows the time left while active
+- **Audio output** and **mute microphone**
+- **Start keyboard cleaning** (when keyboard cleaning mode is on)
+- **Extension features**: turn each one on or off directly
+- **Settings…** and **Quit**
+- The menu reads the current state only when it opens and does nothing otherwise; no permission needed
+
+## Finder shortcuts
+
+Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
+
+- **⌘X to cut, ⌘V to move**: select files in Finder, press ⌘X, then ⌘V in another folder to move them (Finder's ⌥⌘V "Move Item Here"). If something else is copied after cutting, ⌘V pastes the clipboard as usual and never moves the files by mistake
+- **F2 to rename**: press F2 on a selected file to rename it (same as Return)
+- **Only in Finder, never while typing**: when Finder is not frontmost, or while renaming or typing in the search field, ⌘X, ⌘V and F2 behave as usual; if Finder does not answer where the focus is, it counts as typing
+- **Keyboard layouts**: works on the US positions of X, C and V, and only when those keys really type X, C and V (ABC, US, Zhuyin, Pinyin, German and French layouts do); layouts such as Dvorak are left alone
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is off
+
+## Window snapping
+
+Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
+
+- **Preview first**: a preview frame appears at the edge and the window is arranged only on release; dragging away cancels. The bottom edge does not snap (the Dock is often there), nor does an edge where another display joins (the window is being moved across)
+- **Only window drags**: it checks whether the frontmost window moves with the drag, so selecting text, dragging files or resizing never snaps
+- **No fight with the system**: when "Drag windows to screen edges to tile" in System Settings → Desktop & Dock is on, the system handles it and this does nothing
+- **Nothing is intercepted**: it only listens to the mouse; needs Accessibility, and nothing is observed while the feature is off
+
+## Green button maximizes
+
+Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the usable area of the screen the window is on instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size, both with the system animation:
+
+- **Full screen**: with the feature on, the green button no longer enters full screen. Option-click is the system's own "Zoom", not full screen either. Use Window → Full Screen or ⌃⌘F instead
+- **Windows already in full screen, windows that cannot be resized**: keep the system behaviour (leave full screen; nothing happens when the button is disabled)
+- **How it fills**: it uses Window → Fill and Window → Move & Resize → Return to Previous Size from macOS 15, the same as choosing them yourself; Safari, Finder, Chrome, Office, Electron apps and others have them. Apps without them (for example LINE, built with Qt) zoom the window themselves instead, and a window that lands on another screen is moved back and filled there. Windows that support neither are filled directly (no animation). Apps without Fill are remembered, so later clicks do not scan their menu bar again
+- **Windows the system already arranged**: the state comes from whether Return to Previous Size is available, so the first click on a window arranged by the system (Fill, tiling or edge drag) restores it
+- **macOS 14**: there is no Fill menu item, so the window is filled directly to the usable area, without the system animation
+- **Background windows**: clicking the green button of a window that is not in front, for example on another screen, works the same and brings it to the front first
+- **Clicks stay fast**: each left mouse down first asks WindowServer which window is under the pointer, and asks that app what was clicked (on its own thread, waiting at most 15 ms) only when the click is near the window's top-left traffic light buttons (if the app is too slow to answer, that one click enters full screen as usual), so ordinary clicks never disturb apps. The WindowServer lookup, done on every left mouse down, measured a median of about 1 ms and at most about 7 ms (macOS 27.2)
+- **Permission**: needs Accessibility; nothing is intercepted while the feature is off
+
+## Click a Dock icon to minimize
+
+Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
+
+- **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a single click, not a drag or long press. Clicking another app switches to it as usual, and double-clicking a background app's icon only switches to it; windows you minimized yourself are not restored; this app's own icon (while Settings is open) is ignored
+- **How it decides**: on mouse down, before the Dock reacts (the Dock acts on mouse up), asking WindowServer whether the app has open windows instead of waiting on the app. On mouse up the Dock asks the app to reopen and the app restores a window itself, so minimizing waits 0.05 s; for apps that answer later (for example LINE), windows restored within 0.4 s are minimized again, unless you click again in the meantime. Clicking again brings back every window it minimized
+- **Nothing is intercepted**: it only listens to the mouse, so Dock clicks, drags and right-clicks work as usual; Dock icon positions are read only for clicks near a screen edge
+- **Permission**: needs Accessibility; nothing is observed while the feature is off
+
+## Quit an app when its last window closes
+
+Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
+
+- **When it quits**: 0.6 s after a window closes and again 1 s later, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open, and if the WindowServer query fails (for example after a macOS update breaks the private call) the app counts as having windows. An app is quit only after it has finished launching and has run for at least 10 seconds (apps with a splash screen may show their main window seconds later). Finder and hidden apps are never quit
+- **Never quit**: call and meeting apps (FaceTime, Phone, Zoom, Microsoft Teams, Slack, Discord, Webex, Skype, LINE; they may have no window during a call, and quitting would hang up) and virtual machines (Parallels, VMware Fusion, UTM). Add other call apps to the exception list yourself
+- **Exceptions**: add apps that should keep running without windows, such as a music app playing in the background
+- **Power**: it only listens for window changes of the frontmost app, with no polling
+- **Permission**: needs Accessibility; nothing is observed while the feature is off
+
+## Hold ⌘Q / ⌘W
+
+Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
+
+- **How it works**: on key down it remembers the frontmost app and shows a progress ring in the middle of the screen. Only when the hold completes does it send ⌘Q / ⌘W directly to that app, not to whatever is frontmost at that moment. Releasing early, switching to another app or pressing another key cancels, so a window behind can never be closed by mistake. Before sending ⌘W it also checks that the app's focused window has not changed; in browsers ⌘W still closes the tab as usual
+- **Keyboard layouts**: works on the US positions of Q and W, and only when those keys really type Q and W (ABC, US, Zhuyin, Pinyin and German layouts do). French AZERTY, Dvorak and other layouts with the letters elsewhere are not protected; keys go through as usual and no other shortcut (such as ⌘A or ⌘Z on AZERTY) is held back by mistake
+- **Permission**: needs Accessibility; with the feature off or both switches off no keys are intercepted. Secure input (password fields) is never touched, and no keys are logged
+
+## Chinese input methods
+
+The "中文輸入法" (Chinese input) card under Settings → 滑鼠、觸控板與鍵盤 has two switches, both off by default:
+
+- **Caps Lock switches without delay**: macOS makes you hold Caps Lock briefly before it switches between Chinese and English, to avoid accidental presses. This runs the built-in `hidutil` (fixed arguments, no shell) to shorten the delay to 30 ms at launch and after wake (0 makes Caps Lock toggle twice and turn on capitals by accident). The original value is read before the first change and restored when the switch is turned off, also after the app restarts; if it cannot be read, 75 ms is written (Apple does not document the default; this is the value read on macOS 27.2). When the system option "Use Caps Lock to switch to and from ABC" is on, macOS handles the built-in keyboard itself (on macOS 27.2 it keeps rewriting this value while you type), so this only affects external keyboards. No extra permission needed
+- **Half-width letters and symbols while holding Shift**: in Chinese input methods such as Zhuyin or Pinyin, holding Shift types full-width characters like Ａ, ！ and ，. With this on, holding Shift behaves like the English keyboard and everything is half-width: letters `A`, the number row `!@#$%^&*()_+`, punctuation `<>?:"{}|~`. You stay in the Chinese input method, so you keep typing Chinese after releasing Shift. If a Zhuyin composition is in progress (underlined), it is committed first and the English follows it. Because every punctuation key is half-width while Shift is held, full-width punctuation that Zhuyin types with Shift (，。？：！（）) has to be typed another way, for example from Zhuyin's punctuation keyboard. Only Chinese input methods are affected; English, Russian, Korean and Japanese keyboards are left alone. So far it has only been tested with the built-in Zhuyin on macOS 27; Pinyin and other Chinese input methods are untested
+- **How the composition is committed**: while Zhuyin is composing it swallows every key, so the first key of each Shift hold first has the input method commit the composition. To do that it asks the app you are typing in to switch to the English layout and straight back, the way the Input menu in the menu bar does; changing the system setting from the background can leave the menu bar showing Zhuyin while the app keeps typing English. This uses a private macOS interface whose argument formats are assumed from testing, so it is only used on macOS 27, where it was tested. The approach follows [macism](https://github.com/laishulu/macism)'s description; the code is our own
+- **Other macOS versions**: the composition is not committed first, so the key typed with Shift in the middle of a Zhuyin composition is swallowed by the input method; finish choosing the character before pressing Shift. The same happens when typing in this app's own windows, such as Settings
+- **Shift is removed**: letter, number-row and punctuation keys typed with Shift held are sent without Shift, carrying the half-width character; combinations that also hold Command, Control or Option are left alone. Shortcuts that check for Shift (Shift+letter in web pages, games or design apps) may see the key without Shift while a Chinese input method is on; switch to the English layout to use them
+- **When this app is busy**: while the composition is being committed, the following keys wait in a queue. If this app has not handled them within 1 s, the next key makes the interception give up the queue and start over, so the Mac's keyboard does not stay stuck; the keys given up are dropped rather than arriving late in another app
+- **Permission**: half-width Shift needs Accessibility, asked for when you turn the switch on; with the switch off no keys are intercepted. Secure input (password fields) is never touched, and no keys are logged
+- **System behaviour**: on macOS 27, the first key of each Shift hold switches to the English layout and back, so macOS may briefly show its input method indicator
+
+## Login items
+
+Settings → 登入項目 (Login items) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
+
+- **Sources**: the "open at login" items, `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`. Every row has an icon, and items whose program no longer exists say so
+- **What you can do**: add or remove "open at login" apps; disable or enable your own (user-level) agents. Disabling takes effect at the next login and also stops the copy that is running now. Every action asks first. This app's own login item and agent are listed only and can't be disabled or removed here
+- **System-level items are view-only**: items in `/Library/LaunchAgents` and `/Library/LaunchDaemons` are listed with their details (you can reveal the file in Finder), but can't be disabled or removed, and nothing asks for an admin password
+- **Items whose program is gone**: when a user-level agent points to a program that definitely no longer exists, you can move its config file to the Trash here (and put it back later). Programs on external drives (`/Volumes`) or in folders this app can't read are never judged missing. Apple's own items and items whose program still exists have no remove button
+- **Detail page** (the ⓘ on each row): program path, identifier, the signer on the certificate (marked "未驗證" (unverified) when the signature doesn't validate), related apps (declared by the helper itself, or inferred from leftover preference file names and marked as inferred) and the full paths of possibly related files, each of which you can reveal in Finder or copy. It re-reads when you come back to the settings window. "Search the web" only opens your browser's search engine when you press it and sends nothing but the identifier
+- **Information only**: leftover files are listed by path and never deleted for you; similarly named files may belong to other software, so check before you act
+- **Limits**: system-level items can only be switched in System Settings; background items that apps register with SMAppService inside their own bundle aren't listed here, so check System Settings for those; macOS has no public way to toggle other apps' background items
+- **Permission**: reading, adding and removing "open at login" items needs you to allow this app to control System Events (System Settings → Privacy & Security → Automation); macOS asks the first time. If you decline, the other sources still list
 
 ## App icon
 
@@ -263,8 +447,9 @@ Settings → Update checks GitHub for new versions; when there is one, click "�
 - If the app isn't in a writable location (for example installed by an administrator), one-click update can't work and points you to GitHub instead
 
 **Updating from older versions**:
-- every release includes the files older one-click updaters look for;
-- v1.5.0 and later update straight to the latest version, except the v1.7.1 older macOS build, which goes through the bridge release v1.7.2 first;
+- v1.7.2 and later update straight to the latest version;
+- v1.7.1 first updates to v1.7.7, the last release with zips (v1.7.2 for the older macOS build), then one more click brings it to the latest version;
+- v1.5.0–v1.6.2 only look for zips in the latest release, which no longer includes them from v2.0.0, so these need one manual DMG download;
 - v1.4.1 and earlier have no one-click update and need one manual download.
 
 ## Desktop Macs
@@ -424,7 +609,7 @@ CPU usage measured on an M1 MacBook Air:
 
 ## Older versions
 
-Older versions stay on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases), but all have known bugs that the latest version fixes. v1.5.0 and later can update straight to the latest version. If you want to save power, use the latest version with battery only plus power saving mode or a slower update interval instead of an older version.
+Older versions stay on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases), but all have known bugs that the latest version fixes. v1.7.2 and later can update straight to the latest version. If you want to save power, use the latest version with battery only plus power saving mode or a slower update interval instead of an older version.
 
 | Version | Main additions |
 |---|---|
@@ -455,7 +640,7 @@ cd macbookBatteryMonitor
 - Without a checkout you get the latest development version; to build a release, `git checkout v1.7.3` (or another tag) first
 - `build.sh` builds both architectures at once and strips local symbols from the executable (`strip -x`; global symbols stay, so crash reports still show function names); with only the Command Line Tools, when both architectures can't be built at once, it builds for this Mac's architecture
 - Signing: it signs with the "macbookBatteryMonitor Signing" certificate when a trusted one is in the keychain, otherwise ad-hoc; the last line says which. Your own builds are ad-hoc signed, so allow Accessibility and the other permissions yourself once, and again after switching to a released build
-- `./build.sh battery` and `./build.sh status` package the apps for older versions' one-click updates (same content, only `MBMEdition` differs)
+- `./build.sh battery` and `./build.sh status` package the apps for older versions' one-click updates (same content, only `MBMEdition` differs; attached to releases up to v1.7.7 only)
 - The older macOS build is on the `legacy-macos12` branch and builds the same way
 
 ## Development
@@ -525,5 +710,16 @@ The cat in the app icon is `Resources/icon-cat.png` (a cut-out photo); the charg
 
 ## Thanks
 
-- [@melvin0kuo](https://github.com/melvin0kuo): animated power flow, layered component power, power sensor fallbacks, percentage inside the menu bar icon, stable full-charge display and admin CPU sampling (#1, #2, #4–#7), and the ideas for smart charging, charging schedules and the daily recap (#13)
-- [@liaw-boy](https://github.com/liaw-boy): external disks, fans and temperatures, menu bar icon alignment on 1x screens, the layout idea of merging the charge limit slider into the info card, closing the panel by clicking outside, and power saving only on battery (#8–#10, #12); the network speed test and the shared memory and disk icon (#15, #16)
+- [@melvin0kuo](https://github.com/melvin0kuo): animated power flow, layered component power, power sensor fallbacks, percentage inside the menu bar icon, stable full-charge display and admin CPU sampling (#1, #2, #4–#7), and the ideas for smart charging, charging schedules and the daily recap (#13); the menu bar charging icon customization (#27); the documentation refresh with cat animation illustrations (#28)
+- [@liaw-boy](https://github.com/liaw-boy): external disks, fans and temperatures, menu bar icon alignment on 1x screens, the layout idea of merging the charge limit slider into the info card, closing the panel by clicking outside, and power saving only on battery (#8–#10, #12); the network speed test and the shared memory and disk icon (#15, #16); the login items page (#20); Caps Lock without delay and half-width Shift for Chinese input methods (#21); the window switcher that replaces Cmd+Tab (#19); extension features and the feature management page: keep awake, Bluetooth off during sleep, the audio switcher, monitor alerts, settings backup and the permissions page, scroll options and mouse side buttons, keyboard cleaning, hold ⌘Q / ⌘W, Finder shortcuts, window and Dock tools, the cat quick menu, ports and clipboard history (#24); releasing event taps when Accessibility is removed, Dock clicks judged at mouse down, the green button using the system Fill and Caps Lock restoring your own delay (#26); the window switcher listing Safari's minimized windows and skipping full screen toolbars (#29)
+
+## License
+
+Copyright © 2026 TSENG KUAN-CHENG and contributors. All rights reserved. This is not an open source license:
+
+- The source code is public for viewing; you may build and modify it on your own devices for personal use or to prepare a contribution, but you may not distribute it
+- Builds published on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases) (including pre-releases and in-app updates) are free to download and use
+- Submitting a pull request means you agree to the contribution terms in section 4 of the LICENSE
+- The cat photos and animations in the app icon, the charging companion and the desktop pet were provided by others; their copyright belongs to their rights holders
+
+See [LICENSE](LICENSE) for the full terms. If the English and Chinese versions differ, the Chinese version prevails.

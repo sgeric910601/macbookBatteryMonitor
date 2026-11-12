@@ -33,6 +33,17 @@ extension NSApplication {
     }
 }
 
+extension NSRunningApplication {
+    /// activate() 要 macOS 14；舊系統用 activate(options:)，和 NSApplication.activateCompat 一樣不管目前前景是誰都切過去
+    @discardableResult
+    func activateCompat() -> Bool {
+        if #available(macOS 14, *), !Compat.forceMacOS12Paths {
+            return activate()
+        }
+        return activate(options: [.activateIgnoringOtherApps])
+    }
+}
+
 /// macOS 13 起可以設 sizingOptions，讓面板跟著 SwiftUI 內容大小改變；
 /// macOS 12 沒有，內容可能改變時（換頁、換分頁、資料更新）重新問 SwiftUI 內容的理想大小並更新 preferredContentSize。
 /// 不能用 view.fittingSize：面板打開後它會被現有的約束綁住，回報的是目前的大小
@@ -84,6 +95,28 @@ extension View {
             self
         }
     }
+
+    /// onContinuousHover 要 macOS 13：滑鼠在上面移動時呼叫；舊系統只在滑鼠移進來時呼叫一次
+    @ViewBuilder func onHoverMove(_ action: @escaping () -> Void) -> some View {
+        if #available(macOS 13, *), !Compat.forceMacOS12Paths {
+            onContinuousHover { phase in
+                if case .active = phase { action() }
+            }
+        } else {
+            onHover { inside in
+                if inside { action() }
+            }
+        }
+    }
+
+    /// scrollIndicators 要 macOS 13：舊系統照系統設定顯示捲軸
+    @ViewBuilder func hiddenScrollIndicators() -> some View {
+        if #available(macOS 13, *), !Compat.forceMacOS12Paths {
+            scrollIndicators(.never)
+        } else {
+            self
+        }
+    }
 }
 
 /// ContentUnavailableView 要 macOS 14：圖示、標題與說明置中
@@ -115,6 +148,7 @@ enum SymbolCompat {
         "battery.75percent": "battery.75", "battery.100percent": "battery.100", "battery.100percent.bolt": "battery.100.bolt",
         "gauge.with.dots.needle.33percent": "speedometer", "thermometer.medium": "thermometer",
         "bolt.badge.clock": "clock",
+        "accessibility": "figure.stand", "cat": "pawprint",
     ]
     private static var resolved: [String: String] = [:]
 

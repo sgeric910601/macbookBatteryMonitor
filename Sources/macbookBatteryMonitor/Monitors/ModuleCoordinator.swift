@@ -25,6 +25,9 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private var openKind: MonitorKind?
     private var topStream: TopStream?
     private var sleeping = false
+    private var cpuAlert = SustainedAlert(duration: MonitorAlertRules.cpuDuration)
+    private var memoryAlert = SustainedAlert(duration: MonitorAlertRules.memoryDuration)
+    private var diskAlert = SustainedAlert(duration: 0)
 
     /// 合併顯示時的第二條狀態列開著：沒有選單列圖示也要取樣，讓上面的數字即時更新
     var stripActive = false {
@@ -171,9 +174,27 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         if active(.memory) { memory.sample(at: now) }
         if active(.disk) { disk.sample(at: now) }
         if active(.network) { network.sample(at: now) }
+        checkAlerts(cpu: active(.cpu), memory: active(.memory), disk: active(.disk), at: now)
         for (kind, item) in items { render(kind, item) }
         // top 意外結束時（例如被強制結束），面板還開著就重新啟動
         if let topStream, !topStream.isRunning, !sleeping { topStream.start() }
+    }
+
+    /// 監控警示：只判斷這次有取樣的模組；沒取樣的不更新，下次取樣隔太久會重新計時
+    private func checkAlerts(cpu cpuActive: Bool, memory memoryActive: Bool, disk diskActive: Bool, at now: Date) {
+        if settings.alertCPU, cpuActive, let usage = cpu.usage {
+            let rule = MonitorAlertRules.cpu(usage: usage.total)
+            if cpuAlert.update(high: rule.high, recovered: rule.recovered, at: now) { Notifier.shared.notifyCPUBusy() }
+        }
+        if settings.alertMemory, memoryActive, let usage = memory.usage {
+            let rule = MonitorAlertRules.memory(usage.pressure)
+            if memoryAlert.update(high: rule.high, recovered: rule.recovered, at: now) { Notifier.shared.notifyMemoryPressure() }
+        }
+        // 可清出的空間還沒校正完（剛啟動）時剩餘空間偏少，先不判斷，免得誤報
+        if settings.alertDisk, diskActive, let volume = disk.volume, volume.calibrated {
+            let rule = MonitorAlertRules.disk(available: volume.available)
+            if diskAlert.update(high: rule.high, recovered: rule.recovered, at: now) { Notifier.shared.notifyDiskLow(available: volume.available) }
+        }
     }
 
     // MARK: - 選單列

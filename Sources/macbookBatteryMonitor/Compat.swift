@@ -34,13 +34,13 @@ extension NSApplication {
 }
 
 extension NSRunningApplication {
-    /// activate() 要 macOS 14；舊系統用 activate(options:)
+    /// activate() 要 macOS 14；舊系統用 activate(options:)，和 NSApplication.activateCompat 一樣不管目前前景是誰都切過去
     @discardableResult
     func activateCompat() -> Bool {
         if #available(macOS 14, *), !Compat.forceMacOS12Paths {
             return activate()
         }
-        return activate(options: [])
+        return activate(options: [.activateIgnoringOtherApps])
     }
 }
 

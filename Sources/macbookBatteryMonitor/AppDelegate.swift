@@ -618,11 +618,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func refresh() {
         store.refresh()
-        // 接電狀態改變且設定為「只在使用電池時省電」時，這裡會重排計時器；桌上型 Mac 一律視為接著電源
+        // 接電狀態改變且設定為「只在使用電池時省電」時，這裡會重排計時器；桌上型 Mac 一律視為接著電源。
+        // @Published 每次指定都會通知，值沒變時不指定，設定畫面才不會每秒重畫
         if let s = store.snapshot {
-            settings.onACPower = s.externalConnected
+            if settings.onACPower != s.externalConnected { settings.onACPower = s.externalConnected }
         } else if !BatteryReader.hasBattery {
-            settings.onACPower = true
+            if !settings.onACPower { settings.onACPower = true }
         }
         scheduleAdapterPreRead()
         store.setHardwareSampling(active: ui.isVisible && ui.page == .main && !sleeping)

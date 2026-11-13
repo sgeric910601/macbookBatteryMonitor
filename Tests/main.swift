@@ -378,3 +378,6 @@ capsLock.testReadsMostCommonValue()
 capsLock.testIgnoresOurOwnValues()
 capsLock.testRestoreValueIsBounded()
 print("3 caps lock delay tests passed")
+
+XDRBrightnessTests().run()
+print("XDR brightness policy tests passed")

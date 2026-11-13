@@ -63,6 +63,8 @@ fi
 cp Resources/AppIcons/icon-*.png "$APP/Contents/Resources/" 2>/dev/null || true
 # 智慧充電的充電夥伴：透明背景的 HEVC 動畫、不播放時的靜態圖與照片外觀的貓咪照片
 cp Resources/Companion/*.mov Resources/Companion/*.png Resources/Companion/*.heic "$APP/Contents/Resources/"
+mkdir -p "$APP/Contents/Resources/Licenses"
+cp docs/licenses/xdr-boost.txt "$APP/Contents/Resources/Licenses/"
 codesign --force --sign "$SIGN" --timestamp=none "$APP"
 echo "✅ 已產生 ${APP}（MBMEdition=${EDITION}，$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")，簽章：$([[ $SIGN == - ]] && echo ad-hoc || echo "$SIGN")）"
 

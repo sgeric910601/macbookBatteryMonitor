@@ -2,6 +2,11 @@ import AppKit
 import CPUPowerShared
 import UserNotifications
 
+if CommandLine.arguments.contains("--selftest-xdr") {
+    let passed: Bool = MainActor.assumeIsolated { runXDRSelfTest() }
+    exit(passed ? 0 : 1)
+}
+
 // 開發用的自我測試多半在背景執行、最後被結束：輸出改成逐行寫出，才不會留在緩衝區裡遺失
 if CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest") }) {
     setvbuf(stdout, nil, _IOLBF, 0)

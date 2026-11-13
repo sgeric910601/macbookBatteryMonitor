@@ -9,8 +9,9 @@ enum PeripheralReader {
     static func read(includeAllBluetooth: Bool, includeBluetoothLE: Bool = true) -> [PeripheralBattery] {
         let hid = PeripheralParse.hid(hidServices())
         var bluetooth: [PeripheralBattery] = []
+        // 藍牙服務卡住時 system_profiler 會一直等：設上限，否則「讀取中」不會結束，之後的更新全被跳過
         if includeAllBluetooth || bluetoothAudioConnected(),
-           let output = Shell.runSync("/usr/sbin/system_profiler", ["SPBluetoothDataType", "-json"]),
+           let output = Shell.runSync("/usr/sbin/system_profiler", ["SPBluetoothDataType", "-json"], timeout: 15),
            let data = output.data(using: .utf8) {
             bluetooth = PeripheralParse.bluetooth(json: data)
         }

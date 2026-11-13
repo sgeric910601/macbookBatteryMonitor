@@ -47,9 +47,9 @@
 | 你的系統 | 安裝檔 |
 | :--- | :--- |
 | **macOS 14 以上** · Apple 晶片／Intel | [下載通用版 DMG](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor.dmg) |
-| **macOS 12／13** · Apple 晶片／Intel | [下載舊系統版 DMG](https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.7.7/macbookBatteryMonitor-macOS12.dmg)（停在 v1.7.7） |
+| **macOS 12／13** · Apple 晶片／Intel | [下載舊系統版 DMG](https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.7.7/macbookBatteryMonitor-macOS12.dmg)（停在 v1.7.7，維持可用但不再加入新功能） |
 
-已安裝 v1.7.2 以後的版本？到 **設定 → 更新 → 一鍵更新** 即可，設定與歷史資料會保留。v2.0.0 起 Release 不再附 ZIP：v1.7.1 會先一鍵更新到 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；v1.5.0～v1.6.2 請下載上面的 DMG 安裝一次。
+已安裝 v1.7.2 以後的版本？到 **設定 → 更新 → 一鍵更新** 即可，設定與歷史資料會保留；同一頁的「安裝 Beta 版…」可以提前試用測試版，一鍵更新本身不會通知 Beta。v2.0.0 起 Release 不再附 ZIP：v1.7.1 會先一鍵更新到 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；v1.5.0～v1.6.2 請下載上面的 DMG 安裝一次。
 
 <a id="安裝"></a>
 
@@ -125,7 +125,7 @@ xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app
 
 | 類型 | 功能與指南 |
 | :--- | :--- |
-| 電源與裝置 | [防止休眠與擴充管理](docs/guide.zh-TW.md#擴充功能)、[睡眠時關閉藍牙](docs/guide.zh-TW.md#特色)、[音訊切換](docs/guide.zh-TW.md#音訊切換)、[監控警示](docs/guide.zh-TW.md#監控警示) |
+| 電源與裝置 | [防止休眠與擴充管理](docs/guide.zh-TW.md#擴充功能)、[睡眠時關閉藍牙](docs/guide.zh-TW.md#特色)、[音訊切換](docs/guide.zh-TW.md#音訊切換)、[監控警示](docs/guide.zh-TW.md#監控警示)、[XDR 增亮（實驗性）](docs/guide.zh-TW.md#xdr-增亮實驗性) |
 | 輸入與操作 | [滑鼠／觸控板捲動](docs/guide.zh-TW.md#滑鼠與觸控板的捲動方向)、[滑鼠側鍵](docs/guide.zh-TW.md#滑鼠側鍵)、[鍵盤清潔](docs/guide.zh-TW.md#鍵盤清潔模式)、[中文輸入法](docs/guide.zh-TW.md#中文輸入法)、[⌘Q／⌘W 防誤觸](docs/guide.zh-TW.md#qw-防誤觸)、[Finder 加強](docs/guide.zh-TW.md#finder-加強) |
 | 視窗與桌面 | [視窗切換](docs/guide.zh-TW.md#視窗切換)、[視窗吸附](docs/guide.zh-TW.md#視窗吸附)、[綠色按鈕放大](docs/guide.zh-TW.md#綠色按鈕放大)、[點 Dock 圖示縮到 Dock](docs/guide.zh-TW.md#點-dock-圖示縮到-dock)、[關閉最後視窗時結束 App](docs/guide.zh-TW.md#關閉最後視窗時結束-app)、[貓咪快捷選單](docs/guide.zh-TW.md#貓咪快捷選單) |
 | 管理與維護 | [登入項目](docs/guide.zh-TW.md#登入項目)、[設定備份與權限](docs/guide.zh-TW.md#設定備份與權限)、[Port 管理](docs/guide.zh-TW.md#port-管理與結束程式)、[剪貼簿歷史](docs/guide.zh-TW.md#剪貼簿歷史) |

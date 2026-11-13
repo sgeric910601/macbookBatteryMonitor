@@ -60,6 +60,14 @@ final class XDRBrightnessController {
         }
     }
     var supported: Bool { screen != nil && maximumGain > 1 }
+
+    /// 功能管理與貓咪選單用：重新讀顯示器規格，回答這台 Mac 現在有沒有支援的內建 XDR 螢幕。
+    /// 沒有時不能加入；已加入的仍可移除，而且不建立計時器、取樣或按鍵攔截
+    func checkSupport() -> Bool {
+        refreshDisplayLimits()
+        return supported
+    }
+
     /// 打包自測確認移除功能後所有工作都停止，且週期檢查不會偷偷重新啟動。
     var completelyStopped: Bool {
         !started && !enabled && !preparing && safetyTimer == nil && keys == nil
@@ -113,6 +121,20 @@ final class XDRBrightnessController {
                 self?.pauseForCapture()
             }
         })
+        // 接上或拔掉螢幕、闔上或打開筆電時馬上重新判斷，不用等下一次重新整理
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.reconcile() } })
+        updateSafetyTimer()
+    }
+
+    /// 每秒的檢查只在有支援的螢幕時才跑；沒有支援的 Mac（或闔上筆電只接外接螢幕時）不在背景查詢
+    private func updateSafetyTimer() {
+        guard started, supported else {
+            safetyTimer?.invalidate(); safetyTimer = nil
+            return
+        }
+        guard safetyTimer == nil else { return }
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.reconcile() }
         }
@@ -130,6 +152,7 @@ final class XDRBrightnessController {
         for observer in observers {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             DistributedNotificationCenter.default().removeObserver(observer)
+            NotificationCenter.default.removeObserver(observer)
         }
         observers.removeAll()
         displaySignature = nil
@@ -189,6 +212,7 @@ final class XDRBrightnessController {
     func reconcile() {
         guard started else { return }
         refreshDisplayLimits()
+        updateSafetyTimer()
         requestSnapshot()
         updateKeyMonitoring()
         reconcileActiveState()
@@ -196,7 +220,8 @@ final class XDRBrightnessController {
     }
 
     private func requestSnapshot() {
-        guard started, sampleTask == nil else { return }
+        // 沒有支援的螢幕時不取樣：亮度鍵攔截也不會建立，用不到
+        guard started, supported, sampleTask == nil else { return }
         let id = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         sampleTask = Task { [weak self] in
             let result = await Task.detached(priority: .utility) { XDRSystemQuery.snapshot(display: id) }.value
@@ -258,6 +283,8 @@ final class XDRBrightnessController {
         enabled = true
         preparing = true
         deadline = Date().addingTimeInterval(30 * 60)
+        // 螢幕剛回來、還沒輪到重新判斷時也要有每秒檢查，30 分鐘上限與其他還原條件才會生效
+        updateSafetyTimer()
         let token = UUID()
         generation = token
         surface.start()

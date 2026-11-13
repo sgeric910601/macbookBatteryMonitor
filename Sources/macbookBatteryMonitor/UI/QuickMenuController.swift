@@ -132,8 +132,11 @@ final class QuickMenuController: NSObject, NSMenuDelegate {
         let featuresItem = NSMenuItem(title: "擴充功能", action: nil, keyEquivalent: "")
         featuresItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
         let featuresMenu = NSMenu()
+        let xdrSupported = XDRBrightnessController.shared.checkSupport()
         for feature in ExtensionFeature.allCases where feature != .quickMenu {
             let on = settings.isInstalled(feature)
+            // 沒有支援的內建 XDR 螢幕時不能加入 XDR 增亮；已加入的仍列出來，可以移除
+            if feature == .xdrBrightness, !xdrSupported, !on { continue }
             featuresMenu.addItem(action(feature.title, checked: on) { [weak settings] in settings?.setInstalled(feature, !on) })
         }
         featuresItem.submenu = featuresMenu

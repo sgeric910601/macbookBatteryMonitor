@@ -4,6 +4,8 @@ import SwiftUI
 /// 停用不是解除安裝：功能停止運作、從側邊欄拿掉，設定都保留，再啟用就回來
 struct FeatureManagerView: View {
     let settings: AppSettings
+    /// 這台 Mac 現在有沒有支援的內建 XDR 螢幕；沒有時不能加入 XDR 增亮（已加入的仍可移除）
+    @State private var xdrSupported = true
 
     private var groups: [String] {
         ExtensionFeature.allCases.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
@@ -19,6 +21,11 @@ struct FeatureManagerView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        .onAppear { xdrSupported = XDRBrightnessController.shared.checkSupport() }
+        // 頁面開著時闔上筆電或接上外接螢幕，也跟著更新
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            xdrSupported = XDRBrightnessController.shared.checkSupport()
         }
         ForEach(groups, id: \.self) { group in
             Text(group)
@@ -41,6 +48,7 @@ struct FeatureManagerView: View {
     }
 
     private func row(_ feature: ExtensionFeature) -> some View {
+        let unsupported = feature == .xdrBrightness && !xdrSupported
         return HStack(spacing: 12) {
             Image(systemName: feature.symbol)
                 .font(.system(size: 15, weight: .medium))
@@ -62,11 +70,18 @@ struct FeatureManagerView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if unsupported {
+                    Text("這台 Mac 現在沒有支援的內建 XDR 螢幕，不會啟動（闔上筆電只接外接螢幕時也一樣）")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer()
             Toggle("啟用", isOn: Binding(get: { settings.isInstalled(feature) }, set: { settings.setInstalled(feature, $0) }))
                 .toggleStyle(.switch)
                 .labelsHidden()
+                .disabled(unsupported && !settings.isInstalled(feature))
                 .accessibilityLabel("啟用\(feature.title)")
         }
     }

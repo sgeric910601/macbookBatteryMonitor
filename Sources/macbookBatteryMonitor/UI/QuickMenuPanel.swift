@@ -60,7 +60,15 @@ struct QuickMenuPanel: View {
     // MARK: - 擴充功能頁
 
     /// 快捷選單本身不列：在這裡關掉，面板和貓咪圖示會一起消失
-    private var panelFeatures: [ExtensionFeature] { ExtensionFeature.allCases.filter { $0 != .quickMenu } }
+    /// 面板每次打開才建立，所以這裡只查一次這台 Mac 有沒有支援的內建 XDR 螢幕
+    private let xdrSupported = XDRBrightnessController.shared.checkSupport()
+
+    /// 沒有支援的內建 XDR 螢幕時不能加入 XDR 增亮；已加入的仍列出來，可以移除
+    private var panelFeatures: [ExtensionFeature] {
+        ExtensionFeature.allCases.filter {
+            $0 != .quickMenu && !($0 == .xdrBrightness && !xdrSupported && !settings.isInstalled($0))
+        }
+    }
 
     private var featureGroups: [String] {
         panelFeatures.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }

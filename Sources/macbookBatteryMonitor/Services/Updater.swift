@@ -12,6 +12,8 @@ final class Updater {
         case idle
         case checking
         case upToDate
+        /// 按「安裝 Beta 版…」時沒有比目前版本（與最新正式版）新的 Beta
+        case noBeta
         case available(ReleaseInfo)
         case downloading(ReleaseInfo)
         case installing
@@ -56,12 +58,13 @@ final class Updater {
 
     /// 自動檢查：距離上次超過一天才查；查不到不顯示錯誤
     func checkIfDue() {
-        guard state == .idle || state == .upToDate else { return }
+        guard state == .idle || state == .upToDate || state == .noBeta else { return }
         if let lastChecked, Date().timeIntervalSince(lastChecked) < Self.checkInterval { return }
         Task { await check(userInitiated: false) }
     }
 
-    func check(userInitiated: Bool) async {
+    /// beta：使用者按「安裝 Beta 版…」，只找比目前版本與最新正式版都新的 Beta，有更新的正式版也不改列正式版
+    func check(userInitiated: Bool, beta: Bool = false) async {
         switch state {
         case .checking, .downloading, .installing: return
         default: break
@@ -82,6 +85,10 @@ final class Updater {
                 return
             }
             let found = UpdateLogic.choose(releases, current: current)
+            if beta, userInitiated {
+                if let release = found.beta { state = .available(release) } else { state = .noBeta }
+                return
+            }
             // Beta 只在手動檢查時列出，也不發通知
             if let beta = found.beta, found.stable == nil, userInitiated {
                 state = .available(beta)

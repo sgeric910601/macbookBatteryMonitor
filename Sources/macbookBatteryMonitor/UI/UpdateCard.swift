@@ -49,7 +49,7 @@ struct UpdateCard: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text("每天檢查一次，只提示、不自動安裝；更新後設定與歷史資料都會保留。")
+                Text("每天檢查一次，只提示、不自動安裝；Beta 測試版不會自動提示，想試用時按「安裝 Beta 版…」。更新後設定與歷史資料都會保留。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -67,6 +67,11 @@ struct UpdateCard: View {
             Label("已是最新版本（\(updater.currentVersion)）", systemImage: "checkmark.circle.fill")
                 .font(.callout)
                 .foregroundStyle(.green)
+        case .noBeta:
+            Text("目前沒有更新的 Beta 測試版（目前 \(updater.currentVersion)）")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         case .available(let release):
             Text(release.isBeta ? "有 Beta 測試版 v\(release.versionText)（目前 \(updater.currentVersion)）"
                                 : "有新版本 v\(release.versionText)（目前 \(updater.currentVersion)）")
@@ -100,8 +105,17 @@ struct UpdateCard: View {
                 Link("手動下載", destination: Updater.releasesPage).font(.caption)
                 Button("重試") { Task { await updater.check(userInitiated: true) } }
             }
-        case .idle, .upToDate:
-            Button("檢查更新") { Task { await updater.check(userInitiated: true) } }
+        case .idle, .upToDate, .noBeta:
+            HStack(spacing: 8) {
+                // 只找 Beta：找到就直接跳出安裝前的確認
+                Button("安裝 Beta 版…") {
+                    Task {
+                        await updater.check(userInitiated: true, beta: true)
+                        if updater.available?.isBeta == true { ui.confirmingBetaInstall = true }
+                    }
+                }
+                Button("檢查更新") { Task { await updater.check(userInitiated: true) } }
+            }
         }
     }
 

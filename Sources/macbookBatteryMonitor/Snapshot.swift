@@ -241,7 +241,7 @@ enum SnapshotCommand {
         beta.tag = "v9.9.9-beta.1"
         beta.beta = 1
         let states: [(String, Updater.State, Bool)] = [
-            ("idle", .idle, false), ("uptodate", .upToDate, false), ("available", .available(release), false),
+            ("idle", .idle, false), ("uptodate", .upToDate, false), ("nobeta", .noBeta, false), ("available", .available(release), false),
             ("beta", .available(beta), false), ("beta-confirm", .available(beta), true),
             ("downloading", .downloading(release), false), ("failed", .failed("無法連線到 GitHub，請稍後再試"), false)]
         for (name, state, confirming) in states {

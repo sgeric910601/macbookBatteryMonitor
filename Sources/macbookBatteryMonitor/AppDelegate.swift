@@ -685,6 +685,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// 依設定（與工作階段是否在前景）重新開始或停止所有按鍵與滑鼠攔截
     private func applyInputFeatures() {
+        XDRBrightnessController.shared.setInputAvailable(inputAllowed)
         applyScrollDirection(prompt: false)
         applyWindowSwitcher(prompt: false)
         applyShiftHalfWidth(prompt: false)

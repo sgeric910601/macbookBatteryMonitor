@@ -36,6 +36,7 @@ final class XDRBrightnessController {
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var deadline: Date?
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var inputAvailable = true
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var keys: XDRBrightnessKeys?
     @ObservationIgnored private var safetyTimer: Timer?
@@ -83,8 +84,13 @@ final class XDRBrightnessController {
         updateKeyMonitoring()
     }
 
+    func setInputAvailable(_ available: Bool) {
+        inputAvailable = available
+        updateKeyMonitoring()
+    }
+
     private func updateKeyMonitoring() {
-        guard started, supported, automaticActivation || enabled else {
+        guard inputAvailable, started, supported, automaticActivation || enabled else {
             keys?.stop()
             keys = nil
             return

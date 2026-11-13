@@ -193,14 +193,14 @@ final class DockClickController {
             // 和縮小一樣：放開時 Dock 會讓 App 回到前面，馬上隱藏可能被它取消，稍等一下再隱藏
             let generation = clicks
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay) {
-                MainActor.assumeIsolated {
+                MainActor.assumeIsolatedCompat {
                     // 還沒隱藏就雙擊了：不隱藏
                     guard DockClickController.shared.doubleClickOf != generation else { return }
                     DockClickController.shared.hide(pid)
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay + Self.reopenGrace) {
-                MainActor.assumeIsolated {
+                MainActor.assumeIsolatedCompat {
                     let controller = DockClickController.shared
                     // 使用者又點了一下（可能就是要叫回）、雙擊、或還隱藏著：不再隱藏
                     guard DockClick.hideAgain(mode: mode, hidden: Self.isHidden(pid), clickedAgain: controller.clicks != generation,

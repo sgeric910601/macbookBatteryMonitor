@@ -17,8 +17,20 @@
 |---|---|---|
 | `com.apple.WindowManager` 的 `EnableTilingByEdgeDrag` | `Services/WindowSnapController.swift`：系統內建的拖曳吸附開著時，我們的吸附不動作 | 依 macOS 版本判斷：15 以上視為開著，14 視為沒有內建吸附 |
 | `com.apple.dock` 的 `orientation` | `Services/DockClickController.swift`：只在 Dock 那一邊的螢幕邊緣判斷點擊 | 視為 `bottom` |
+| `com.apple.WindowManager` 的 `GloballyEnabled` | `Services/DockClickController.swift`：幕前調度開著時，點 Dock 圖示改成隱藏 App；每次點擊都重讀 | 視為關著（macOS 12 沒有幕前調度） |
 
-兩者都是 `defaults read` 看得到的設定值（macOS 27.0.1 本機讀得到）。只讀不寫。
+三者都是 `defaults read` 看得到的設定值（macOS 27.0.1 本機讀得到）。只讀不寫。
+
+`GloballyEnabled` 是控制中心「幕前調度」開關存的值（開 1、關 0，切換後馬上寫入）。macOS 27.0.1 本機對最前面的文字編輯視窗實測四種收法：
+
+| 收法 | 幕前調度開著 | 幕前調度關著 |
+|---|---|---|
+| 「輔助使用」按縮小鈕 | 視窗進左邊的縮圖列（約 98×116 的縮圖），`kAXMinimized` 仍是 false | 縮到 Dock，`kAXMinimized` 變成 true |
+| 送 ⌘M 給 App | 同上 | 同上 |
+| 設 `kAXMinimized` 為 true | 同上；之後讓 App 回到前面也叫不回來 | 同上；設回 false 就叫回 |
+| 設 App 的 `kAXHidden` 為 true | 視窗完全收起；取消隱藏後原尺寸回到最前面 | 同左 |
+
+只有隱藏 App 在兩種情況下結果一樣，所以開著幕前調度時改用隱藏。
 
 ## 未公開的「輔助使用」代號
 

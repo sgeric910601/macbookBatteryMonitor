@@ -2,6 +2,21 @@ import Foundation
 
 final class XDRBrightnessTests {
     func run() {
+        var presentation = XDRPresentationGate()
+        let first = presentation.begin()
+        XCTAssertTrue(presentation.canReveal(first))
+        presentation.stop()
+        XCTAssertTrue(!presentation.canReveal(first))
+        let second = presentation.begin()
+        XCTAssertTrue(!presentation.canReveal(first))
+        XCTAssertTrue(presentation.canReveal(second))
+        let cached = XDRKeySnapshot(nativeBrightness: 1, allowed: true, sampledAt: 10)
+        XCTAssertEqual(cached.action(up: true, gain: 1, active: false, automatic: true, maximum: 3.2, now: 11), .activate(1.05))
+        XCTAssertEqual(cached.action(up: true, gain: 1, active: false, automatic: true, maximum: 3.2, now: 13), .system)
+        let blocked = XDRKeySnapshot(nativeBrightness: 1, allowed: false, sampledAt: 10)
+        XCTAssertEqual(blocked.action(up: true, gain: 1, active: false, automatic: true, maximum: 3.2, now: 10), .system)
+        XCTAssertTrue(!XDRBrightnessPolicy.needsOverlay(gain: 1))
+        XCTAssertTrue(XDRBrightnessPolicy.needsOverlay(gain: 1.05))
         XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: 500, peakHDR: 1600, potentialHeadroom: 16), 3.2)
         XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: 600, peakHDR: 1600, potentialHeadroom: 2), 2)
         XCTAssertEqual(XDRBrightnessPolicy.maximumGain(sdrMaximum: nil, peakHDR: 1600, potentialHeadroom: 16), 1.6)
@@ -26,12 +41,12 @@ final class XDRBrightnessTests {
         XCTAssertTrue(sequence.consumeDown(code: 3, adjusted: true, repeating: false))
         XCTAssertTrue(sequence.consumeDown(code: 3, adjusted: false, repeating: true))
         XCTAssertTrue(sequence.consumeUp(code: 3))
-        // Native down is delivered. XDR may consume later repeats, but macOS must receive up.
+        // 原生按下已送出：XDR 可接管後續重複事件，但放開仍須送回 macOS。
         XCTAssertTrue(!sequence.consumeDown(code: 2, adjusted: false, repeating: false))
         XCTAssertTrue(sequence.shouldAdjustDown(code: 2, repeating: true))
         XCTAssertTrue(sequence.consumeDown(code: 2, adjusted: true, repeating: true))
         XCTAssertTrue(!sequence.consumeUp(code: 2))
-        // A repeat first observed after attaching the tap stays with macOS until release.
+        // 掛上監聽時已在重複的按鍵，持續交由 macOS 處理到放開。
         XCTAssertTrue(!sequence.shouldAdjustDown(code: 2, repeating: true))
         XCTAssertTrue(!sequence.consumeDown(code: 2, adjusted: false, repeating: true))
         XCTAssertTrue(!sequence.shouldAdjustDown(code: 2, repeating: true))

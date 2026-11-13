@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct XDRBrightnessCard: View {
+    let settings: AppSettings
     private let control = XDRBrightnessController.shared
 
     var body: some View {
@@ -13,8 +14,8 @@ struct XDRBrightnessCard: View {
                 ))
                 .disabled(!control.supported || control.preparing)
                 Toggle("亮度鍵到頂後自動啟用 XDR", isOn: Binding(
-                    get: { control.automaticActivation },
-                    set: { control.setAutomaticActivation($0) }
+                    get: { settings.xdrAutomaticActivation },
+                    set: { settings.xdrAutomaticActivation = $0 }
                 ))
                 .disabled(!control.supported)
                 HStack {

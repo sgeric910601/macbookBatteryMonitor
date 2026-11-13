@@ -228,7 +228,20 @@ Battery, charging, system monitors, the charging companion and peripherals are b
 - **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
 - **Not extension features, always there**: the keep-awake button in the panel, the connection status (VPN, Low Data Mode) in the network panel, the connected-devices list on the peripherals page, and the permissions page and settings backup in Settings. None needs a permission, and each reads only while its panel or page is open
 - **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
-- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history
+- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history, XDR brightness boost (experimental)
+
+## XDR brightness boost (experimental)
+
+For MacBook Pro models with a built-in XDR display and usable EDR headroom reported by macOS. Availability depends on the model, display settings and current system state; support is not guaranteed for every XDR model. External displays are not supported.
+
+- **Add the feature first**: it is not added by default. Add “XDR 增亮” in Settings → 功能管理 (feature management), then open its settings to enable it and adjust the gain. It works on battery or external power; extra brightness increases power use and heat
+- **Slider and brightness keys**: the slider needs no Accessibility permission. Taking over the physical brightness keys requires Accessibility. With “亮度鍵到頂後自動啟用 XDR” enabled, extra brightness starts after normal brightness reaches its maximum. Returning the gain to 1× removes the overlay and restores normal brightness
+- **At most 30 minutes per boost**: sleep, locking, leaving the current user session, entering power saving mode, a thermal state outside the allowed range, a display configuration change or quitting the app also removes the boost overlay and restores normal brightness
+- **Brightness figures are estimates**: nits are calculated from system-reported brightness data and EDR headroom, not measured with an instrument. Gain is a request and macOS limits the actual output; a peak target such as 1600 nits does not guarantee sustained or full-screen brightness. A boost percentage is shown when valid brightness data is unavailable
+
+**Screenshots and recording**: while boosting, a non-blocking global monitor recognizes ⌘⇧3/4/5/6, including Control variants, and the app also detects the launch of the macOS screenshot tool. Detection removes the overlay and pauses automatic brightness-key boosting. Re-enable XDR manually when finished; it does not resume automatically, so it cannot reapply the overlay during recording. This adds no permission request, but shortcut detection depends on the existing Accessibility and system monitoring permissions available to the app. Third-party recording tools, command-line screenshots and timing races with an immediate capture cannot be guaranteed to exclude the overlay. Click “還原亮度” (restore brightness) or turn off XDR before starting a capture or recording.
+
+See the [XDR design and local verification notes](docs/design/xdr-brightness.md) (Chinese).
 
 ## Settings backup and permissions
 

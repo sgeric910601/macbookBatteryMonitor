@@ -4,6 +4,7 @@ import SwiftUI
 /// 設定視窗左邊的分類
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
+    case xdrBrightness
     /// 選單列顯示方式、電力流向細項與詳細資訊欄位
     case display
     /// 更新頻率、省電模式、系統監控與 CPU 功耗
@@ -33,6 +34,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "一般"
+        case .xdrBrightness: return "XDR 額外增亮"
         case .display: return "顯示項目"
         case .monitors: return "監控與省電"
         case .charging: return "充電"
@@ -52,6 +54,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: return "gearshape"
+        case .xdrBrightness: return "sun.max.fill"
         case .display: return "menubar.rectangle"
         case .monitors: return "cpu"
         case .charging: return "battery.100.bolt"
@@ -71,6 +74,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .general: return .gray
+        case .xdrBrightness: return .yellow
         case .display: return .blue
         case .monitors: return .orange
         case .startup: return .indigo
@@ -90,6 +94,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .general: return "App 圖示、通知、開機啟動與設定備份"
+        case .xdrBrightness: return "內建 XDR 螢幕增亮與亮度鍵自動啟用"
         case .display: return "選單列的顯示方式與面板裡的項目"
         case .monitors: return "更新頻率、省電與系統監控"
         case .startup: return "登入時自動啟動的項目與它們的來歷"
@@ -111,6 +116,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch feature {
         case .scrollDirection, .inputMethod, .quitGuard, .keyboardCleaning, .mouseButtons: return .input
         case .windowSwitcher: return .windowSwitcher
+        case .xdrBrightness: return .xdrBrightness
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
         case .audioSwitch, .quickMenu, .portManager, .clipboardHistory: return nil
         }

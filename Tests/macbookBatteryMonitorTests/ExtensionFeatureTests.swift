@@ -3,12 +3,17 @@ import Foundation
 struct ExtensionFeatureTests {
     /// 原始值存在設定裡（加入狀態的鍵），改名會讓所有人的選擇失效；基本功能不在清單裡
     func testRawValuesAreStable() {
-        XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod", "quitGuard", "lastWindowQuit", "dockClick", "keyboardCleaning", "mouseButtons", "audioSwitch", "greenButton", "windowSnap", "finderKeys", "quickMenu", "portManager", "clipboardHistory"])
+        XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod", "quitGuard", "lastWindowQuit", "dockClick", "keyboardCleaning", "mouseButtons", "audioSwitch", "greenButton", "windowSnap", "finderKeys", "quickMenu", "portManager", "clipboardHistory", "xdrBrightness"])
+        XCTAssertEqual(ExtensionFeature.xdrBrightness.installedKey, "feature.xdrBrightness.installed")
+        XCTAssertTrue(ExtensionFeature.xdrBrightness.needsAccessibility)
+        XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { $0 == .xdrBrightness }), [ExtensionFeature.xdrBrightness.title])
+        XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { _ in false }), [])
         XCTAssertEqual(ExtensionFeature.windowSwitcher.installedKey, "feature.windowSwitcher.installed")
     }
 
     /// 從舊版更新：沒存過加入狀態時，捲動方向和已經打開過的功能保留，沒用過的新功能不會自己出現；存過的照存的
     func testUpgradeKeepsReleasedFeatures() {
+        XCTAssertTrue(!ExtensionFeature.xdrBrightness.isInstalled(stored: nil, switchedOn: false))
         XCTAssertTrue(ExtensionFeature.scrollDirection.isInstalled(stored: nil, switchedOn: false))
         XCTAssertTrue(!ExtensionFeature.windowSwitcher.isInstalled(stored: nil, switchedOn: false))
         XCTAssertTrue(!ExtensionFeature.inputMethod.isInstalled(stored: nil, switchedOn: false))

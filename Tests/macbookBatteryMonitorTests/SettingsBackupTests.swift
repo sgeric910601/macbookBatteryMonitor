@@ -24,6 +24,19 @@ struct SettingsBackupTests {
         XCTAssertEqual(back["items"] as? [String], ["a", "b"])
         XCTAssertEqual(back["limits"] as? [String: Int], ["mouse": 20])
         XCTAssertNil(back["secret"])
+        // XDR 的加入狀態與自動啟用是獨立選擇，false 也要完整保留。
+        let xdrSchema: [String: SettingsBackup.Kind] = [
+            ExtensionFeature.xdrBrightness.installedKey: .bool, "xdrAutomaticActivation": .bool,
+        ]
+        for automatic in [false, true] {
+            let xdrValues: [String: Any] = [ExtensionFeature.xdrBrightness.installedKey: false,
+                                           "xdrAutomaticActivation": automatic]
+            let xdrData = try! SettingsBackup.export(xdrValues, schema: xdrSchema)
+            let restored = try! SettingsBackup.read(xdrData, schema: xdrSchema)
+            XCTAssertEqual(restored[ExtensionFeature.xdrBrightness.installedKey] as? Bool, false)
+            XCTAssertEqual(restored["xdrAutomaticActivation"] as? Bool, automatic)
+        }
+
     }
 
     /// 型別不對、不認得的設定都略過，其他照常匯入

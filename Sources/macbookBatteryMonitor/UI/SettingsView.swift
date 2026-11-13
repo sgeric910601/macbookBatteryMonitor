@@ -99,8 +99,9 @@ struct SettingsView: View {
             }
             .settingsSection(.display, shown: section)
 
-            XDRBrightnessCard()
-                .settingsSection(.display, shown: section)
+            if settings.isInstalled(.xdrBrightness), section == .xdrBrightness {
+                XDRBrightnessCard(settings: settings)
+            }
 
             Card {
                 VStack(alignment: .leading, spacing: 8) {

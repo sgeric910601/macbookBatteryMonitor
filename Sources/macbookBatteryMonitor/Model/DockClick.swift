@@ -20,6 +20,20 @@ enum DockClick {
         return minimizedByUs ? .restore : .none
     }
 
+    /// 實際用的收法。開著幕前調度時，系統會把「縮到 Dock」的視窗放進左邊的縮圖列而不是 Dock，
+    /// 而且「輔助使用」照樣回報沒縮小：再點一次會被當成視窗還開著、又縮一次，叫不回來。這時一律改成隱藏 App，
+    /// 再點一次由 Dock 照原本的方式取消隱藏
+    static func effectiveMode(_ mode: Mode, stageManager: Bool) -> Mode {
+        stageManager ? .hide : mode
+    }
+
+    /// 隱藏後過一陣子（reopenGrace）再看一次：放開時 Dock 讓 App「重新打開」，回應慢的 App 會在我們隱藏之後才回到前面，這時再隱藏一次。
+    /// mode：這次點擊實際用的收法（effectiveMode）；hidden：那時讀到 App 是不是隱藏中（問不到為 nil）；
+    /// clickedAgain：隱藏之後使用者又按下過（可能就是要叫回）；doubleClick：這一下是雙擊的第一下（雙擊不算收起）
+    static func hideAgain(mode: Mode, hidden: Bool?, clickedAgain: Bool, doubleClick: Bool) -> Bool {
+        mode == .hide && hidden == false && !clickedAgain && !doubleClick
+    }
+
     /// 某個時間點最前面的 App。監聽只收不擋，回呼跑到時 Dock 可能已經切換 App，不能讀「現在」的前景 App：
     /// 用切換紀錄（依時間排序）找出按下那一刻以前最後一次切換到的 App；紀錄都比按下晚時為 nil
     static func frontApp(at time: Double, history: [(pid: Int32, time: Double)]) -> Int32? {

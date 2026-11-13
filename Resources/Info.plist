@@ -23,7 +23,7 @@
     <key>CFBundleShortVersionString</key>
     <string>2.0.1</string>
     <key>CFBundleVersion</key>
-    <string>23</string>
+    <string>24</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>LSMinimumSystemVersion</key>
@@ -31,7 +31,7 @@
     <key>MBMEdition</key>
     <string>status</string>
     <key>MBMPrerelease</key>
-    <string>beta.1</string>
+    <string>beta.2</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>「電池與系統監控」需要透過 System Events 讀取、新增與移除「登入時打開」的項目。App 不會控制其他程式的內容。</string>
     <key>LSUIElement</key>

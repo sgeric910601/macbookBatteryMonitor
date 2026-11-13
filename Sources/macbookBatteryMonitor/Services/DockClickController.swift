@@ -158,10 +158,12 @@ final class DockClickController {
             self.press = nil
             let distance = hypot(location.x - press.location.x, location.y - press.location.y)
             guard let pid = press.clicked, time - press.time <= Self.maxPressDuration else { return }
+            // 每次點擊都重讀幕前調度：App 開著時切換也馬上生效
+            let effective = DockClick.effectiveMode(mode, stageManager: Self.stageManagerOn())
             let action = DockClick.decide(frontAppAtMouseDown: press.front, clickedApp: pid, hadVisibleWindows: press.visible,
-                                          dragDistance: distance, mode: mode, minimizedByUs: press.minimizedByUs)
+                                          dragDistance: distance, mode: effective, minimizedByUs: press.minimizedByUs)
             Self.log.debug("Dock 點擊動作：\(String(describing: action), privacy: .public)")
-            perform(action, pid: pid)
+            perform(action, pid: pid, mode: effective)
         default:
             return
         }
@@ -179,7 +181,8 @@ final class DockClickController {
         return (visible, !excluded.isEmpty)
     }
 
-    private func perform(_ action: DockClick.Action, pid: pid_t) {
+    /// mode：這次點擊實際用的收法（effectiveMode）
+    private func perform(_ action: DockClick.Action, pid: pid_t, mode: DockClick.Mode) {
         guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else {
             minimizedByUs[pid] = nil
             return
@@ -187,10 +190,25 @@ final class DockClickController {
         switch action {
         case .none: return
         case .hide:
-            // 本 App 是選單列 App，NSRunningApplication.hide() 第一次常沒作用：改用「輔助使用」
-            let element = AXUIElementCreateApplication(pid)
-            AXUIElementSetMessagingTimeout(element, 0.3)
-            AXUIElementSetAttributeValue(element, kAXHiddenAttribute as CFString, kCFBooleanTrue)
+            // 和縮小一樣：放開時 Dock 會讓 App 回到前面，馬上隱藏可能被它取消，稍等一下再隱藏
+            let generation = clicks
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay) {
+                MainActor.assumeIsolatedCompat {
+                    // 還沒隱藏就雙擊了：不隱藏
+                    guard DockClickController.shared.doubleClickOf != generation else { return }
+                    DockClickController.shared.hide(pid)
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay + Self.reopenGrace) {
+                MainActor.assumeIsolatedCompat {
+                    let controller = DockClickController.shared
+                    // 使用者又點了一下（可能就是要叫回）、雙擊、或還隱藏著：不再隱藏
+                    guard DockClick.hideAgain(mode: mode, hidden: Self.isHidden(pid), clickedAgain: controller.clicks != generation,
+                                              doubleClick: controller.doubleClickOf == generation) else { return }
+                    Self.log.debug("隱藏的 App 又被叫回，再隱藏一次")
+                    controller.hide(pid)
+                }
+            }
         case .minimize:
             let generation = clicks
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.reopenDelay) {
@@ -247,6 +265,26 @@ final class DockClickController {
         // 和之前縮下去、還沒叫回的合併，「再點一次」才全部叫得回來；這次又縮到的不重複記
         let earlier = (minimizedByUs[pid] ?? []).filter { !addedIDs.contains($0.id) && Self.isMinimized($0.element) != false }
         minimizedByUs[pid] = earlier + added
+    }
+
+    /// 本 App 是選單列 App，NSRunningApplication.hide() 第一次常沒作用：改用「輔助使用」
+    private func hide(_ pid: pid_t) {
+        guard port != nil else { return }
+        let element = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(element, 0.3)
+        AXUIElementSetAttributeValue(element, kAXHiddenAttribute as CFString, kCFBooleanTrue)
+    }
+
+    /// App 是不是隱藏中（問不到時為 nil）
+    private static func isHidden(_ pid: pid_t) -> Bool? {
+        let element = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(element, 0.3)
+        return attribute(element, kAXHiddenAttribute) as? Bool
+    }
+
+    /// 幕前調度（控制中心）有沒有開著。未公開的設定值，沒有這個鍵（例如 macOS 12，或從沒開過）時當作關著
+    private static func stageManagerOn() -> Bool {
+        UserDefaults(suiteName: "com.apple.WindowManager")?.bool(forKey: "GloballyEnabled") ?? false
     }
 
     /// 剛縮下去又被 App 晚到的「重新打開」叫回的視窗，再縮一次

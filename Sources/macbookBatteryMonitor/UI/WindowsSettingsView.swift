@@ -50,7 +50,7 @@ struct WindowsSettingsView: View {
                         Text("把它的視窗縮到 Dock").tag(DockClick.Mode.minimize)
                         Text("隱藏 App").tag(DockClick.Mode.hide)
                     }
-                    Text("只有點的是目前最前面的 App、而且它有開著的視窗時才收起來；再點一次照 Dock 原本的方式叫回來。點別的 App、拖曳圖示、按右鍵都照常。只監聽滑鼠，不攔截。")
+                    Text("只有點的是目前最前面的 App、而且它有開著的視窗時才收起來；再點一次照 Dock 原本的方式叫回來。點別的 App、拖曳圖示、按右鍵都照常。只監聽滑鼠，不攔截。開著幕前調度時，系統會把縮下去的視窗放到左邊的縮圖列而不是 Dock，這時一律改成隱藏 App。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

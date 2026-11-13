@@ -104,3 +104,17 @@ struct XDRKeySnapshot: Sendable {
             automatic: automatic, nativeBrightness: nativeBrightness, maximum: maximum)
     }
 }
+
+/// 每次啟動使用不同代號，晚到的 GPU 呈現回呼不能揭開已停止或重啟的畫面。
+struct XDRPresentationGate {
+    private var current: UUID?
+
+    mutating func begin() -> UUID {
+        let token = UUID()
+        current = token
+        return token
+    }
+
+    mutating func stop() { current = nil }
+    func canReveal(_ token: UUID) -> Bool { current == token }
+}

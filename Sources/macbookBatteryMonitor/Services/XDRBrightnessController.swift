@@ -69,7 +69,7 @@ final class XDRBrightnessController {
 
     var renderingHealthy: Bool { surface?.visible == true && (surface?.completedFrames ?? 0) > 0 }
     var renderingStatus: String {
-        "visible=\(surface?.visible ?? false), submitted=\(surface?.renderedFrames ?? 0), completed=\(surface?.completedFrames ?? 0), drawable=\(surface?.drawableStatus ?? "none"), HUD \(hud.geometryStatus)"
+        "visible=\(surface?.visible ?? false), submitted=\(surface?.renderedFrames ?? 0), completed=\(surface?.completedFrames ?? 0), presented=\(surface?.presentedFrames ?? 0), revealed=\(surface?.revealed ?? false), drawable=\(surface?.drawableStatus ?? "none"), HUD \(hud.geometryStatus)"
     }
     var keysStatus: String { keys?.status ?? "亮度鍵自動啟用已關閉" }
 

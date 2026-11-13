@@ -2,6 +2,14 @@ import Foundation
 
 final class XDRBrightnessTests {
     func run() {
+        var presentation = XDRPresentationGate()
+        let first = presentation.begin()
+        XCTAssertTrue(presentation.canReveal(first))
+        presentation.stop()
+        XCTAssertTrue(!presentation.canReveal(first))
+        let second = presentation.begin()
+        XCTAssertTrue(!presentation.canReveal(first))
+        XCTAssertTrue(presentation.canReveal(second))
         let cached = XDRKeySnapshot(nativeBrightness: 1, allowed: true, sampledAt: 10)
         XCTAssertEqual(cached.action(up: true, gain: 1, active: false, automatic: true, maximum: 3.2, now: 11), .activate(1.05))
         XCTAssertEqual(cached.action(up: true, gain: 1, active: false, automatic: true, maximum: 3.2, now: 13), .system)

@@ -236,7 +236,7 @@ private enum XDRHUDMenuAnchor {
                 }
             }
         }
-        // The beta displays its temporary display item immediately before the clock.
+        // Beta 的暫時顯示器圖示位於時鐘前方，讀不到直接位置時以此回退。
         return clockLeft.map { $0 - 24 }
     }
 

@@ -59,6 +59,21 @@ final class XDRBrightnessKeys {
     }
 
     static func nativeBrightness(_ display: CGDirectDisplayID?) -> Float? {
+        XDRSystemQuery.nativeBrightness(display)
+    }
+}
+
+/// 只讀系統查詢；控制器在背景 Task 呼叫，不在會擋輸入的回呼裡執行。
+enum XDRSystemQuery {
+    static func snapshot(display: CGDirectDisplayID?) -> XDRKeySnapshot {
+        let session = CGSessionCopyCurrentDictionary() as? [String: Any]
+        let unlocked = session != nil && session?["CGSSessionScreenIsLocked"] as? Bool != true
+            && session?[kCGSessionOnConsoleKey as String] as? Bool != false
+        return XDRKeySnapshot(nativeBrightness: nativeBrightness(display), allowed: unlocked,
+                              sampledAt: ProcessInfo.processInfo.systemUptime)
+    }
+
+    static func nativeBrightness(_ display: CGDirectDisplayID?) -> Float? {
         guard let display, let reader = brightnessReader else { return nil }
         var brightness: Float = 0
         guard reader(display, &brightness) == 0, brightness.isFinite, (0...1).contains(brightness) else { return nil }

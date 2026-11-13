@@ -1,8 +1,8 @@
 import AppKit
 import MetalKit
 
-// EDR multiply overlay adapted from XDR Boost, Copyright (c) 2026 Pieter Levels, MIT.
-// Full license: docs/licenses/xdr-boost.txt.
+// EDR 乘算覆蓋層改編自 XDR Boost，Copyright (c) 2026 Pieter Levels，MIT 授權。
+// 完整授權：docs/licenses/xdr-boost.txt。
 @MainActor
 final class XDRSurface: NSObject, MTKViewDelegate {
     private let window: NSWindow
@@ -11,6 +11,7 @@ final class XDRSurface: NSObject, MTKViewDelegate {
     private(set) var renderedFrames = 0
     private(set) var completedFrames = 0
     var visible: Bool { window.isVisible }
+    var drawableStatus: String { "\(Int(view.drawableSize.width))×\(Int(view.drawableSize.height))" }
 
     init?(screen: NSScreen, gain: Double = 1.15) {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return nil }
@@ -28,6 +29,9 @@ final class XDRSurface: NSObject, MTKViewDelegate {
         view.colorPixelFormat = .rgba16Float
         view.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)
         view.preferredFramesPerSecond = 5
+        // 畫面是均勻純色，不需依螢幕解析度配置浮點紋理，由合成器放大即可。
+        view.autoResizeDrawable = false
+        view.drawableSize = CGSize(width: 2, height: 2)
         let initialGain = XDRBrightnessPolicy.clamp(gain, maximum: XDRBrightnessPolicy.absoluteMaximumGain)
         view.clearColor = MTLClearColor(red: initialGain, green: initialGain, blue: initialGain, alpha: 1)
         guard let layer = view.layer as? CAMetalLayer else { return nil }

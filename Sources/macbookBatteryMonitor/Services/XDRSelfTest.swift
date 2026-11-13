@@ -9,6 +9,18 @@ func runXDRSelfTest() -> Bool {
     app.finishLaunching()
     let control = XDRBrightnessController.shared
     control.start()
+    let cacheReady = Date().addingTimeInterval(0.4)
+    while Date() < cacheReady { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+    control.stop()
+    control.reconcile()
+    let stopped = control.completelyStopped
+    let stoppedUntil = Date().addingTimeInterval(0.2)
+    while Date() < stoppedUntil { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+    let stayedStopped = control.completelyStopped
+    print("Feature stop and late sampling: \(stopped && stayedStopped)")
+    control.start()
+    let restartedUntil = Date().addingTimeInterval(0.4)
+    while Date() < restartedUntil { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
     print("XDR supported: \(control.supported)")
     let id = control.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
     let before = id.flatMap(XDRGammaSnapshot.capture)
@@ -62,7 +74,11 @@ func runXDRSelfTest() -> Bool {
         let mid = before.red.count / 2
         print("Gamma midpoint before: \(before.red[mid]), boosted: \(boosted.red[mid])")
     }
+    control.setGain(1)
+    let unitGainReleased = !control.enabled && !control.renderingHealthy
+    print("Unit gain released overlay: \(unitGainReleased)")
     let restored = control.disable()
+    control.stop()
     print("XDR restored: \(restored)")
     guard let before, let after = id.flatMap(XDRGammaSnapshot.capture), before.red.count == after.red.count else { return false }
     let beforeChannels: [Float] = before.red + before.green + before.blue
@@ -71,6 +87,7 @@ func runXDRSelfTest() -> Bool {
     let delta: Float = differences.max() ?? 1
     print("Gamma restoration max delta: \(delta)")
     print("Rendering lifecycle check only; physical brightness requires visual verification")
-    return activated && restored && !control.enabled && delta < 0.005
+    return activated && stopped && stayedStopped && unitGainReleased && control.completelyStopped
+        && restored && !control.enabled && delta < 0.005
         && (!(automaticTest || CommandLine.arguments.contains("--xdr-keys")) || keyChanges > 0)
 }

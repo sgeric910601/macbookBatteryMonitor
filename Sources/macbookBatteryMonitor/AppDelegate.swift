@@ -69,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        XDRBrightnessController.shared.start()
+        applyXDRBrightness()
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(statusItemClicked(_:))
@@ -146,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         applyWindowSwitcher(prompt: false)
         settings.onInputSourceFixChange = { [weak self] in self?.applyInputSourceFix(prompt: true) }
         applyInputSourceFix(prompt: false)
+        settings.onXDRBrightnessChange = { [weak self] in self?.applyXDRBrightness() }
         settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
@@ -301,8 +302,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     /// 加入或移除擴充功能後，依新的狀態啟動或停止它；開關原本就關著的功能，加入時不會跳出權限詢問
+    private func applyXDRBrightness() {
+        let controller = XDRBrightnessController.shared
+        if settings.isInstalled(.xdrBrightness) {
+            controller.setInputAvailable(inputAllowed)
+            controller.start()
+            controller.reconcile()
+        } else {
+            controller.stop()
+        }
+    }
+
     private func applyFeature(_ feature: ExtensionFeature) {
         switch feature {
+        case .xdrBrightness: applyXDRBrightness()
         case .scrollDirection: applyScrollDirection(prompt: true)
         case .windowSwitcher: applyWindowSwitcher(prompt: true)
         case .inputMethod: applyInputSourceFix(prompt: true)
@@ -589,7 +602,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Refresh
 
     private func refresh() {
-        XDRBrightnessController.shared.reconcile()
+        if settings.isInstalled(.xdrBrightness) { XDRBrightnessController.shared.reconcile() }
         store.refresh()
         // 接電狀態改變且設定為「只在使用電池時省電」時，這裡會重排計時器；桌上型 Mac 一律視為接著電源
         if let s = store.snapshot {

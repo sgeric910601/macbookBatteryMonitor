@@ -91,6 +91,14 @@ final class AppSettings {
     /// 加入或移除擴充功能時（參數是改變的功能）
     @ObservationIgnored var onFeatureInstallChange: ((ExtensionFeature) -> Void)?
 
+    /// 亮度鍵自動啟用設定改變時，重新同步 XDR 監聽狀態
+    @ObservationIgnored var onXDRBrightnessChange: (() -> Void)?
+
+    /// 保留實驗版的儲存鍵，加入 XDR 功能前不會因此啟動
+    var xdrAutomaticActivation: Bool {
+        didSet { defaults.set(xdrAutomaticActivation, forKey: Keys.xdrAutomaticActivation); onXDRBrightnessChange?() }
+    }
+
     /// 已加入的擴充功能；沒加入的不啟動，設定裡也看不到
     private(set) var installedFeatures: Set<ExtensionFeature> = []
 
@@ -100,6 +108,7 @@ final class AppSettings {
     /// 也不含周邊設備的低電量門檻（以藍牙裝置的硬體位址為鍵，匯出檔可能被分享）
     static let backupSchema: [String: SettingsBackup.Kind] = {
         var schema: [String: SettingsBackup.Kind] = [
+            Keys.xdrAutomaticActivation: .bool,
             Keys.display: .string, Keys.lowAlertEnabled: .bool, Keys.lowThreshold: .int, Keys.fullAlertEnabled: .bool,
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
@@ -122,6 +131,7 @@ final class AppSettings {
         for key in Self.backupSchema.keys { values[key] = defaults.object(forKey: key) }
         // 加入狀態用實際的值：從舊版更新、沒存過的也要帶過去，否則在全新安裝的 Mac 匯入後功能會變成沒加入
         values.merge(ExtensionFeature.installedValues(isInstalled)) { _, actual in actual }
+        values[Keys.xdrAutomaticActivation] = xdrAutomaticActivation
         return try SettingsBackup.export(values, schema: Self.backupSchema)
     }
 
@@ -133,6 +143,7 @@ final class AppSettings {
         // 功能自己的開關：加入了但開關關著時，匯入一樣會讓它開始攔截按鍵或滑鼠
         let switches: [(String, String)] = [
             (Keys.bluetoothOffDuringSleep, "睡眠時關閉藍牙"), (Keys.windowSwitcher, "視窗切換"),
+            (Keys.xdrAutomaticActivation, "XDR 亮度鍵自動啟用"),
             (Keys.capsLockNoDelay, "Caps Lock 切換中英不延遲"), (Keys.shiftHalfWidth, "按住 Shift 打半形"),
             (Keys.quitGuardQuit, "⌘Q 防誤觸"), (Keys.quitGuardClose, "⌘W 防誤觸"),
             (Keys.scrollReverseMouse, "滑鼠滾輪反向"), (Keys.scrollReverseTrackpad, "觸控板反向"), (Keys.scrollSmooth, "滑鼠滾輪平滑捲動"),
@@ -593,6 +604,7 @@ final class AppSettings {
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
+        static let xdrAutomaticActivation = "xdrAutomaticActivation"
         static let chargingWakeEnabled = "chargingWakeEnabled"
     }
 
@@ -616,6 +628,7 @@ final class AppSettings {
         let savedOpacity = defaults.double(forKey: "chargingIconOpacity")
         chargingIconOpacity = savedOpacity.isFinite ? min(1, max(0, savedOpacity)) : 1
         defaults.register(defaults: [
+            Keys.xdrAutomaticActivation: true,
             Keys.display: MenuBarDisplay.iconAndPercent.rawValue,
             Keys.lowAlertEnabled: true,
             Keys.lowThreshold: 20,
@@ -668,6 +681,7 @@ final class AppSettings {
             if stored == nil { defaults.set(isInstalled, forKey: feature.installedKey) }
         }
         installedFeatures = installed
+        xdrAutomaticActivation = defaults.bool(forKey: Keys.xdrAutomaticActivation)
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)
         display = MenuBarDisplay(rawValue: defaults.string(forKey: Keys.display) ?? "") ?? .iconAndPercent
         lowAlertEnabled = defaults.bool(forKey: Keys.lowAlertEnabled)

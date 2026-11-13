@@ -9,6 +9,8 @@ enum XDRBrightnessKeyAction: Equatable {
 enum XDRBrightnessPolicy {
     static let absoluteMaximumGain = 16.0
 
+    static func needsOverlay(gain: Double) -> Bool { gain.isFinite && gain > 1.001 }
+
     static func maximumGain(sdrMaximum: Double?, peakHDR: Double?, potentialHeadroom: Double) -> Double {
         guard potentialHeadroom.isFinite, potentialHeadroom >= 1 else { return 1 }
         guard let sdrMaximum, let peakHDR,
@@ -85,5 +87,20 @@ struct XDRBrightnessKeySequence {
     mutating func consumeUp(code: Int) -> Bool {
         guard let press = presses.removeValue(forKey: code) else { return false }
         return !press.sentDownToSystem
+    }
+}
+
+/// 亮度鍵只使用最近一次背景取樣，資料過期或環境不允許時交還系統。
+struct XDRKeySnapshot: Sendable {
+    let nativeBrightness: Float?
+    let allowed: Bool
+    let sampledAt: TimeInterval
+
+    func action(up: Bool, gain: Double, active: Bool, automatic: Bool,
+                maximum: Double, now: TimeInterval) -> XDRBrightnessKeyAction {
+        let age = now - sampledAt
+        guard allowed, age >= 0, age <= 2.5 else { return .system }
+        return XDRBrightnessPolicy.keyAction(up: up, gain: gain, active: active,
+            automatic: automatic, nativeBrightness: nativeBrightness, maximum: maximum)
     }
 }

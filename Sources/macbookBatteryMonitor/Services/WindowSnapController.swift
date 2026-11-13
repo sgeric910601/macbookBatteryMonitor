@@ -180,7 +180,10 @@ final class WindowSnapController {
         let element = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(element, 0.1)
         guard let value = attribute(element, kAXFocusedWindowAttribute), CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        return (value as! AXUIElement)
+        let window = value as! AXUIElement
+        // 視窗元素不會沿用 App 元素的等待上限：之後讀寫位置、大小都在主執行緒上
+        AXUIElementSetMessagingTimeout(window, 0.1)
+        return window
     }
 
     private static func frame(of window: AXUIElement) -> CGRect? {

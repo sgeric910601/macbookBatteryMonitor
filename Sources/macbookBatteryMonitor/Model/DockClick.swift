@@ -28,10 +28,11 @@ enum DockClick {
     }
 
     /// 隱藏後過一陣子（reopenGrace）再看一次：放開時 Dock 讓 App「重新打開」，回應慢的 App 會在我們隱藏之後才回到前面，這時再隱藏一次。
-    /// mode：這次點擊實際用的收法（effectiveMode）；hidden：那時讀到 App 是不是隱藏中（問不到為 nil）；
+    /// mode：這次點擊實際用的收法（effectiveMode）；hidden：那時讀到 App 是不是隱藏中（問不到為 nil），
+    /// 要問「輔助使用」、App 沒回應時會等，所以其他條件都成立才問；
     /// clickedAgain：隱藏之後使用者又按下過（可能就是要叫回）；doubleClick：這一下是雙擊的第一下（雙擊不算收起）
-    static func hideAgain(mode: Mode, hidden: Bool?, clickedAgain: Bool, doubleClick: Bool) -> Bool {
-        mode == .hide && hidden == false && !clickedAgain && !doubleClick
+    static func hideAgain(mode: Mode, hidden: @autoclosure () -> Bool?, clickedAgain: Bool, doubleClick: Bool) -> Bool {
+        mode == .hide && !clickedAgain && !doubleClick && hidden() == false
     }
 
     /// 某個時間點最前面的 App。監聽只收不擋，回呼跑到時 Dock 可能已經切換 App，不能讀「現在」的前景 App：

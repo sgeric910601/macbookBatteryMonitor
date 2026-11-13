@@ -22,6 +22,9 @@ struct DockClickTests {
         XCTAssertEqual(decide(action: DockClick.effectiveMode(.minimize, stageManager: true)), .hide)
         // 視窗都收起來了：隱藏不靠我們叫回（Dock 會取消隱藏），只有我們縮下去的才叫回
         XCTAssertEqual(decide(visibleWindows: false, action: DockClick.effectiveMode(.minimize, stageManager: true)), .none)
+        // 沒開幕前調度時縮下去的，之後才打開幕前調度：再點一次照樣叫回
+        XCTAssertEqual(decide(visibleWindows: false, action: DockClick.effectiveMode(.minimize, stageManager: true), weMinimized: true),
+                       .restore)
     }
 
     /// 隱藏後被晚到的「重新打開」叫回：使用者沒再點才再隱藏一次
@@ -43,6 +46,17 @@ struct DockClickTests {
         // 沒開幕前調度、設定是隱藏 App：和開著時一樣會再隱藏
         XCTAssertTrue(DockClick.hideAgain(mode: DockClick.effectiveMode(.hide, stageManager: false), hidden: false,
                                           clickedAgain: false, doubleClick: false))
+        // 又點了或雙擊時不去問 App 是不是隱藏中（App 沒回應時會等）
+        var asked = 0
+        func hidden() -> Bool? {
+            asked += 1
+            return false
+        }
+        XCTAssertTrue(!DockClick.hideAgain(mode: stageManager, hidden: hidden(), clickedAgain: true, doubleClick: false))
+        XCTAssertTrue(!DockClick.hideAgain(mode: stageManager, hidden: hidden(), clickedAgain: false, doubleClick: true))
+        XCTAssertEqual(asked, 0)
+        XCTAssertTrue(DockClick.hideAgain(mode: stageManager, hidden: hidden(), clickedAgain: false, doubleClick: false))
+        XCTAssertEqual(asked, 1)
     }
 
     /// 點別的 App（是要切過去）、點的不是 App 圖示、按下時沒有最前面的 App：不動

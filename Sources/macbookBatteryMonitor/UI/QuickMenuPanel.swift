@@ -19,7 +19,8 @@ struct QuickMenuPanel: View {
     var close: () -> Void
     var openSettings: (SettingsSection?) -> Void
 
-    static let clipboardLimit = 5
+    /// 剪貼簿歷史最高多高（四列，一列 34、列距 4），再多就捲動
+    static let clipboardMaxHeight: CGFloat = 4 * 34 + 3 * 4
 
     private var showsAudio: Bool { settings.isInstalled(.audioSwitch) }
     private var showsMic: Bool { showsAudio && audio.micSupported }
@@ -229,14 +230,25 @@ struct QuickMenuPanel: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
-                ForEach(Array(clipboard.prefix(Self.clipboardLimit).enumerated()), id: \.offset) { _, text in
-                    QuickRow(symbol: Self.clipboardSymbol(text), tint: .purple,
-                             title: ClipboardHistory.preview(text), selected: false) {
-                        ClipboardHistoryController.shared.restore(text)
-                        close()
-                    }
-                    .help(String(text.prefix(500)))
+                // 全部 30 筆都能選：四列放得下就直接列出，放不下才捲動（不用猜一列多高）
+                ViewThatFits(in: .vertical) {
+                    clipboardRows
+                    ScrollView { clipboardRows }
                 }
+                .frame(maxHeight: Self.clipboardMaxHeight)
+            }
+        }
+    }
+
+    private var clipboardRows: some View {
+        VStack(spacing: 4) {
+            ForEach(Array(clipboard.enumerated()), id: \.offset) { _, text in
+                QuickRow(symbol: Self.clipboardSymbol(text), tint: .purple,
+                         title: ClipboardHistory.preview(text), selected: false) {
+                    ClipboardHistoryController.shared.restore(text)
+                    close()
+                }
+                .help(String(text.prefix(500)))
             }
         }
     }

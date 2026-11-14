@@ -297,7 +297,7 @@ The system integration uses private macOS functions, all loaded at run time and 
 
 Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
 
-- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch. Virtual devices that cannot be the default output (for example Background Music's "UI Sounds" device for system alerts) are not listed, as in the system Sound menu
+- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch. Virtual devices that cannot be the default output (for example a device some audio tools add for system alert sounds) are not listed, as in the system Sound menu
 - **Mute microphone**: uses the device's mute switch, or, if there is no switch, the menu says "輸入音量調到 0" (set input volume to 0) and the volume is restored when unmuted or when the app quits. A meeting app's automatic gain may turn it back up, so use the meeting app's own mute for such devices. The button shows a crossed-out microphone while muted
 - **Permission**: uses the public Core Audio API and needs no permission; devices are read only when the menu opens
 
@@ -342,11 +342,11 @@ Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a
 - **Three large buttons**: keep awake (with the time left), mute microphone (with the audio switcher on) and start keyboard cleaning (with keyboard cleaning mode on)
 - **Keep-awake duration**: 30 min, 1 h, 2 h or until turned off, with the running one highlighted; the display can stay on too
 - **Audio output**: the same device list as the audio switcher; click one to switch
-- **Clipboard history** (when on): the last 5 items, click one to put it back on the clipboard; clearing keeps the panel open
+- **Clipboard history** (when on): the last 30 items (four rows visible, the rest scroll), click one to put it back on the clipboard; clearing keeps the panel open
 - **功能管理** (manage features): switches the panel to an extension features page where each feature has its own switch; "返回" (back) or Esc returns. A feature that needs Accessibility opens the permissions page if it is not allowed yet. The cat quick menu itself is turned off in Settings, since turning it off here would remove the panel
 - **Settings** and **Quit** at the bottom
 - Clicking outside closes the panel; the battery and system monitor panels also close when you click elsewhere or on another menu bar icon
-- The panel reads the current state only when it opens and does nothing otherwise; no permission needed
+- The panel reads the current state when it opens and keeps it up to date while open; when closed it does nothing; no permission needed
 
 ## Finder shortcuts
 

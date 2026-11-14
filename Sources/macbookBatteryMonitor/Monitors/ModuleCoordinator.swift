@@ -327,7 +327,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         popover.allowInFullScreen()
         NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
-        if behavior == .transient { startOutsideClickMonitoring(button: button) }
+        if behavior == .transient, popover.isShown { startOutsideClickMonitoring(button: button) }
         startTop()
     }
 

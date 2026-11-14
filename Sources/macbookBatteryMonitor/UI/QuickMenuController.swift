@@ -83,7 +83,8 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
         popover.allowInFullScreen()
         NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
-        startOutsideClickMonitoring(button: button)
+        // 沒真的顯示出來（沒有 didClose 可等）就不留監聽
+        if popover.isShown { startOutsideClickMonitoring(button: button) }
     }
 
     /// 點其他 App、桌面或本 App 其他視窗（電池、系統監控的圖示與面板）就收起來。

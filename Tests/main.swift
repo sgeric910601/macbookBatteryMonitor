@@ -381,3 +381,10 @@ print("3 caps lock delay tests passed")
 
 XDRBrightnessTests().run()
 print("XDR brightness policy tests passed")
+
+let parsers = ParserTests()
+parsers.testChargeLimitPicksLowestManualPolicy()
+parsers.testChargeLimitRejectsUnexpectedData()
+parsers.testProcessEnergyUsesLastSample()
+parsers.testProcessEnergyEmpty()
+print("4 parser tests passed")

@@ -50,7 +50,7 @@ enum StatusIconRenderer {
                let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil),
                let tinted = symbol.withSymbolConfiguration(
                    NSImage.SymbolConfiguration(pointSize: overlayPointSize, weight: .black)
-                       .applying(.init(paletteColors: [charging ? NSColor.black : plugColor]))
+                       .applying(.init(paletteColors: [charging ? chargingTextColor : plugColor]))
                ) {
                 let s = tinted.size
                 // 符號的圖形在自己的外框裡偏上下，所以量出實際圖形的中心再對齊電池中心
@@ -58,12 +58,11 @@ enum StatusIconRenderer {
                 // 實機像素量測：只用墨跡中心計算，插頭仍偏下約 0.6 個螢幕像素，所以往上補 0.25（插頭才和綠色區塊上下等距）
                 let measuredBias: CGFloat = charging ? 0 : 0.25
                 let rect = NSRect(x: body.midX - ink.x, y: body.midY - ink.y + measuredBias, width: s.width, height: s.height)
-                // 插頭和綠色之間留一圈很細的空隙：先用插頭的輪廓往四周挖掉綠色（透明），再畫插頭
-                if !charging {
-                    let gap: CGFloat = 0.4
-                    for (dx, dy) in [(-gap, 0), (gap, 0), (0, -gap), (0, gap), (-gap * 0.7, -gap * 0.7), (gap * 0.7, gap * 0.7), (-gap * 0.7, gap * 0.7), (gap * 0.7, -gap * 0.7)] {
-                        tinted.draw(in: rect.offsetBy(dx: dx, dy: dy), from: .zero, operation: .destinationOut, fraction: 1)
-                    }
+                // 插頭、閃電和綠色之間留一圈很細的空隙：先用符號的輪廓往四周挖掉綠色（透明），再畫符號。
+                // 閃電用「充電圖示文字顏色」（預設白色），和內嵌百分比的文字同一個設定
+                let gap: CGFloat = 0.4
+                for (dx, dy) in [(-gap, 0), (gap, 0), (0, -gap), (0, gap), (-gap * 0.7, -gap * 0.7), (gap * 0.7, gap * 0.7), (-gap * 0.7, gap * 0.7), (gap * 0.7, -gap * 0.7)] {
+                    tinted.draw(in: rect.offsetBy(dx: dx, dy: dy), from: .zero, operation: .destinationOut, fraction: 1)
                 }
                 tinted.draw(in: rect)
             }

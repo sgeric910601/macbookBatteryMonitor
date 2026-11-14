@@ -192,7 +192,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    SwitchRow("在網路面板顯示測速", isOn: binding(\.networkSpeedTest))
+                    SwitchRow("在網路面板顯示測速", isOn: Binding(get: { settings.isInstalled(.speedTest) }, set: { settings.setInstalled(.speedTest, $0) }))
                         .disabled(!settings.systemMonitors || !settings.monitorNetwork)
                     if settings.systemMonitors {
                         Text(settings.monitorNetwork

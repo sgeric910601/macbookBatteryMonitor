@@ -327,6 +327,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .quickMenu: applyQuickMenu()
         // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
         case .portManager: break
+        case .speedTest: settings.onMonitorsChange?()
+        // 只在打開「登入項目」頁時讀取，沒有背景工作
+        case .startupItems: break
         case .clipboardHistory: applyQuickMenu()
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔

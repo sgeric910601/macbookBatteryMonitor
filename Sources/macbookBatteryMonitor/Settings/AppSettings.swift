@@ -138,7 +138,11 @@ final class AppSettings {
     /// 讀取並檢查設定檔，還不寫入。turnsOn：匯入後會從關閉變成打開的項目（擴充功能、睡眠時關閉藍牙、指定 App 防止休眠），
     /// 要先讓使用者確認：其中有需要「輔助使用」或會記錄剪貼簿的功能
     func readBackup(_ data: Data) throws -> (values: [String: Any], turnsOn: [String]) {
-        let values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        var values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        // 舊版匯出的備份只有 networkSpeedTest：轉成測速擴充功能的加入狀態，不讓舊備份的測速設定被丟掉
+        if let legacy = values.removeValue(forKey: Keys.networkSpeedTest) as? Bool, values[ExtensionFeature.speedTest.installedKey] == nil {
+            values[ExtensionFeature.speedTest.installedKey] = legacy
+        }
         var turnsOn = ExtensionFeature.allCases.filter { values[$0.installedKey] as? Bool == true && !isInstalled($0) }.map(\.title)
         // 功能自己的開關：加入了但開關關著時，匯入一樣會讓它開始攔截按鍵或滑鼠
         let switches: [(String, String)] = [
@@ -303,10 +307,6 @@ final class AppSettings {
     /// 合併現在是否生效：開關打開，且記憶體與磁碟都有開
     var memoryDiskMerged: Bool {
         MonitorKind.mergesMemoryDisk(merge: mergeMemoryDisk, memory: isMonitorEnabled(.memory), disk: isMonitorEnabled(.disk))
-    }
-    /// 網路面板顯示測速卡片。預設關閉：測一次要用掉數百 MB 流量，避免誤按
-    var networkSpeedTest: Bool {
-        didSet { defaults.set(networkSpeedTest, forKey: Keys.networkSpeedTest); onMonitorsChange?() }
     }
 
     /// 系統監控總開關：關閉時選單列只有電池（桌上型為耗電）圖示，四個模組都不取樣，和以前的電池版一樣省電
@@ -639,7 +639,6 @@ final class AppSettings {
             Keys.monitorDisk: true,
             Keys.monitorNetwork: true,
             Keys.mergeMemoryDisk: false,
-            Keys.networkSpeedTest: false,
             Keys.powerSaving: false,
             Keys.powerSavingOnBatteryOnly: false,
             Keys.bluetoothOffDuringSleep: false,
@@ -672,6 +671,7 @@ final class AppSettings {
         let switchedOn: [ExtensionFeature: Bool] = [
             .windowSwitcher: defaults.bool(forKey: Keys.windowSwitcher),
             .inputMethod: defaults.bool(forKey: Keys.capsLockNoDelay) || defaults.bool(forKey: Keys.shiftHalfWidth),
+            .speedTest: defaults.bool(forKey: Keys.networkSpeedTest),
         ]
         for feature in ExtensionFeature.allCases {
             let stored = defaults.object(forKey: feature.installedKey) as? Bool
@@ -693,7 +693,6 @@ final class AppSettings {
         monitorDisk = defaults.bool(forKey: Keys.monitorDisk)
         monitorNetwork = defaults.bool(forKey: Keys.monitorNetwork)
         mergeMemoryDisk = defaults.bool(forKey: Keys.mergeMemoryDisk)
-        networkSpeedTest = defaults.bool(forKey: Keys.networkSpeedTest)
         alertCPU = defaults.bool(forKey: Keys.alertCPU)
         alertMemory = defaults.bool(forKey: Keys.alertMemory)
         alertDisk = defaults.bool(forKey: Keys.alertDisk)

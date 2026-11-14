@@ -120,13 +120,13 @@ final class MenuBarStrip: NSObject {
                 button.image = source.image
                 button.attributedTitle = source.attributedTitle
                 button.imagePosition = source.title.isEmpty ? .imageOnly : source.imagePosition
-                button.toolTip = source.toolTip
+                button.setToolTipUnlessHovered(source.toolTip)
             } else if let kind = MonitorKind(rawValue: button.key) {
                 let content = monitors.stripContent(kind)
                 button.image = content.image
                 button.title = ""
                 button.imagePosition = .imageOnly
-                button.toolTip = content.tooltip
+                button.setToolTipUnlessHovered(content.tooltip)
             }
         }
         layout()

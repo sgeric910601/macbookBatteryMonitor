@@ -773,7 +773,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         button.image = settings.display == .percentOnly ? nil
             : NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "系統耗電")
         button.title = settings.display == .iconOnly ? "" : text
-        button.toolTip = "系統耗電 \(Format.watts(watts))"
+        button.setToolTipUnlessHovered("系統耗電 \(Format.watts(watts))")
     }
 
     private func updateStatusItem() {
@@ -842,7 +842,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             string: text,
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)]
         )
-        button.toolTip = tooltip(s, e)
+        button.setToolTipUnlessHovered(tooltip(s, e))
         chargingIconFlow?.needsLayout = true
     }
 
@@ -1012,5 +1012,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             defaults.set(path, forKey: LoginItem.registeredPathKey)
             defaults.set(identity, forKey: LoginItem.registeredCodeKey)
         }
+    }
+}
+
+extension NSView {
+    /// 數字每秒更新時，滑鼠停在上面就先不換提示文字：換了 macOS 會在游標目前的位置重新顯示提示框，看起來像跟著滑鼠跑。
+    /// 滑鼠離開後下一次更新再換
+    func setToolTipUnlessHovered(_ text: String?) {
+        guard toolTip != text else { return }
+        if let window, window.isVisible {
+            let pointer = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+            if bounds.contains(pointer) { return }
+        }
+        toolTip = text
     }
 }

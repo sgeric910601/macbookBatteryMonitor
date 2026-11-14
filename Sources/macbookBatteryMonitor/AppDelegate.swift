@@ -50,6 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var lastStatusKey = ""
     private var chargingIconFlow: ChargingIconFlowView?
     private var sleeping = false
+    private var screensAsleep = false
+    /// 螢幕關著或切到其他使用者時沒人看得到：監控暫停、定時更新拉長（見 RefreshPacing）
+    private var unseen: Bool { screensAsleep || !sessionActive }
     private var powerTransitionTask: Task<Void, Never>?
 
     /// 所有資訊依設定的更新頻率更新（預設每秒，省電模式至少 2 秒）；面板關著時也一樣（插拔電源另由 IOPS 通知立即更新）。
@@ -206,6 +209,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(sessionBecameActive), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(screensDidSleep), name: NSWorkspace.screensDidSleepNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(screensDidWake), name: NSWorkspace.screensDidWakeNotification, object: nil
         )
         KeepAwakeController.shared.battery = { [weak self] in
             guard let s = self?.store.snapshot else { return (nil, false) }
@@ -611,7 +620,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             settings.onACPower = true
         }
         scheduleAdapterPreRead()
-        store.setHardwareSampling(active: ui.isVisible && ui.page == .main && !sleeping)
+        store.setHardwareSampling(active: ui.isVisible && ui.page == .main && !sleeping && !unseen)
         updateStatusItem()
         if let s = store.snapshot, let e = store.estimates {
             Notifier.shared.evaluate(s, state: e.state, settings: settings)
@@ -630,15 +639,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func scheduleRefresh(every interval: TimeInterval) {
         refreshTimer?.invalidate()
-        refreshTimer = repeating(every: interval) { $0.refresh() }
-        // 誤差不超過 0.3 秒，下一次更新才配得到 1 秒前預先讀的變壓器輸入
-        refreshTimer?.tolerance = min(interval * 0.2, 0.3)
+        refreshTimer = repeating(every: RefreshPacing.interval(base: interval, unseen: unseen)) { $0.refresh() }
+        refreshTimer?.tolerance = RefreshPacing.tolerance(base: interval, unseen: unseen)
     }
 
     private func scheduleAdapterPreRead() {
         adapterPreReadTimer?.invalidate()
         adapterPreReadTimer = nil
-        guard interval > 1, !sleeping else { return }
+        guard interval > 1, !sleeping, !unseen else { return }
         let timer = Timer(fire: Date().addingTimeInterval(interval - 1), interval: 0, repeats: false) { _ in
             MainActor.assumeIsolated { BatteryReader.recordAdapterInput() }
         }
@@ -689,11 +697,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         sessionActive = false
         KeyboardCleaningController.shared.stop()
         applyInputFeatures()
+        visibilityChanged()
     }
 
     @objc private func sessionBecameActive() {
         sessionActive = true
         applyInputFeatures()
+        visibilityChanged()
+    }
+
+    @objc private func screensDidSleep() {
+        screensAsleep = true
+        visibilityChanged()
+    }
+
+    @objc private func screensDidWake() {
+        screensAsleep = false
+        visibilityChanged()
+    }
+
+    /// 螢幕關著（例如插電過夜）或切到其他使用者時，每秒更新沒人看得到：監控暫停、定時更新拉長；回來時馬上更新一次
+    private func visibilityChanged() {
+        guard !sleeping else { return }
+        monitors.setSleeping(unseen)
+        // 面板開著時螢幕睡著，面板不會自己收起：硬體與 top 取樣也停
+        if unseen {
+            store.setHardwareSampling(active: false)
+            store.setProcessSampling(active: false)
+        }
+        scheduleRefresh(every: interval)
+        scheduleAdapterPreRead()
+        if !unseen { refresh() }
     }
 
     /// 依設定（與工作階段是否在前景）重新開始或停止所有按鍵與滑鼠攔截
@@ -751,7 +785,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統已喚醒") }
         sleeping = false
         applyBluetooth(bluetoothSleep.didWake())
-        monitors.setSleeping(false)
+        // 闔蓋接外接螢幕等情況醒來時螢幕可能還關著
+        monitors.setSleeping(unseen)
+        scheduleRefresh(every: interval)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設
         InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
@@ -972,7 +1008,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func scheduleProcessCheck() {
         processTimer?.invalidate()
         processTimer = repeating(every: interval) { delegate in
-            delegate.store.setProcessSampling(active: !delegate.sleeping && delegate.ui.page == .main && delegate.ui.tab == .processes)
+            delegate.store.setProcessSampling(active: !delegate.sleeping && !delegate.unseen && delegate.ui.page == .main && delegate.ui.tab == .processes)
         }
     }
 

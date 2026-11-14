@@ -111,7 +111,7 @@ final class AppSettings {
             Keys.xdrAutomaticActivation: .bool,
             Keys.display: .string, Keys.lowAlertEnabled: .bool, Keys.lowThreshold: .int, Keys.fullAlertEnabled: .bool,
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
-            Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
+            Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
             Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.keepAwakeApps: .strings, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.mouseBackButton: .string, Keys.mouseForwardButton: .string, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
@@ -303,10 +303,6 @@ final class AppSettings {
     /// 合併現在是否生效：開關打開，且記憶體與磁碟都有開
     var memoryDiskMerged: Bool {
         MonitorKind.mergesMemoryDisk(merge: mergeMemoryDisk, memory: isMonitorEnabled(.memory), disk: isMonitorEnabled(.disk))
-    }
-    /// 網路面板顯示測速卡片。預設關閉：測一次要用掉數百 MB 流量，避免誤按
-    var networkSpeedTest: Bool {
-        didSet { defaults.set(networkSpeedTest, forKey: Keys.networkSpeedTest); onMonitorsChange?() }
     }
 
     /// 系統監控總開關：關閉時選單列只有電池（桌上型為耗電）圖示，四個模組都不取樣，和以前的電池版一樣省電
@@ -639,7 +635,6 @@ final class AppSettings {
             Keys.monitorDisk: true,
             Keys.monitorNetwork: true,
             Keys.mergeMemoryDisk: false,
-            Keys.networkSpeedTest: false,
             Keys.powerSaving: false,
             Keys.powerSavingOnBatteryOnly: false,
             Keys.bluetoothOffDuringSleep: false,
@@ -672,6 +667,7 @@ final class AppSettings {
         let switchedOn: [ExtensionFeature: Bool] = [
             .windowSwitcher: defaults.bool(forKey: Keys.windowSwitcher),
             .inputMethod: defaults.bool(forKey: Keys.capsLockNoDelay) || defaults.bool(forKey: Keys.shiftHalfWidth),
+            .speedTest: defaults.bool(forKey: Keys.networkSpeedTest),
         ]
         for feature in ExtensionFeature.allCases {
             let stored = defaults.object(forKey: feature.installedKey) as? Bool
@@ -693,7 +689,6 @@ final class AppSettings {
         monitorDisk = defaults.bool(forKey: Keys.monitorDisk)
         monitorNetwork = defaults.bool(forKey: Keys.monitorNetwork)
         mergeMemoryDisk = defaults.bool(forKey: Keys.mergeMemoryDisk)
-        networkSpeedTest = defaults.bool(forKey: Keys.networkSpeedTest)
         alertCPU = defaults.bool(forKey: Keys.alertCPU)
         alertMemory = defaults.bool(forKey: Keys.alertMemory)
         alertDisk = defaults.bool(forKey: Keys.alertDisk)

@@ -3,7 +3,7 @@ import Foundation
 struct ExtensionFeatureTests {
     /// 原始值存在設定裡（加入狀態的鍵），改名會讓所有人的選擇失效；基本功能不在清單裡
     func testRawValuesAreStable() {
-        XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod", "quitGuard", "lastWindowQuit", "dockClick", "keyboardCleaning", "mouseButtons", "audioSwitch", "greenButton", "windowSnap", "finderKeys", "quickMenu", "portManager", "clipboardHistory", "xdrBrightness"])
+        XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod", "quitGuard", "lastWindowQuit", "dockClick", "keyboardCleaning", "mouseButtons", "audioSwitch", "greenButton", "windowSnap", "finderKeys", "quickMenu", "portManager", "clipboardHistory", "xdrBrightness", "speedTest", "startupItems"])
         XCTAssertEqual(ExtensionFeature.xdrBrightness.installedKey, "feature.xdrBrightness.installed")
         XCTAssertTrue(ExtensionFeature.xdrBrightness.needsAccessibility)
         XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { $0 == .xdrBrightness }), [ExtensionFeature.xdrBrightness.title])
@@ -15,6 +15,9 @@ struct ExtensionFeatureTests {
     func testUpgradeKeepsReleasedFeatures() {
         XCTAssertTrue(!ExtensionFeature.xdrBrightness.isInstalled(stored: nil, switchedOn: false))
         XCTAssertTrue(ExtensionFeature.scrollDirection.isInstalled(stored: nil, switchedOn: false))
+        XCTAssertTrue(ExtensionFeature.startupItems.isInstalled(stored: nil, switchedOn: false))
+        XCTAssertTrue(!ExtensionFeature.speedTest.isInstalled(stored: nil, switchedOn: false))
+        XCTAssertTrue(ExtensionFeature.speedTest.isInstalled(stored: nil, switchedOn: true))
         XCTAssertTrue(!ExtensionFeature.windowSwitcher.isInstalled(stored: nil, switchedOn: false))
         XCTAssertTrue(!ExtensionFeature.inputMethod.isInstalled(stored: nil, switchedOn: false))
         for feature in ExtensionFeature.allCases {

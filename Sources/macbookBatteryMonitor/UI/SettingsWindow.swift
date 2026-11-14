@@ -118,7 +118,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .windowSwitcher: return .windowSwitcher
         case .xdrBrightness: return .xdrBrightness
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
-        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory: return nil
+        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .startupItems: return nil
         }
     }
 
@@ -216,7 +216,7 @@ struct SettingsWindowView: View {
                         ConnectedDevicesCard()
                     case .windowSwitcher: WindowSwitcherSettingsView(settings: settings, ui: ui)
                     case .windows: WindowsSettingsView(settings: settings, ui: ui)
-                    case .startup: StartupItemsView(manager: startupItems)
+                    case .startup: StartupItemsGate(settings: settings, manager: startupItems)
                     case .features: FeatureManagerView(settings: settings)
                     case .permissions: PermissionsView(settings: settings)
                     default: EmptyView()

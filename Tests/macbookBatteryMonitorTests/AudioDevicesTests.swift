@@ -27,8 +27,8 @@ struct AudioDevicesTests {
 
     /// 只有需要「輔助使用」的擴充功能才列在權限頁的輔助使用底下
     func testAccessibilityNeeds() {
-        XCTAssertTrue(!ExtensionFeature.audioSwitch.needsAccessibility && !ExtensionFeature.quickMenu.needsAccessibility && !ExtensionFeature.portManager.needsAccessibility && !ExtensionFeature.clipboardHistory.needsAccessibility)
-        XCTAssertTrue(ExtensionFeature.allCases.filter { ![.audioSwitch, .quickMenu, .portManager, .clipboardHistory].contains($0) }.allSatisfy(\.needsAccessibility))
+        XCTAssertTrue(!ExtensionFeature.audioSwitch.needsAccessibility && !ExtensionFeature.quickMenu.needsAccessibility && !ExtensionFeature.portManager.needsAccessibility && !ExtensionFeature.clipboardHistory.needsAccessibility && !ExtensionFeature.speedTest.needsAccessibility && !ExtensionFeature.startupItems.needsAccessibility)
+        XCTAssertTrue(ExtensionFeature.allCases.filter { ![.audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .startupItems].contains($0) }.allSatisfy(\.needsAccessibility))
         XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { $0 == .audioSwitch }), [])
     }
 }

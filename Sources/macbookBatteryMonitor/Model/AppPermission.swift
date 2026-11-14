@@ -37,7 +37,7 @@ enum AppPermission: CaseIterable, Identifiable {
         case .screenRecording: return isInstalled(.windowSwitcher) ? ["視窗切換的縮圖（選用）"] : []
         case .notifications: return ["電量提醒", "監控警示", "新版本通知"]
         case .bluetooth: return ["周邊設備電量"]
-        case .automation: return ["登入項目的「登入時打開」"]
+        case .automation: return isInstalled(.startupItems) ? ["登入項目的「登入時打開」"] : []
         }
     }
 

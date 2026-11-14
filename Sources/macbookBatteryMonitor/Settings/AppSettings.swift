@@ -111,7 +111,7 @@ final class AppSettings {
             Keys.xdrAutomaticActivation: .bool,
             Keys.display: .string, Keys.lowAlertEnabled: .bool, Keys.lowThreshold: .int, Keys.fullAlertEnabled: .bool,
             Keys.fullThreshold: .int, Keys.monitorCPU: .bool, Keys.monitorMemory: .bool, Keys.monitorDisk: .bool,
-            Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.systemMonitors: .bool,
+            Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
             Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.keepAwakeApps: .strings, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.mouseBackButton: .string, Keys.mouseForwardButton: .string, Keys.updateInterval: .int,
             Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
@@ -138,7 +138,11 @@ final class AppSettings {
     /// 讀取並檢查設定檔，還不寫入。turnsOn：匯入後會從關閉變成打開的項目（擴充功能、睡眠時關閉藍牙、指定 App 防止休眠），
     /// 要先讓使用者確認：其中有需要「輔助使用」或會記錄剪貼簿的功能
     func readBackup(_ data: Data) throws -> (values: [String: Any], turnsOn: [String]) {
-        let values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        var values = try SettingsBackup.read(data, schema: Self.backupSchema)
+        // 舊版匯出的備份只有 networkSpeedTest：轉成測速擴充功能的加入狀態，不讓舊備份的測速設定被丟掉
+        if let legacy = values.removeValue(forKey: Keys.networkSpeedTest) as? Bool, values[ExtensionFeature.speedTest.installedKey] == nil {
+            values[ExtensionFeature.speedTest.installedKey] = legacy
+        }
         var turnsOn = ExtensionFeature.allCases.filter { values[$0.installedKey] as? Bool == true && !isInstalled($0) }.map(\.title)
         // 功能自己的開關：加入了但開關關著時，匯入一樣會讓它開始攔截按鍵或滑鼠
         let switches: [(String, String)] = [

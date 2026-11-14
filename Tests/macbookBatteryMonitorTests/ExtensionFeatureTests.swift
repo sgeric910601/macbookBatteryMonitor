@@ -11,6 +11,12 @@ struct ExtensionFeatureTests {
         XCTAssertEqual(ExtensionFeature.windowSwitcher.installedKey, "feature.windowSwitcher.installed")
     }
 
+    /// 登入項目沒啟用時，權限頁不把「自動化」算成它在用
+    func testAutomationPermissionFollowsLoginItems() {
+        XCTAssertEqual(AppPermission.automation.users(isInstalled: { _ in false }), [])
+        XCTAssertEqual(AppPermission.automation.users(isInstalled: { $0 == .startupItems }).count, 1)
+    }
+
     /// 從舊版更新：沒存過加入狀態時，捲動方向和已經打開過的功能保留，沒用過的新功能不會自己出現；存過的照存的
     func testUpgradeKeepsReleasedFeatures() {
         XCTAssertTrue(!ExtensionFeature.xdrBrightness.isInstalled(stored: nil, switchedOn: false))

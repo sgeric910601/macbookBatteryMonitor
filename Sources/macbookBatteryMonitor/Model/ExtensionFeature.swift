@@ -140,7 +140,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
         case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼工具標成機密的內容），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
         case .xdrBrightness: return "讓內建 XDR 螢幕額外增亮，亮度鍵到頂後可自動啟用；會增加耗電"
-        case .speedTest: return "網路面板多一個測速卡片，按下才測：約 20～30 秒、會用掉數百 MB 流量，連到 Apple 的測速伺服器"
+        case .speedTest: return "網路面板多一個測速卡片，按下才測：約 20～30 秒、會用掉數百 MB 流量，連到 Apple 的測速伺服器；要開著系統監控的網路模組才看得到"
         case .startupItems: return "列出登入時自動啟動的項目，可以新增、停用或移除；打開頁面時才讀取，要允許「自動化」控制 System Events"
         }
     }

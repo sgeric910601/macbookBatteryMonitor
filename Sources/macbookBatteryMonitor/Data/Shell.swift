@@ -32,13 +32,4 @@ enum Shell {
         defer { lock.unlock() }
         return timedOut ? nil : String(data: data, encoding: .utf8)
     }
-
-    /// 在背景 queue 執行，不卡住主執行緒
-    static func run(_ path: String, _ arguments: [String]) async -> String? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: runSync(path, arguments))
-            }
-        }
-    }
 }

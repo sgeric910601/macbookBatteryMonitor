@@ -63,7 +63,7 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
 
     private func showPopover(from button: NSView) {
         guard let settings else { return }
-        AudioSwitchController.shared.refresh()
+        if settings.isInstalled(.audioSwitch) { AudioSwitchController.shared.refresh() }
         state.page = .main
         let root = QuickMenuPanel(settings: settings, state: state, awake: .shared, audio: .shared,
                                   close: { [weak self] in self?.popover?.closeNow() },

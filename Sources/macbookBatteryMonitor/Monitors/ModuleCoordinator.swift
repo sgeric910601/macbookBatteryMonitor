@@ -304,6 +304,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     }
 
     private func showPopover(_ kind: MonitorKind, from button: NSView, behavior: NSPopover.Behavior = .transient) {
+        // 舊面板的 popoverDidClose 可能在新面板接手後才到，那時不會拆它的點擊監聽：先拆，免得作用在新面板上
+        stopOutsideClickMonitoring()
         openKind = kind
         cpu.setThermalActive(kind == .cpu)
         disk.setHealthActive(kind == .disk || (kind == .memory && settings.memoryDiskMerged))

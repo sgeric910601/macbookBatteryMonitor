@@ -41,6 +41,8 @@ final class XDRBrightnessController {
     @ObservationIgnored private var safetyTimer: Timer?
     private let hud = XDRBrightnessHUD()
     @ObservationIgnored private var sampleTask: Task<Void, Never>?
+    /// 取樣進行中又有人要新的（例如按亮度鍵剛把系統亮度推到頂）：這次結束後馬上再取一次，不用等下一秒
+    @ObservationIgnored private var snapshotPending = false
     @ObservationIgnored private var keySnapshot = XDRKeySnapshot(nativeBrightness: nil, allowed: false, sampledAt: 0)
     @ObservationIgnored private var keyGain = 1.0
     @ObservationIgnored private var cachedKeyAllowed = false
@@ -48,6 +50,10 @@ final class XDRBrightnessController {
     @ObservationIgnored private var displaySignature: String?
     @ObservationIgnored private var lifecycleSuspended = false
     @ObservationIgnored private var capturePaused = false
+    /// 截圖程式最近一次啟動（或按下截圖快捷鍵）的時間。截圖程式截完後常會在背景留好幾分鐘，
+    /// 所以只看「剛啟動」：10 秒內不開啟增亮，之後再按亮度鍵就放行
+    @ObservationIgnored private var captureStartedAt = -Double.infinity
+    private var captureRecent: Bool { ProcessInfo.processInfo.systemUptime - captureStartedAt < 10 }
     @ObservationIgnored private var captureMonitor: Any?
     @ObservationIgnored private var localCaptureMonitor: Any?
     @ObservationIgnored private var nativeRefreshTask: Task<Void, Never>?
@@ -118,6 +124,7 @@ final class XDRBrightnessController {
             MainActor.assumeIsolated {
                 guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                       Self.isCaptureApplication(app) else { return }
+                self?.captureStartedAt = ProcessInfo.processInfo.systemUptime
                 self?.pauseForCapture()
             }
         })
@@ -230,7 +237,11 @@ final class XDRBrightnessController {
 
     private func requestSnapshot() {
         // 沒有支援的螢幕、或不需要背景檢查時不取樣（手動開啟時在 enable 裡同步讀一次）
-        guard started, supported, needsMonitoring, sampleTask == nil else { return }
+        guard started, supported, needsMonitoring else { return }
+        guard sampleTask == nil else {
+            snapshotPending = true
+            return
+        }
         let id = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         sampleTask = Task { [weak self] in
             let result = await Task.detached(priority: .utility) { XDRSystemQuery.snapshot(display: id) }.value
@@ -239,6 +250,10 @@ final class XDRBrightnessController {
             keySnapshot = result
             cachedKeyAllowed = unavailableReason == nil
             reconcileActiveState()
+            if snapshotPending {
+                snapshotPending = false
+                requestSnapshot()
+            }
         }
     }
 
@@ -277,8 +292,7 @@ final class XDRBrightnessController {
         }
         if let reason = unavailableReason { status = reason; return }
         let conflicts = ["fyi.lunar.Lunar", "com.niklasr22.BrightIntosh", "me.guillaumeb.CosmicNitor"]
-        if NSWorkspace.shared.runningApplications.contains(where: Self.isCaptureApplication) {
-            capturePaused = true
+        if captureRecent {
             status = "請先完成截圖／錄影，再啟用 XDR"
             return
         }
@@ -343,6 +357,8 @@ final class XDRBrightnessController {
 
     /// 會擋輸入的回呼只讀取記憶體快取；系統查詢、視窗與呈現都排到回呼結束後。
     private func handleKey(up: Bool) -> Bool {
+        // 截圖／錄影時暫停過：過了 10 秒再按亮度鍵就恢復，不必手動重新啟用
+        if capturePaused, !captureRecent { capturePaused = false }
         guard started, inputAvailable, !lifecycleSuspended, !capturePaused, !preparing else { return false }
         let allowed = cachedKeyAllowed && keySnapshot.allowed
         let snapshot = XDRKeySnapshot(nativeBrightness: keySnapshot.nativeBrightness,
@@ -410,9 +426,10 @@ final class XDRBrightnessController {
     }
 
     private func pauseForCapture() {
+        captureStartedAt = ProcessInfo.processInfo.systemUptime
         guard enabled || preparing else { return }
         capturePaused = true
-        disable(reason: "截圖／錄影時已還原亮度；完成後請手動重新啟用 XDR")
+        disable(reason: "截圖／錄影時已還原亮度；完成後再按亮度鍵或重新啟用即可")
     }
 
     @discardableResult

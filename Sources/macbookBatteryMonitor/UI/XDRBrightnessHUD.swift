@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 import Observation
-import ApplicationServices
 
-private let xdrHUDSize = CGSize(width: 308, height: 92)
+/// 和系統亮度提示框同大小（macOS 27 實測 308 × 66 點），疊在同一個位置
+private let xdrHUDSize = CGSize(width: 308, height: 66)
 
 @MainActor @Observable
 private final class XDRBrightnessHUDState {
@@ -21,32 +21,31 @@ private struct XDRBrightnessHUDView: View {
     let state: XDRBrightnessHUDState
 
     var body: some View {
-        VStack(spacing: 6) {
-            capsule
-            nitsBadge
-        }
-        .frame(width: xdrHUDSize.width, height: xdrHUDSize.height)
-        .environment(\.colorScheme, .dark)
-        .opacity(state.shown ? 1 : 0)
-        .animation(.easeOut(duration: 0.1), value: state.gain)
-        .animation(.easeOut(duration: 0.18), value: state.shown)
-    }
-
-    private var capsule: some View {
         HStack(spacing: 12) {
             Image(systemName: "sun.max.fill")
                 .font(.system(size: 27, weight: .regular))
                 .frame(width: 27)
-            XDRBrightnessSegments(progress: state.progress)
-                .frame(height: 4)
-                .accessibilityLabel("XDR 增亮")
-                .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
+            VStack(alignment: .leading, spacing: 5) {
+                XDRBrightnessSegments(progress: state.progress)
+                    .frame(height: 4)
+                    .accessibilityLabel("XDR 增亮")
+                    .accessibilityValue("\(Int((state.gain * 100).rounded()))%")
+                // 估算亮度放在格子下方，和格子同一個框裡
+                Text(nitsText)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.75))
+            }
+            .padding(.top, 15)
         }
         .foregroundStyle(Color.white)
         .padding(.leading, 24)
         .padding(.trailing, 31)
-        .frame(width: xdrHUDSize.width, height: 66)
+        .frame(width: xdrHUDSize.width, height: xdrHUDSize.height)
         .background { capsuleBackground }
+        .environment(\.colorScheme, .dark)
+        .opacity(state.shown ? 1 : 0)
+        .animation(.easeOut(duration: 0.1), value: state.gain)
+        .animation(.easeOut(duration: 0.18), value: state.shown)
     }
 
     @ViewBuilder private var capsuleBackground: some View {
@@ -60,15 +59,6 @@ private struct XDRBrightnessHUDView: View {
         #else
         Capsule().fill(.ultraThinMaterial)
         #endif
-    }
-
-    private var nitsBadge: some View {
-        Text(nitsText)
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(Color.white.opacity(0.9))
-            .padding(.horizontal, 9)
-            .frame(height: 20)
-            .background(.ultraThinMaterial, in: Capsule())
     }
 
     private var nitsText: String {
@@ -111,34 +101,30 @@ final class XDRBrightnessHUD {
     private var panel: NSPanel?
     private var hideTask: Task<Void, Never>?
     private var alignmentTask: Task<Void, Never>?
-    private var lastAlignmentRequest = -Double.infinity
-    private var menuAnchor: (display: UInt32, screenFrame: CGRect, x: CGFloat)?
+    /// 最近一次量到的系統亮度提示框（全域座標、左上為原點）；之後我們的提示框疊在同一個位置
+    private var nativeFrame: (display: UInt32, screenFrame: CGRect, rect: CGRect)?
     private var lastNativeKey = -Double.infinity
     private var lastNativeDismissal = -Double.infinity
     var geometryStatus: String {
-        "frame=\(panel.map { NSStringFromRect($0.frame) } ?? "none"), anchor=\(menuAnchor?.x.description ?? "fallback")"
+        "frame=\(panel.map { NSStringFromRect($0.frame) } ?? "none"), native=\(nativeFrame.map { NSStringFromRect($0.rect) } ?? "fallback")"
     }
 
+    /// 按了交給系統的亮度鍵後呼叫：系統提示框出現時讀它的位置（只讀視窗清單，不需要權限）
     func prepareAlignment(on screen: NSScreen, afterNativeKey: Bool = false) {
-        let now = ProcessInfo.processInfo.systemUptime
-        if afterNativeKey { lastNativeKey = now }
-        guard alignmentTask == nil, now - lastAlignmentRequest >= 0.5,
+        guard afterNativeKey else { return }
+        lastNativeKey = ProcessInfo.processInfo.systemUptime
+        guard alignmentTask == nil,
               let display = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32 else { return }
-        lastAlignmentRequest = now
         let frame = screen.frame
         let bounds = CGDisplayBounds(display)
-        let processes = ["com.apple.controlcenter", "com.apple.systemuiserver"].flatMap {
-            NSRunningApplication.runningApplications(withBundleIdentifier: $0).map(\.processIdentifier)
-        }
         alignmentTask = Task { [weak self] in
-            if afterNativeKey { try? await Task.sleep(for: .milliseconds(120)) }
-            let x = await Task.detached(priority: .userInitiated) {
-                XDRHUDMenuAnchor.centerX(processes: processes, screenBounds: bounds)
-            }.value
+            // 系統提示框要一點時間才出現
+            try? await Task.sleep(for: .milliseconds(120))
+            let rect = await Task.detached(priority: .userInitiated) { XDRNativeOSDFrame.capsule(on: bounds) }.value
             guard let self else { return }
             alignmentTask = nil
-            guard !Task.isCancelled, let x, screen.frame == frame else { return }
-            menuAnchor = (display, frame, x)
+            guard !Task.isCancelled, let rect, screen.frame == frame else { return }
+            nativeFrame = (display, frame, rect)
             if state.shown, panel?.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32 == display {
                 positionPanel(on: screen)
             }
@@ -146,24 +132,26 @@ final class XDRBrightnessHUD {
     }
 
     private func positionPanel(on screen: NSScreen) {
-        let frame = screen.visibleFrame
         let origin: NSPoint
         if #available(macOS 26.0, *) {
             let display = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32
-            let anchor = menuAnchor.flatMap { $0.display == display && $0.screenFrame == screen.frame ? $0.x : nil }
-                ?? screen.frame.maxX - 196
-            let x = min(screen.frame.maxX - xdrHUDSize.width - 10,
-                        max(screen.frame.minX + 10, anchor - xdrHUDSize.width / 2))
-            origin = NSPoint(x: x, y: frame.maxY - xdrHUDSize.height - 10)
+            if let native = nativeFrame, native.display == display, native.screenFrame == screen.frame {
+                // 全域座標（左上原點）換成 AppKit 座標（主螢幕左下原點）
+                let primaryHeight = NSScreen.screens.first?.frame.height ?? screen.frame.maxY
+                origin = NSPoint(x: native.rect.minX, y: primaryHeight - native.rect.maxY)
+            } else {
+                // 還沒看過系統提示框：macOS 27 實測右邊離螢幕邊緣 9.5 點、上邊在選單列下方 10 點
+                origin = NSPoint(x: screen.frame.maxX - 9.5 - xdrHUDSize.width,
+                                 y: screen.visibleFrame.maxY - 10 - xdrHUDSize.height)
+            }
         } else {
-            origin = NSPoint(x: screen.frame.midX - xdrHUDSize.width / 2, y: frame.minY + 100)
+            origin = NSPoint(x: screen.frame.midX - xdrHUDSize.width / 2, y: screen.visibleFrame.minY + 100)
         }
         panel?.setFrameOrigin(origin)
     }
 
     func show(screen: NSScreen, gain: Double, maximumGain: Double, nits: Int?) {
         hideTask?.cancel()
-        prepareAlignment(on: screen)
         if lastNativeKey > lastNativeDismissal,
            ProcessInfo.processInfo.systemUptime - lastNativeKey < 2,
            let display = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32 {
@@ -211,50 +199,21 @@ final class XDRBrightnessHUD {
     }
 }
 
-
-private enum XDRHUDMenuAnchor {
-    static func centerX(processes: [pid_t], screenBounds: CGRect) -> CGFloat? {
-        var clockLeft: CGFloat?
-        for pid in processes {
-            let application = AXUIElementCreateApplication(pid)
-            AXUIElementSetMessagingTimeout(application, 0.05)
-            for attribute in [kAXExtrasMenuBarAttribute, kAXMenuBarAttribute] {
-                var value: CFTypeRef?
-                guard AXUIElementCopyAttributeValue(application, attribute as CFString, &value) == .success,
-                      let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { continue }
-                let menu = value as! AXUIElement
-                for item in AX.array(menu, kAXChildrenAttribute) {
-                    let identifier = (AX.string(item, kAXIdentifierAttribute) ?? "").lowercased()
-                    let description = AX.string(item, kAXDescriptionAttribute) ?? ""
-                    let isDisplay = identifier.contains("menuextra.display") || identifier.hasSuffix(".display")
-                        || identifier == "display" || ["顯示器", "Display", "Displays"].contains(description)
-                    let isClock = identifier.contains("menuextra.clock") || identifier.hasSuffix(".clock") || identifier == "clock"
-                    guard isDisplay || isClock, let rect = frame(of: item), rect.width > 0,
-                          screenBounds.contains(CGPoint(x: rect.midX, y: rect.midY)) else { continue }
-                    if isDisplay { return rect.midX }
-                    clockLeft = rect.minX
-                }
-            }
+/// 系統亮度提示框所在的視窗（macOS 27：MenuBarAgent 的 367 × 160 視窗，提示框在裡面左 29.5、上 10 點）
+private enum XDRNativeOSDFrame {
+    static func capsule(on screenBounds: CGRect) -> CGRect? {
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        for window in windows where window[kCGWindowOwnerName as String] as? String == "MenuBarAgent" {
+            guard let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = bounds["X"], let y = bounds["Y"], let width = bounds["Width"], let height = bounds["Height"],
+                  abs(width - 367) < 2, abs(height - 160) < 2 else { continue }
+            let rect = CGRect(x: x + 29.5, y: y + 10, width: xdrHUDSize.width, height: xdrHUDSize.height)
+            guard screenBounds.contains(CGPoint(x: rect.midX, y: rect.midY)) else { continue }
+            return rect
         }
-        // Beta 的暫時顯示器圖示位於時鐘前方，讀不到直接位置時以此回退。
-        return clockLeft.map { $0 - 24 }
-    }
-
-    private static func frame(of element: AXUIElement) -> CGRect? {
-        var position: CFTypeRef?
-        var size: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &position) == .success,
-              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size) == .success,
-              let position, let size,
-              CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() else { return nil }
-        var point = CGPoint.zero
-        var dimensions = CGSize.zero
-        guard AXValueGetValue(position as! AXValue, .cgPoint, &point),
-              AXValueGetValue(size as! AXValue, .cgSize, &dimensions) else { return nil }
-        return CGRect(origin: point, size: dimensions)
+        return nil
     }
 }
-
 
 @MainActor
 private enum XDRNativeOSD {

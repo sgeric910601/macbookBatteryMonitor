@@ -154,6 +154,11 @@ final class CatEyesView: NSView {
         didSet { if mood != oldValue { applyMood(animated: true) } }
     }
 
+    /// 會眨眼；關掉時連計時器都不建立（只開「跟著游標」時不眨眼）
+    var blinks = true {
+        didSet { if blinks != oldValue { updateBlinking() } }
+    }
+
     /// 眼睛跟著游標；關掉時不監聽滑鼠，眼睛看前方
     var followsCursor = true {
         didSet { if followsCursor != oldValue { updateCursorWatching() } }
@@ -236,7 +241,11 @@ final class CatEyesView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         updateCursorWatching()
-        if window != nil {
+        updateBlinking()
+    }
+
+    private func updateBlinking() {
+        if window != nil, blinks {
             scheduleBlink()
         } else {
             blinkTimer?.invalidate()
@@ -419,6 +428,7 @@ struct CatEyesOverlay: NSViewRepresentable {
     let key: Int
     let mood: CatMood
     var followsCursor = true
+    var blinks = true
 
     func makeNSView(context: Context) -> CatEyesView { CatEyesView(frame: .zero) }
 
@@ -426,5 +436,6 @@ struct CatEyesOverlay: NSViewRepresentable {
         view.configure(photo: photo, eyes: eyes, key: key)
         view.mood = mood
         view.followsCursor = followsCursor
+        view.blinks = blinks
     }
 }

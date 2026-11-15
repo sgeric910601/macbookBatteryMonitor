@@ -36,7 +36,7 @@ final class QuitGuardController {
             stop()
             return false
         }
-        KeyboardLetters.shared.start()
+        KeyboardLetters.shared.start(for: "quitGuard")
         if activationObserver == nil {
             activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -70,6 +70,7 @@ final class QuitGuardController {
         tap.stop()
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
         activationObserver = nil
+        KeyboardLetters.shared.stop(for: "quitGuard")
         finish()
     }
 

@@ -41,6 +41,8 @@ final class EventTapAccess: @unchecked Sendable {
     private var lastSuccessfulProbe: Date?
     /// 這次執行已經發過「已暫停」通知：暫停、恢復又暫停時不再重複發
     private var announcedPause = false
+    /// 有沒有功能需要會擋輸入的攔截（AppDelegate 依加入的功能告知）；停用中而且都不需要時不再定時試建
+    private var wanted = true
 
     /// 停用狀態（剛重開過又偵測到、或無法重開）：會擋住輸入的功能暫停，期間慢慢試建，建得起來就恢復
     var isLost: Bool { locked { state == .paused } }
@@ -229,6 +231,21 @@ final class EventTapAccess: @unchecked Sendable {
         }
     }
 
+    /// 加入或移除功能時呼叫。停用中：都不需要就停掉定時試建；又有功能需要時馬上試一次，之後照常定時試建
+    func setWanted(_ value: Bool) {
+        queue.async { [self] in
+            guard wanted != value else { return }
+            wanted = value
+            guard locked({ state == .paused }) else { return }
+            if value {
+                startPausedTimer(after: 0)
+            } else {
+                pausedTimer?.cancel()
+                pausedTimer = nil
+            }
+        }
+    }
+
     /// 停用會擋住輸入的功能，每隔一段時間試建，建得起來就恢復
     private func pause() {
         locked { state = .paused }
@@ -238,8 +255,15 @@ final class EventTapAccess: @unchecked Sendable {
             announcedPause = true
             DispatchQueue.main.async { MainActor.assumeIsolated { Notifier.shared.notifyTapAccessDisabled() } }
         }
+        pausedTimer?.cancel()
+        pausedTimer = nil
+        if wanted { startPausedTimer(after: Self.pausedInterval) }
+    }
+
+    /// 停用中定時試建（只在 queue 上呼叫）
+    private func startPausedTimer(after delay: Int) {
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + .seconds(Self.pausedInterval), repeating: .seconds(Self.pausedInterval), leeway: .seconds(5))
+        timer.schedule(deadline: .now() + .seconds(delay), repeating: .seconds(Self.pausedInterval), leeway: .seconds(5))
         timer.setEventHandler { [weak self] in
             guard let self, Self.canCreateTap() else { return }
             pausedTimer?.cancel()

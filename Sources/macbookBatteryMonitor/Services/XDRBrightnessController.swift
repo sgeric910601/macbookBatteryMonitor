@@ -128,9 +128,13 @@ final class XDRBrightnessController {
         updateSafetyTimer()
     }
 
-    /// 每秒的檢查只在有支援的螢幕時才跑；沒有支援的 Mac（或闔上筆電只接外接螢幕時）不在背景查詢
+    /// 需要背景檢查與取樣的時候：增亮中、正在啟動，或亮度鍵攔截真的在運作（要用最新的快照判斷）。
+    /// 只是加入功能、從滑桿手動開啟、或沒有輔助使用權限建不起攔截時，平常不檢查，按下開啟時才讀一次
+    private var needsMonitoring: Bool { enabled || preparing || keys?.isRunning == true }
+
+    /// 每秒的檢查只在有支援的螢幕、而且需要時才跑；沒有支援的 Mac（或闔上筆電只接外接螢幕時）不在背景查詢
     private func updateSafetyTimer() {
-        guard started, supported else {
+        guard started, supported, needsMonitoring else {
             safetyTimer?.invalidate(); safetyTimer = nil
             return
         }
@@ -183,6 +187,11 @@ final class XDRBrightnessController {
     }
 
     private func updateKeyMonitoring() {
+        // 自動啟用、增亮狀態改變時，每秒檢查與取樣跟著開始或停止
+        defer {
+            updateSafetyTimer()
+            requestSnapshot()
+        }
         guard inputAvailable, !lifecycleSuspended, started, supported, automaticActivation || enabled else {
             keys?.stop()
             keys = nil
@@ -220,8 +229,8 @@ final class XDRBrightnessController {
     }
 
     private func requestSnapshot() {
-        // 沒有支援的螢幕時不取樣：亮度鍵攔截也不會建立，用不到
-        guard started, supported, sampleTask == nil else { return }
+        // 沒有支援的螢幕、或不需要背景檢查時不取樣（手動開啟時在 enable 裡同步讀一次）
+        guard started, supported, needsMonitoring, sampleTask == nil else { return }
         let id = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         sampleTask = Task { [weak self] in
             let result = await Task.detached(priority: .utility) { XDRSystemQuery.snapshot(display: id) }.value
@@ -261,6 +270,11 @@ final class XDRBrightnessController {
             status = "僅在正式打包 App 中開啟"; return
         }
         refreshDisplayLimits()
+        // 平常不取樣時快照是舊的：按下開啟這一刻同步讀一次（只查鎖定狀態與目前亮度，很快）
+        if ProcessInfo.processInfo.systemUptime - keySnapshot.sampledAt > 2.5 {
+            keySnapshot = XDRSystemQuery.snapshot(display: screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID)
+            cachedKeyAllowed = unavailableReason == nil
+        }
         if let reason = unavailableReason { status = reason; return }
         let conflicts = ["fyi.lunar.Lunar", "com.niklasr22.BrightIntosh", "me.guillaumeb.CosmicNitor"]
         if NSWorkspace.shared.runningApplications.contains(where: Self.isCaptureApplication) {

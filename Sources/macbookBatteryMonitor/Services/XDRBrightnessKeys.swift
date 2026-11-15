@@ -11,6 +11,9 @@ final class XDRBrightnessKeys {
 
     init(adjust: @escaping (Bool) -> Bool) { self.adjust = adjust }
 
+    /// 攔截真的建起來了（沒有輔助使用權限時建不起來）
+    var isRunning: Bool { tap != nil }
+
     func start() {
         guard AXIsProcessTrusted(), !EventTapAccess.shared.isLost else {
             if tap != nil { stop() }
@@ -63,7 +66,7 @@ final class XDRBrightnessKeys {
     }
 }
 
-/// 只讀系統查詢；控制器在背景 Task 呼叫，不在會擋輸入的回呼裡執行。
+/// 只讀系統查詢；控制器平常在背景 Task 呼叫，手動開啟時在主執行緒同步呼叫一次；不在會擋輸入的回呼裡執行。
 enum XDRSystemQuery {
     static func snapshot(display: CGDirectDisplayID?) -> XDRKeySnapshot {
         let session = CGSessionCopyCurrentDictionary() as? [String: Any]

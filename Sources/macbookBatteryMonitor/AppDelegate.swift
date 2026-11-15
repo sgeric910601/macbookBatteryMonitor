@@ -50,8 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var lastStatusKey = ""
     private var chargingIconFlow: ChargingIconFlowView?
     private var sleeping = false
-    private var screensAsleep = false
-    /// 螢幕關著或切到其他使用者時沒人看得到：監控暫停、定時更新拉長（見 RefreshPacing）
+    /// 啟動時螢幕可能已經關著（例如夜裡被重新開啟）：先讀一次，之後靠通知更新
+    private var screensAsleep = CGDisplayIsAsleep(CGMainDisplayID()) != 0
+    /// 螢幕關著或切到其他使用者時沒人看得到：監控只留警示、定時更新拉長（見 RefreshPacing）
     private var unseen: Bool { screensAsleep || !sessionActive }
     private var powerTransitionTask: Task<Void, Never>?
 
@@ -216,6 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(screensDidWake), name: NSWorkspace.screensDidWakeNotification, object: nil
         )
+        if unseen { monitors.setUnseen(true) }
         KeepAwakeController.shared.battery = { [weak self] in
             guard let s = self?.store.snapshot else { return (nil, false) }
             return (s.percent, !s.externalConnected)
@@ -716,10 +718,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         visibilityChanged()
     }
 
-    /// 螢幕關著（例如插電過夜）或切到其他使用者時，每秒更新沒人看得到：監控暫停、定時更新拉長；回來時馬上更新一次
+    /// 螢幕關著（例如插電過夜）或切到其他使用者時，每秒更新沒人看得到：監控只留警示、定時更新拉長；回來時馬上更新一次
     private func visibilityChanged() {
         guard !sleeping else { return }
-        monitors.setSleeping(unseen)
+        monitors.setUnseen(unseen)
         // 面板開著時螢幕睡著，面板不會自己收起：硬體與 top 取樣也停
         if unseen {
             store.setHardwareSampling(active: false)
@@ -786,7 +788,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         sleeping = false
         applyBluetooth(bluetoothSleep.didWake())
         // 闔蓋接外接螢幕等情況醒來時螢幕可能還關著
-        monitors.setSleeping(unseen)
+        monitors.setUnseen(unseen)
+        monitors.setSleeping(false)
         scheduleRefresh(every: interval)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設

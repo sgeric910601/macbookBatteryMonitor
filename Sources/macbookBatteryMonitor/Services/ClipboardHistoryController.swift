@@ -48,7 +48,9 @@ final class ClipboardHistoryController {
             ClipboardHistoryController.shared.resume(.screenOff)
         }
         lastChange = NSPasteboard.general.changeCount
-        startTimer()
+        // 在鎖定中啟用（例如 App 在鎖定畫面時被重新開啟）：先不檢查，解鎖時才開始
+        reconcileLock()
+        if pausedBy.isEmpty { startTimer() }
     }
 
     private func startTimer() {

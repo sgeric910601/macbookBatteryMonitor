@@ -183,13 +183,8 @@ final class ShiftTap: @unchecked Sendable {
     private var runLoop: CFRunLoop?
     private var logic = ShiftHalfWidth()
     private var imeActive = false
-    /// 交給主執行緒、還沒送出的按鍵數
-    private var queued = 0
-    /// 開始排隊的時間；主執行緒卡住太久時攔截這邊自己放行，整台 Mac 的鍵盤不會跟著卡死
-    private var queuedSince: CFTimeInterval = 0
-    private static let stuckAfter: CFTimeInterval = 1.0
-    /// 每次放行、停止、啟動加一；主執行緒拿到舊編號的按鍵就丟掉
-    private var currentGeneration = 0
+    /// 交給主執行緒、還沒送出的按鍵（見 KeyQueue）
+    private var queue = KeyQueue()
     /// 交給主執行緒的按鍵（已轉換好）、要不要先送出組字、編號。只在攔截還沒啟動時設定
     var onDeferred: ((CGEvent, Bool, Int) -> Void)?
 
@@ -201,13 +196,12 @@ final class ShiftTap: @unchecked Sendable {
         return body()
     }
 
-    var generation: Int { locked { currentGeneration } }
+    var generation: Int { locked { queue.generation } }
     func setIMEActive(_ value: Bool) { locked { imeActive = value } }
 
     /// 只在鎖裡呼叫：放棄目前的排隊與狀態
     private func resetLocked() {
-        currentGeneration += 1
-        queued = 0
+        queue.reset()
         logic = ShiftHalfWidth()
     }
 
@@ -273,12 +267,7 @@ final class ShiftTap: @unchecked Sendable {
         guard generation == self.generation else { return }
         event.setIntegerValueField(.eventSourceUserData, value: Self.replayMark)
         event.post(tap: .cgSessionEventTap)
-        locked {
-            guard generation == currentGeneration else { return }
-            queued = max(0, queued - 1)
-            // 每送出一個就重新計時：主執行緒慢但還在處理時不算卡住
-            queuedSince = CACurrentMediaTime()
-        }
+        locked { queue.sent(generation: generation, now: CACurrentMediaTime()) }
     }
 
     /// 改成不按 Shift、文字是半形字的按鍵
@@ -317,21 +306,15 @@ final class ShiftTap: @unchecked Sendable {
         }
         let isRepeat = type == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0
         let (action, deferIt, generation, drop) = locked { () -> (ShiftHalfWidth.Action, Bool, Int, Bool) in
-            if queued > 0, CACurrentMediaTime() - queuedSince > Self.stuckAfter {
-                // 主執行緒沒在處理：放棄排隊、直接放行，鍵盤不會跟著卡死
-                resetLocked()
-            }
-            // 送出組字期間系統自動產生的重複按鍵：之後一次送出會冒出一串，丟掉；送出後照常重複
-            if isRepeat, queued > 0 { return (.pass, false, currentGeneration, true) }
+            let now = CACurrentMediaTime()
+            // 主執行緒沒在處理：放棄排隊、直接放行，鍵盤不會跟著卡死
+            if queue.dropIfStuck(now: now) { logic = ShiftHalfWidth() }
+            if queue.dropsRepeat(isRepeat) { return (.pass, false, queue.generation, true) }
             // 不是中文輸入法、沒在按住、沒在排隊：直接放行
-            guard imeActive || logic.holding || queued > 0 else { return (.pass, false, currentGeneration, false) }
+            guard imeActive || logic.holding || queue.isQueuing else { return (.pass, false, queue.generation, false) }
             let action = input.map { logic.handle($0, imeActive: imeActive) } ?? .pass
-            let deferIt = action == .halfWidth(commitFirst: true) || queued > 0
-            if deferIt {
-                if queued == 0 { queuedSince = CACurrentMediaTime() }
-                queued += 1
-            }
-            return (action, deferIt, currentGeneration, false)
+            let deferIt = queue.enqueueIfNeeded(commitFirst: action == .halfWidth(commitFirst: true), now: now)
+            return (action, deferIt, queue.generation, false)
         }
         if drop { return nil }
         if action != .pass { Self.convert(event, keyCode: keyCode) }

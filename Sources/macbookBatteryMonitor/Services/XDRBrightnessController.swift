@@ -51,9 +51,9 @@ final class XDRBrightnessController {
     @ObservationIgnored private var lifecycleSuspended = false
     @ObservationIgnored private var capturePaused = false
     /// 截圖程式最近一次啟動（或按下截圖快捷鍵）的時間。截圖程式截完後常會在背景留好幾分鐘，
-    /// 所以只看「剛啟動」：10 秒內不開啟增亮，之後再按亮度鍵就放行
+    /// 所以只看「剛啟動」：只擋按下快捷鍵到選取框出現之間的空檔，之後交給 captureUIOnScreen 判斷
     @ObservationIgnored private var captureStartedAt = -Double.infinity
-    private var captureRecent: Bool { ProcessInfo.processInfo.systemUptime - captureStartedAt < 10 }
+    private var captureRecent: Bool { ProcessInfo.processInfo.systemUptime - captureStartedAt < 1.5 }
     @ObservationIgnored private var captureMonitor: Any?
     @ObservationIgnored private var localCaptureMonitor: Any?
     @ObservationIgnored private var nativeRefreshTask: Task<Void, Never>?
@@ -94,9 +94,7 @@ final class XDRBrightnessController {
         lifecycleSuspended = false
         capturePaused = false
         refreshDisplayLimits()
-        requestSnapshot()
         updateKeyMonitoring()
-        if let screen { hud.prepareAlignment(on: screen) }
         Self.log.notice("Automatic XDR: \(self.automaticActivation, privacy: .public), keys: \(self.keysStatus, privacy: .public)")
         observers.append(DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
@@ -157,6 +155,7 @@ final class XDRBrightnessController {
         guard started else { return }
         started = false
         sampleTask?.cancel(); sampleTask = nil
+        snapshotPending = false
         nativeRefreshTask?.cancel(); nativeRefreshTask = nil
         safetyTimer?.invalidate(); safetyTimer = nil
         disable(reason: "功能未加入")
@@ -179,7 +178,6 @@ final class XDRBrightnessController {
     private func resume() {
         guard started else { return }
         lifecycleSuspended = false
-        requestSnapshot()
         updateKeyMonitoring()
     }
 
@@ -229,7 +227,6 @@ final class XDRBrightnessController {
         guard started else { return }
         refreshDisplayLimits()
         updateSafetyTimer()
-        requestSnapshot()
         updateKeyMonitoring()
         reconcileActiveState()
         cachedKeyAllowed = unavailableReason == nil
@@ -266,6 +263,9 @@ final class XDRBrightnessController {
             disable(reason: "顯示器已變更，已還原亮度")
         } else if screen?.frame != screenFrame {
             disable(reason: "顯示尺寸已變更，已還原亮度")
+        } else if Self.captureUIOnScreen() {
+            // 截圖快捷鍵被系統攔走、截圖程式又早就在背景時收不到任何事件：每秒檢查與調整亮度時看畫面上有沒有選取框
+            pauseForCapture()
         }
     }
 
@@ -292,7 +292,7 @@ final class XDRBrightnessController {
         }
         if let reason = unavailableReason { status = reason; return }
         let conflicts = ["fyi.lunar.Lunar", "com.niklasr22.BrightIntosh", "me.guillaumeb.CosmicNitor"]
-        if captureRecent {
+        if captureRecent || Self.captureUIOnScreen() {
             status = "請先完成截圖／錄影，再啟用 XDR"
             return
         }
@@ -357,7 +357,7 @@ final class XDRBrightnessController {
 
     /// 會擋輸入的回呼只讀取記憶體快取；系統查詢、視窗與呈現都排到回呼結束後。
     private func handleKey(up: Bool) -> Bool {
-        // 截圖／錄影時暫停過：過了 10 秒再按亮度鍵就恢復，不必手動重新啟用
+        // 截圖／錄影時暫停過：過了空檔再按亮度鍵就解除；真的開啟前 enable() 還會確認截圖程式沒有在畫面上
         if capturePaused, !captureRecent { capturePaused = false }
         guard started, inputAvailable, !lifecycleSuspended, !capturePaused, !preparing else { return false }
         let allowed = cachedKeyAllowed && keySnapshot.allowed
@@ -401,6 +401,15 @@ final class XDRBrightnessController {
             }
             return true
         }
+    }
+
+    /// 截圖程式有畫面上的視窗（選取框、錄影工具列、截完的縮圖）：正在截圖或錄影。
+    /// 截完後只留在背景、沒有視窗的不算（它常會留好幾分鐘）
+    private static func captureUIOnScreen() -> Bool {
+        let pids = Set(NSWorkspace.shared.runningApplications.filter(isCaptureApplication).map(\.processIdentifier))
+        guard !pids.isEmpty else { return false }
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        return windows.contains { pids.contains(($0[kCGWindowOwnerPID as String] as? pid_t) ?? -1) }
     }
 
     private static func isCaptureApplication(_ app: NSRunningApplication) -> Bool {

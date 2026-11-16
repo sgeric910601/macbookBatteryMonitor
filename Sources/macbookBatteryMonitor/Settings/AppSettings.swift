@@ -501,6 +501,14 @@ final class AppSettings {
     static let peripheralThresholdChoices = [0, 10, 15, 20, 30, 50]
 
     func isVisible(_ item: FlowItem) -> Bool { !hiddenFlowItems.contains(item.rawValue) }
+    var showChargerSpecifications: Bool {
+        get { !hiddenDetailFields.contains("chargerSpecifications") }
+        set {
+            if newValue { hiddenDetailFields.remove("chargerSpecifications") }
+            else { hiddenDetailFields.insert("chargerSpecifications") }
+        }
+    }
+
     func isVisible(_ field: DetailField) -> Bool { !hiddenDetailFields.contains(field.rawValue) }
     func setVisible(_ item: FlowItem, _ visible: Bool) {
         if visible { hiddenFlowItems.remove(item.rawValue) } else { hiddenFlowItems.insert(item.rawValue) }

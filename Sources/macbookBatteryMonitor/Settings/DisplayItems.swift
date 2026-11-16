@@ -32,7 +32,6 @@ enum DetailField: String, CaseIterable, Identifiable {
     case cycles, condition, remaining, fullCharge
     case design, lowPower, adapter, chargeLimit
     case adapterVoltage, adapterCurrent
-    case adapterManufacturer, adapterModel, adapterSpecification, adapterConnection, adapterName
 
     var id: String { rawValue }
 
@@ -40,8 +39,7 @@ enum DetailField: String, CaseIterable, Identifiable {
     static func available(limitSlider: Bool) -> [DetailField] {
         guard limitSlider else { return allCases }
         // 拿掉充電上限後把低耗電模式移到最後，變壓器、變壓器電壓、變壓器電流才會排在一起
-        let chargerFields: [DetailField] = [.adapterManufacturer, .adapterModel, .adapterSpecification, .adapterConnection, .adapterName]
-        return allCases.filter { $0 != .chargeLimit && $0 != .lowPower && !chargerFields.contains($0) } + [.lowPower] + chargerFields
+        return allCases.filter { $0 != .chargeLimit && $0 != .lowPower } + [.lowPower]
     }
 
     var title: String {
@@ -64,11 +62,6 @@ enum DetailField: String, CaseIterable, Identifiable {
         case .chargeLimit: return "充電上限"
         case .adapterVoltage: return "變壓器電壓"
         case .adapterCurrent: return "變壓器電流"
-        case .adapterManufacturer: return "充電器廠商"
-        case .adapterModel: return "充電器型號"
-        case .adapterSpecification: return "協商規格"
-        case .adapterConnection: return "連接方式"
-        case .adapterName: return "充電器名稱"
         }
     }
 }

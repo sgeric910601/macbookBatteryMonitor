@@ -66,15 +66,22 @@ struct PanelView: View {
                 .labelsHidden()
                 Group {
                     switch ui.tab {
-                    case .details: DetailsGridView(s: s, e: e, health: store.systemHealth, limitSlider: store.chargeLimit.supported,
-                                                   openDisplayItems: { ui.openSettings(.display) })
+                    case .details:
+                        VStack(spacing: 10) {
+                            DetailsGridView(s: s, e: e, health: store.systemHealth, limitSlider: store.chargeLimit.supported,
+                                            openDisplayItems: { ui.openSettings(.display) })
+                            if s.externalConnected, settings.showChargerSpecifications {
+                                ChargerSpecificationsCard(adapter: s.adapter)
+                            }
+                        }
                     case .history: HistoryChartView(history: store.history, ui: ui)
                     case .processes: TopProcessesView(store: store)
                     case .peripherals: PeripheralsView(store: store.peripherals, settings: settings)
                     case .today: DailyRecapView(recap: DailyBatteryRecap.make(samples: store.history.samples, day: s.date))
                     }
                 }
-                .frame(height: 231, alignment: .top)
+                .frame(height: ui.tab == .details ? nil : 231, alignment: .top)
+                .fixedSize(horizontal: false, vertical: ui.tab == .details)
                 footer(updated: s.date)
             } else if let desktop = store.desktop {
                 DesktopPanelView(store: store, desktop: desktop, settings: settings, ui: ui)

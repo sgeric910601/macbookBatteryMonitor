@@ -7,6 +7,35 @@ struct AdapterInfo: Codable, Equatable {
     var voltage_mV: Int?
     var current_mA: Int?
     var name: String?
+    var manufacturer: String?
+    var model: String?
+    var connection: String?
+
+    static func parse(_ details: [String: Any]) -> AdapterInfo {
+        func positive(_ key: String) -> Int? {
+            guard let n = details[key] as? NSNumber, n.intValue > 0 else { return nil }
+            return n.intValue
+        }
+        func text(_ key: String) -> String? {
+            guard let value = details[key] as? String else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return AdapterInfo(watts: positive("Watts"), voltage_mV: positive("AdapterVoltage") ?? positive("Voltage"),
+            current_mA: positive("Current"), name: text("Name") ?? text("Description"),
+            manufacturer: text("Manufacturer"), model: text("Model"))
+    }
+    var specification: String? {
+        guard let v = voltage_mV, let a = current_mA, v > 0, a > 0 else { return nil }
+        return String(format: "%g V · %g A", Double(v) / 1000, Double(a) / 1000)
+    }
+    /// 多種連接埠同時啟用時不猜測哪個正在供電。
+    static func connectionLabel(activeTypes: [String]) -> String? {
+        let types = Set(activeTypes.map { $0.localizedCaseInsensitiveContains("MagSafe") ? "MagSafe" : $0 })
+        guard types.count == 1 else { return nil }
+        if types.contains("MagSafe") { return "MagSafe" }
+        return types.contains("USB-C") ? "USB-C" : nil
+    }
 }
 
 /// 某一時間點讀到的原始電池資料。時間單位都是分鐘，nil 代表系統沒提供或還在計算。
@@ -227,6 +256,11 @@ enum BatteryReader {
 
         if s.externalConnected {
             s.adapter = adapterInfo()
+            if let details = reg["AdapterDetails"] as? [String: Any] {
+                let connection = s.adapter?.connection
+                s.adapter = AdapterInfo.parse(details)
+                s.adapter?.connection = connection
+            }
         } else {
             adapterCache = nil
         }
@@ -279,22 +313,33 @@ enum BatteryReader {
         return Double(load) / 1000
     }
 
-    /// 變壓器規格（額定瓦數等）不會每秒變；接上電源後先查一次，之後每 30 秒更新
+    /// 變壓器規格（額定瓦數等）不會每秒變；跟隨面板更新，避免切換連接埠後顯示舊資料
     private static var adapterCache: (info: AdapterInfo?, date: Date)?
 
     private static func adapterInfo() -> AdapterInfo? {
-        if let cache = adapterCache, Date().timeIntervalSince(cache.date) < 30 { return cache.info }
+        if let cache = adapterCache, Date().timeIntervalSince(cache.date) < 1 { return cache.info }
         var info: AdapterInfo?
         if let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any] {
-            info = AdapterInfo(
-                watts: int(details["Watts"]),
-                voltage_mV: int(details["AdapterVoltage"]) ?? int(details["Voltage"]),
-                current_mA: int(details["Current"]),
-                name: (details["Name"] as? String) ?? (details["Description"] as? String)
-            )
+            info = AdapterInfo.parse(details)
+            info?.connection = adapterConnection()
         }
         adapterCache = (info, Date())
         return info
+    }
+
+    private static func adapterConnection() -> String? {
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccessoryManager"), &iterator) == KERN_SUCCESS else { return nil }
+        defer { IOObjectRelease(iterator) }
+        var types: [String] = []
+        while case let service = IOIteratorNext(iterator), service != 0 {
+            defer { IOObjectRelease(service) }
+            guard let active = IORegistryEntryCreateCFProperty(service, "ConnectionActive" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber,
+                  active.boolValue,
+                  let type = IORegistryEntryCreateCFProperty(service, "PortTypeDescription" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String else { continue }
+            types.append(type)
+        }
+        return AdapterInfo.connectionLabel(activeTypes: types)
     }
 
     private static func registryProperties() -> [String: Any]? {

@@ -381,3 +381,4 @@ print("3 caps lock delay tests passed")
 
 XDRBrightnessTests().run()
 print("XDR brightness policy tests passed")
+runAdapterInfoTests()

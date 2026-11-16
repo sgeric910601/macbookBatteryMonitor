@@ -31,6 +31,27 @@ struct DetailsGridView: View {
                 }
                 .font(.callout)
             }
+            if s.externalConnected {
+                Divider().padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("充電器資訊").font(.callout.weight(.semibold))
+                    adapterRow("名稱", s.adapter?.name ?? "系統未提供")
+                    if let maker = s.adapter?.manufacturer { adapterRow("製造商", maker) }
+                    if let model = s.adapter?.model { adapterRow("型號", model) }
+                    if let watts = s.adapter?.watts { adapterRow("協商供電能力", "\(watts) W") }
+                    if let spec = s.adapter?.specification { adapterRow("協商規格", spec) }
+                    adapterRow("連接方式", s.adapter?.connection ?? "無法確認")
+                }
+                .font(.caption)
+            }
+
+        }
+    }
+
+    private func adapterRow(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(title).foregroundStyle(.secondary).frame(width: 84, alignment: .leading)
+            Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

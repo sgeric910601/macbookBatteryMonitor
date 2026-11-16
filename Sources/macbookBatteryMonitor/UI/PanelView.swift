@@ -203,9 +203,14 @@ private struct HeaderView: View {
                 Text("\(s.percent)%")
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                Label(e.state.title, systemImage: e.state.symbol)
-                    .font(.callout)
-                    .foregroundStyle(e.state.tint)
+                HStack(spacing: 6) {
+                    Label(e.state.title, systemImage: e.state.symbol)
+                        .foregroundStyle(e.state.tint)
+                    if e.state == .charging, s.externalConnected, let connection = s.adapter?.connection {
+                        Text(connection).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .font(.callout)
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 2) {

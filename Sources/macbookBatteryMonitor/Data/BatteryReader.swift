@@ -21,8 +21,13 @@ struct AdapterInfo: Codable, Equatable {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
+        func productName(_ value: String?) -> String? {
+            guard let value else { return nil }
+            let generic = ["pd charger", "usb pd charger", "usb-c charger", "charger"]
+            return generic.contains(value.lowercased()) ? nil : value
+        }
         return AdapterInfo(watts: positive("Watts"), voltage_mV: positive("AdapterVoltage") ?? positive("Voltage"),
-            current_mA: positive("Current"), name: text("Name") ?? text("Description"),
+            current_mA: positive("Current"), name: productName(text("Name")) ?? productName(text("Description")),
             manufacturer: text("Manufacturer"), model: text("Model"))
     }
     var specification: String? {
@@ -262,12 +267,17 @@ enum BatteryReader {
         if s.externalConnected {
             s.adapter = adapterInfo(chargerCount: int(reg["ChargerCount"]))
             if let details = reg["AdapterDetails"] as? [String: Any] {
-                let connection = s.adapter?.connection
-                s.adapter = AdapterInfo.parse(details)
-                s.adapter?.connection = connection
+                let reported = s.adapter
+                var current = AdapterInfo.parse(details)
+                // 這次 API 查詢與原始資料互補；沒有產品名稱時不能以通用描述蓋掉它。
+                current.name = current.name ?? reported?.name
+                current.manufacturer = current.manufacturer ?? reported?.manufacturer
+                current.model = current.model ?? reported?.model
+                current.connection = reported?.connection
+                s.adapter = current
             }
         } else {
-            adapterCache = nil
+            s.adapter = nil
         }
         return s
     }
@@ -319,16 +329,13 @@ enum BatteryReader {
     }
 
     /// 變壓器規格（額定瓦數等）不會每秒變；跟隨面板更新，避免切換連接埠後顯示舊資料
-    private static var adapterCache: (info: AdapterInfo?, date: Date)?
 
     private static func adapterInfo(chargerCount: Int?) -> AdapterInfo? {
-        if let cache = adapterCache, Date().timeIntervalSince(cache.date) < 1 { return cache.info }
         var info: AdapterInfo?
         if let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any] {
             info = AdapterInfo.parse(details)
             info?.connection = adapterConnection(chargerCount: chargerCount)
         }
-        adapterCache = (info, Date())
         return info
     }
 

@@ -113,7 +113,7 @@ struct ChargerSpecificationsCard: View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
                 CardTitle("充電器規格", systemImage: "powerplug.fill")
-                Text(adapter?.name ?? "充電器已連接")
+                Text(adapter?.name ?? "充電器（系統未回報名稱）")
                     .font(.callout.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
                 if let maker = adapter?.manufacturer { line("製造商", maker) }

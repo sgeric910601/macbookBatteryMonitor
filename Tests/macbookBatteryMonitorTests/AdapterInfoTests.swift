@@ -8,9 +8,11 @@ func runAdapterInfoTests() {
     let old = try! JSONDecoder().decode(AdapterInfo.self, from: Data("{\"watts\":30}".utf8))
     precondition(old.watts == 30 && old.manufacturer == nil)
     precondition(AdapterInfo.parse(["Name":"  ","Description":"pd charger"]).name == "pd charger")
-    precondition(AdapterInfo.connectionLabel(activeTypes: ["MagSafe 3"]) == "MagSafe")
+    precondition(AdapterInfo.connectionLabel(activeTypes: ["MagSafe 3"]) == "MagSafe 3")
     precondition(AdapterInfo.connectionLabel(activeTypes: ["USB-C"]) == "USB-C")
     precondition(AdapterInfo.connectionLabel(activeTypes: ["USB-C", "MagSafe 3"]) == nil)
     precondition(AdapterInfo.connectionLabel(activeTypes: []) == nil)
+    precondition(AdapterInfo.connectionLabel(activeTypes: ["USB-C", "MagSafe 3"], chargerCount: 1) == "MagSafe 3")
+    precondition(AdapterInfo.connectionLabel(activeTypes: ["USB-C", "MagSafe 3"], chargerCount: 2) == nil)
     print("Adapter metadata, negotiated specification and backward decoding tests passed")
 }

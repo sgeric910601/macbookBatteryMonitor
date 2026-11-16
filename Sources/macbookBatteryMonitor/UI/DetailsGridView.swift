@@ -14,8 +14,8 @@ struct DetailsGridView: View {
     var body: some View {
         Card(expand: true) {
             // 只顯示設定裡勾選的欄位，依序每列兩欄
-            let fields = DetailField.available(limitSlider: limitSlider).filter { settings.isVisible($0) }
-            if fields.isEmpty {
+            let fields = DetailField.available(limitSlider: limitSlider).filter { settings.isVisible($0) && $0 != .adapterName }
+            if fields.isEmpty && !settings.isVisible(.adapterName) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("所有欄位都已隱藏。")
                         .font(.callout)
@@ -28,30 +28,19 @@ struct DetailsGridView: View {
                     ForEach(Array(stride(from: 0, to: fields.count, by: 2)), id: \.self) { index in
                         row(fields[index], index + 1 < fields.count ? fields[index + 1] : nil)
                     }
+                    if settings.isVisible(.adapterName) {
+                        GridRow {
+                            Text(DetailField.adapterName.title).foregroundStyle(.secondary)
+                            Text(value(.adapterName))
+                                .gridCellColumns(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 }
                 .font(.callout)
             }
-            if s.externalConnected {
-                Divider().padding(.vertical, 4)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("充電器資訊").font(.callout.weight(.semibold))
-                    adapterRow("名稱", s.adapter?.name ?? "系統未提供")
-                    if let maker = s.adapter?.manufacturer { adapterRow("製造商", maker) }
-                    if let model = s.adapter?.model { adapterRow("型號", model) }
-                    if let watts = s.adapter?.watts { adapterRow("協商供電能力", "\(watts) W") }
-                    if let spec = s.adapter?.specification { adapterRow("協商規格", spec) }
-                    adapterRow("連接方式", s.adapter?.connection ?? "無法確認")
-                }
-                .font(.caption)
-            }
 
-        }
-    }
-
-    private func adapterRow(_ title: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text(title).foregroundStyle(.secondary).frame(width: 84, alignment: .leading)
-            Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -73,6 +62,12 @@ struct DetailsGridView: View {
         case .lowPower: return s.lowPowerMode ? "開啟" : "關閉"
         case .adapter: return adapterText
         case .chargeLimit: return s.chargeLimit.map { "\($0.limit)%" } ?? "未設定"
+        case .adapterName: return adapterDetail(s.adapter?.name)
+        case .adapterManufacturer: return adapterDetail(s.adapter?.manufacturer)
+        case .adapterModel: return adapterDetail(s.adapter?.model)
+        case .adapterSpecification: return adapterDetail(s.adapter?.specification)
+        case .adapterConnection:
+            return s.externalConnected ? (s.adapter?.connection ?? "無法確認") : "未連接"
         case .adapterVoltage:
             guard s.externalConnected else { return "未連接" }
             return s.smcAdapterVolts.map { String(format: "%.2f V", $0) } ?? "—"
@@ -81,6 +76,10 @@ struct DetailsGridView: View {
             let milliamps = s.smcAdapterAmps.map { Int(($0 * 1000).rounded()) } ?? s.systemCurrentIn_mA
             return milliamps.map { "\($0.formatted()) mA" } ?? "—"
         }
+    }
+
+    private func adapterDetail(_ text: String?) -> String {
+        s.externalConnected ? (text ?? "系統未提供") : "未連接"
     }
 
     /// macOS 自己的預估：用電池時是剩餘時間，充電時是充滿時間

@@ -30,11 +30,16 @@ struct AdapterInfo: Codable, Equatable {
         return String(format: "%g V · %g A", Double(v) / 1000, Double(a) / 1000)
     }
     /// 多種連接埠同時啟用時不猜測哪個正在供電。
-    static func connectionLabel(activeTypes: [String]) -> String? {
-        let types = Set(activeTypes.map { $0.localizedCaseInsensitiveContains("MagSafe") ? "MagSafe" : $0 })
+    static func connectionLabel(activeTypes: [String], chargerCount: Int? = nil) -> String? {
+        let types = Set(activeTypes)
+        let magSafe = types.filter { $0.localizedCaseInsensitiveContains("MagSafe") }
+        // MagSafe 只有供電用途；系統只認到一個充電器時，USB-C 的活動連線可能只是周邊。
+        // 有多個充電來源時，不能從連線狀態判斷實際選中的來源。
+        if let chargerCount, chargerCount > 1 { return nil }
+        if magSafe.count == 1, types.count == 1 || chargerCount == 1 { return magSafe.first }
         guard types.count == 1 else { return nil }
-        if types.contains("MagSafe") { return "MagSafe" }
         return types.contains("USB-C") ? "USB-C" : nil
+
     }
 }
 
@@ -255,7 +260,7 @@ enum BatteryReader {
         }
 
         if s.externalConnected {
-            s.adapter = adapterInfo()
+            s.adapter = adapterInfo(chargerCount: int(reg["ChargerCount"]))
             if let details = reg["AdapterDetails"] as? [String: Any] {
                 let connection = s.adapter?.connection
                 s.adapter = AdapterInfo.parse(details)
@@ -316,18 +321,18 @@ enum BatteryReader {
     /// 變壓器規格（額定瓦數等）不會每秒變；跟隨面板更新，避免切換連接埠後顯示舊資料
     private static var adapterCache: (info: AdapterInfo?, date: Date)?
 
-    private static func adapterInfo() -> AdapterInfo? {
+    private static func adapterInfo(chargerCount: Int?) -> AdapterInfo? {
         if let cache = adapterCache, Date().timeIntervalSince(cache.date) < 1 { return cache.info }
         var info: AdapterInfo?
         if let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any] {
             info = AdapterInfo.parse(details)
-            info?.connection = adapterConnection()
+            info?.connection = adapterConnection(chargerCount: chargerCount)
         }
         adapterCache = (info, Date())
         return info
     }
 
-    private static func adapterConnection() -> String? {
+    private static func adapterConnection(chargerCount: Int?) -> String? {
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccessoryManager"), &iterator) == KERN_SUCCESS else { return nil }
         defer { IOObjectRelease(iterator) }
@@ -339,7 +344,7 @@ enum BatteryReader {
                   let type = IORegistryEntryCreateCFProperty(service, "PortTypeDescription" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String else { continue }
             types.append(type)
         }
-        return AdapterInfo.connectionLabel(activeTypes: types)
+        return AdapterInfo.connectionLabel(activeTypes: types, chargerCount: chargerCount)
     }
 
     private static func registryProperties() -> [String: Any]? {

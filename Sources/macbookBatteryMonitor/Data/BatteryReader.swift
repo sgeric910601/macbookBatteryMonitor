@@ -265,17 +265,8 @@ enum BatteryReader {
         }
 
         if s.externalConnected {
-            s.adapter = adapterInfo(chargerCount: int(reg["ChargerCount"]))
-            if let details = reg["AdapterDetails"] as? [String: Any] {
-                let reported = s.adapter
-                var current = AdapterInfo.parse(details)
-                // 這次 API 查詢與原始資料互補；沒有產品名稱時不能以通用描述蓋掉它。
-                current.name = current.name ?? reported?.name
-                current.manufacturer = current.manufacturer ?? reported?.manufacturer
-                current.model = current.model ?? reported?.model
-                current.connection = reported?.connection
-                s.adapter = current
-            }
+            s.adapter = adapterInfo(registryDetails: reg["AdapterDetails"] as? [String: Any],
+                                    chargerCount: int(reg["ChargerCount"]))
         } else {
             s.adapter = nil
         }
@@ -330,12 +321,12 @@ enum BatteryReader {
 
     /// 變壓器規格（額定瓦數等）不會每秒變；跟隨面板更新，避免切換連接埠後顯示舊資料
 
-    private static func adapterInfo(chargerCount: Int?) -> AdapterInfo? {
-        var info: AdapterInfo?
-        if let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any] {
-            info = AdapterInfo.parse(details)
-            info?.connection = adapterConnection(chargerCount: chargerCount)
-        }
+    private static func adapterInfo(registryDetails: [String: Any]?, chargerCount: Int?) -> AdapterInfo? {
+        // 單次快照只使用一份詳細資料，避免換充電器時混用系統不同步的名稱與規格。
+        let details = registryDetails ?? (IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any])
+        var info = details.map(AdapterInfo.parse)
+        if info == nil { info = AdapterInfo() }
+        info?.connection = adapterConnection(chargerCount: chargerCount)
         return info
     }
 

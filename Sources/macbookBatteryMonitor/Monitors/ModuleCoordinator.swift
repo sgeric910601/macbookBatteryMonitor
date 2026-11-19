@@ -26,6 +26,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private var outsideClickMonitors: [Any] = []
     private var topStream: TopStream?
     private var sleeping = false
+    /// 螢幕關著或切到其他使用者：不畫選單列；有開警示時每 30 秒取樣一次，警示照常（見 RefreshPacing）
+    private var unseen = false
     private var cpuAlert = SustainedAlert(duration: MonitorAlertRules.cpuDuration)
     private var memoryAlert = SustainedAlert(duration: MonitorAlertRules.memoryDuration)
     private var diskAlert = SustainedAlert(duration: 0)
@@ -138,6 +140,20 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         updateTimer()
     }
 
+    func setUnseen(_ value: Bool) {
+        guard value != unseen else { return }
+        unseen = value
+        timer?.invalidate()
+        timer = nil
+        if value {
+            topStream?.stop()
+        } else if !sleeping {
+            tick()
+            if openKind != nil { startTop() }
+        }
+        updateTimer()
+    }
+
     /// 更新頻率或省電模式改變後，計時器與 top 改用新的間隔
     func applySampleInterval() {
         timer?.invalidate()
@@ -149,13 +165,15 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     // MARK: - 定時取樣（依設定的更新頻率）
 
     private func updateTimer() {
-        let shouldRun = (!items.isEmpty || stripActive) && !sleeping
+        let alerting = settings.alertCPU || settings.alertMemory || settings.alertDisk
+        let shouldRun = (!items.isEmpty || stripActive) && !sleeping && (!unseen || alerting)
         if shouldRun, timer == nil {
-            let interval = settings.sampleInterval
+            let base = settings.sampleInterval
+            let interval = RefreshPacing.interval(base: base, unseen: unseen)
             let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }
             }
-            timer.tolerance = interval * 0.1
+            timer.tolerance = unseen ? RefreshPacing.tolerance(base: base, unseen: true) : interval * 0.1
             RunLoop.main.add(timer, forMode: .common)
             self.timer = timer
         } else if !shouldRun {
@@ -176,6 +194,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         if active(.disk) { disk.sample(at: now) }
         if active(.network) { network.sample(at: now) }
         checkAlerts(cpu: active(.cpu), memory: active(.memory), disk: active(.disk), at: now)
+        guard !unseen else { return }
         for (kind, item) in items { render(kind, item) }
         // top 意外結束時（例如被強制結束），面板還開著就重新啟動
         if let topStream, !topStream.isRunning, !sleeping { topStream.start() }
@@ -363,7 +382,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private func startTop() {
         topStream?.stop()
         topStream = nil
-        guard !sleeping, let openKind else { return }
+        guard !sleeping, !unseen, let openKind else { return }
         let column: String
         switch openKind {
         case .cpu:

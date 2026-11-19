@@ -382,6 +382,11 @@ capsLock.testIgnoresOurOwnValues()
 capsLock.testRestoreValueIsBounded()
 print("3 caps lock delay tests passed")
 
+let refreshPacing = RefreshPacingTests()
+refreshPacing.testIntervalStretchesOnlyWhenUnseen()
+refreshPacing.testTolerance()
+print("2 refresh pacing tests passed")
+
 XDRBrightnessTests().run()
 print("XDR brightness policy tests passed")
 

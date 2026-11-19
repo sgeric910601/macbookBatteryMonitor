@@ -7,5 +7,6 @@ models+=(Sources/macbookBatteryMonitor/Model/XDRBrightness.swift Sources/macbook
 if [[ -f Sources/macbookBatteryMonitor/Model/PowerBreakdown.swift ]]; then
     models+=(Sources/macbookBatteryMonitor/Model/PowerBreakdown.swift)
 fi
+models+=(Sources/macbookBatteryMonitor/Model/RefreshPacing.swift)
 swiftc Sources/macbookBatteryMonitor/Data/BatteryReader.swift Sources/macbookBatteryMonitor/Data/SMC.swift Sources/macbookBatteryMonitor/Data/ChargeLimit.swift Sources/macbookBatteryMonitor/Model/Estimator.swift "${models[@]}" Sources/macbookBatteryMonitor/UI/PowerFlowLayers.swift Sources/macbookBatteryMonitor/Monitors/MonitorModels.swift Tests/macbookBatteryMonitorTests/*.swift Tests/main.swift -o build/tests/power-tests
 build/tests/power-tests

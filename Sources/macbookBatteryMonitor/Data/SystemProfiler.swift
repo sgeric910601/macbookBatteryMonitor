@@ -24,7 +24,7 @@ struct SystemHealth: Codable, Equatable {
 
 enum SystemProfiler {
     static func readSync() -> SystemHealth? {
-        guard let output = Shell.runSync("/usr/sbin/system_profiler", ["SPPowerDataType", "-json"]),
+        guard let output = Shell.runSync("/usr/sbin/system_profiler", ["SPPowerDataType", "-json"], timeout: 15),
               let data = output.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["SPPowerDataType"] as? [[String: Any]],

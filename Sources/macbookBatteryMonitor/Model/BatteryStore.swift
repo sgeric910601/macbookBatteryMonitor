@@ -289,6 +289,8 @@ final class BatteryStore {
     }
 
     func refreshHealth() {
+        // 桌上型 Mac 沒有電池：不必每 6 小時跑一次 system_profiler
+        guard BatteryReader.hasBattery else { return }
         Task {
             if let health = await SystemProfiler.read() {
                 systemHealth = health

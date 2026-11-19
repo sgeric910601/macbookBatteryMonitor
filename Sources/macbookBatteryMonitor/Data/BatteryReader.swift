@@ -44,7 +44,6 @@ struct AdapterInfo: Codable, Equatable {
         if magSafe.count == 1, types.count == 1 || chargerCount == 1 { return magSafe.first }
         guard types.count == 1 else { return nil }
         return types.contains("USB-C") ? "USB-C" : nil
-
     }
 }
 
@@ -198,7 +197,8 @@ enum BatteryReader {
         return current
     }
 
-    static func read(includeTemperature: Bool = true, includeLivePower: Bool = true) -> BatterySnapshot? {
+    /// includeConnection：掃連接埠辨識 MagSafe／USB-C。只顯示在面板裡，面板關著時不用掃
+    static func read(includeTemperature: Bool = true, includeLivePower: Bool = true, includeConnection: Bool = true) -> BatterySnapshot? {
         // 桌上型 Mac 的電池元件是空的，不讀，改走桌上型的系統耗電
         guard hasBattery, let reg = registryProperties() else { return nil }
         let data = reg["BatteryData"] as? [String: Any] ?? [:]
@@ -266,7 +266,7 @@ enum BatteryReader {
 
         if s.externalConnected {
             s.adapter = adapterInfo(registryDetails: reg["AdapterDetails"] as? [String: Any],
-                                    chargerCount: int(reg["ChargerCount"]))
+                                    chargerCount: int(reg["ChargerCount"]), includeConnection: includeConnection)
         } else {
             s.adapter = nil
         }
@@ -319,14 +319,13 @@ enum BatteryReader {
         return Double(load) / 1000
     }
 
-    /// 變壓器規格（額定瓦數等）不會每秒變；跟隨面板更新，避免切換連接埠後顯示舊資料
-
-    private static func adapterInfo(registryDetails: [String: Any]?, chargerCount: Int?) -> AdapterInfo? {
+    /// 變壓器規格：每次更新都從同一次讀到的電池資料取（不另外查），換充電器後不會顯示舊資料
+    private static func adapterInfo(registryDetails: [String: Any]?, chargerCount: Int?, includeConnection: Bool) -> AdapterInfo? {
         // 單次快照只使用一份詳細資料，避免換充電器時混用系統不同步的名稱與規格。
         let details = registryDetails ?? (IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any])
         var info = details.map(AdapterInfo.parse)
         if info == nil { info = AdapterInfo() }
-        info?.connection = adapterConnection(chargerCount: chargerCount)
+        if includeConnection { info?.connection = adapterConnection(chargerCount: chargerCount) }
         return info
     }
 

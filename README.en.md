@@ -319,7 +319,7 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 
 ## Clipboard history
 
-Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu:
+Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu (collapsed by default; click its title to list them):
 
 - **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
 - **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
@@ -342,7 +342,7 @@ Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a
 - **Three large buttons**: keep awake (with the time left), mute microphone (with the audio switcher on) and start keyboard cleaning (with keyboard cleaning mode on)
 - **Keep-awake duration**: 30 min, 1 h, 2 h or until turned off, with the running one highlighted; the display can stay on too
 - **Audio output**: the same device list as the audio switcher; click one to switch
-- **Clipboard history** (when on): the last 30 items (four rows visible, the rest scroll), click one to put it back on the clipboard; clearing keeps the panel open
+- **Clipboard history** (when on): collapsed by default and showing only the item count, so opening the panel (for example while sharing your screen) doesn't reveal what you copied; click the title to list the last 30 items (four rows visible, the rest scroll). It starts collapsed every time the panel opens. Click an item to put it back on the clipboard; once expanded it can be cleared, and clearing keeps the panel open
 - **功能管理** (manage features): switches the panel to an extension features page where each feature has its own switch; "返回" (back) or Esc returns. A feature that needs Accessibility opens the permissions page if it is not allowed yet. The cat quick menu itself is turned off in Settings, since turning it off here would remove the panel
 - **Settings** and **Quit** at the bottom
 - Clicking outside closes the panel; the battery and system monitor panels also close when you click elsewhere or on another menu bar icon

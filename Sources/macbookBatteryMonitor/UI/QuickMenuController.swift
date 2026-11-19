@@ -65,6 +65,8 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
         guard let settings else { return }
         if settings.isInstalled(.audioSwitch) { AudioSwitchController.shared.refresh() }
         state.page = .main
+        // 每次打開都從收起開始，上次展開過也不會直接露出內容
+        state.clipboardExpanded = false
         let root = QuickMenuPanel(settings: settings, state: state, awake: .shared, audio: .shared,
                                   close: { [weak self] in self?.popover?.closeNow() },
                                   openSettings: { [weak self] section in

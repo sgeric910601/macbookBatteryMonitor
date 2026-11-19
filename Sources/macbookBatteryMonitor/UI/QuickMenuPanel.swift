@@ -7,6 +7,8 @@ import SwiftUI
 final class QuickMenuState {
     enum Page { case main, features }
     var page: Page = .main
+    /// 剪貼簿歷史預設收起：打開面板（例如分享螢幕時）不會直接露出複製過的內容，點標題才列出
+    var clipboardExpanded = false
 }
 
 /// 貓咪快捷面板：常用操作的捷徑。沒啟用的功能整塊不顯示。
@@ -209,9 +211,28 @@ struct QuickMenuPanel: View {
         Card {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    QuickCardTitle("剪貼簿歷史", symbol: "doc.on.clipboard.fill", tint: .purple)
-                    Spacer()
-                    if !clipboard.isEmpty {
+                    // 收起時只顯示筆數，不顯示內容
+                    Button {
+                        state.clipboardExpanded.toggle()
+                    } label: {
+                        HStack(spacing: 6) {
+                            QuickCardTitle("剪貼簿歷史", symbol: "doc.on.clipboard.fill", tint: .purple)
+                            Image(systemName: state.clipboardExpanded ? "chevron.down" : "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 8)
+                            if !state.clipboardExpanded, !clipboard.isEmpty {
+                                Text("\(clipboard.count) 筆")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(state.clipboardExpanded ? "收起剪貼簿歷史" : "列出剪貼簿歷史")
+                    .accessibilityValue(state.clipboardExpanded ? "已展開" : "已收起")
+                    if state.clipboardExpanded, !clipboard.isEmpty {
                         Button {
                             // 清除後面板留著，清單變回空的
                             ClipboardHistoryController.shared.clear()
@@ -222,20 +243,22 @@ struct QuickMenuPanel: View {
                         .buttonStyle(.borderless)
                     }
                 }
-                .padding(.bottom, 4)
-                if clipboard.isEmpty {
-                    Text("複製的文字會出現在這裡")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                .padding(.bottom, state.clipboardExpanded ? 4 : 0)
+                if state.clipboardExpanded {
+                    if clipboard.isEmpty {
+                        Text("複製的文字會出現在這裡")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    // 全部 30 筆都能選：四列放得下就直接列出，放不下才捲動（不用猜一列多高）
+                    ViewThatFits(in: .vertical) {
+                        clipboardRows
+                        ScrollView { clipboardRows }
+                    }
+                    .frame(maxHeight: Self.clipboardMaxHeight)
                 }
-                // 全部 30 筆都能選：四列放得下就直接列出，放不下才捲動（不用猜一列多高）
-                ViewThatFits(in: .vertical) {
-                    clipboardRows
-                    ScrollView { clipboardRows }
-                }
-                .frame(maxHeight: Self.clipboardMaxHeight)
             }
         }
     }

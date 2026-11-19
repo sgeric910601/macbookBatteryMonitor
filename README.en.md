@@ -251,7 +251,7 @@ See the [XDR design and local verification notes](docs/design/xdr-brightness.md)
 
 ## Monitor alerts
 
-"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. While the screens are off or another user is active and any alert is on, the monitors that are on are sampled every 30 seconds and still checked. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
 
 ## Mouse and trackpad scroll directions
 
@@ -323,6 +323,7 @@ Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu,
 
 - **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
 - **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
+- **Paused while locked or with the screens off**: the clipboard isn't checked; checking resumes with an immediate check once the screen is unlocked and on
 - **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
 - The menu can clear the history; no permission needed
 
@@ -539,6 +540,7 @@ CPU usage measured on an M1 MacBook Air:
 | CPU or memory monitor panel open | About 3%, plus about 6% for `top` | About 2%, plus about 3% for `top` |
 
 - With the panel closed, only what the menu bar needs is read (charge, state, power, time remaining); plugging and unplugging update immediately through system notifications. Menu bar icons are only redrawn when a number, time or state changes
+- **Slower when nobody can see it**: while the screens are off (display sleep) or another user is active, timed updates are at least 30 seconds apart, the system monitors don't redraw the menu bar, and hardware power and per-process energy sampling pause; smart charging and battery notifications are checked about every 30 seconds too. If any CPU, memory or disk alert is on, the monitors that are on keep sampling every 30 seconds so alerts still work; with none on, sampling stops. Everything updates right away when the screen wakes or you switch back
 - The panel is built each time it opens and released entirely when it closes, so nothing draws in the background. Component details, SMC temperatures and the optional admin CPU sampling are only read while the panel is open
 - `top` only runs while the top energy users tab or a CPU/memory panel is open
 - Each SMC key's format is looked up once and remembered; only `PDTR` and `PSTR` are read every second. Adapter details are read every 30 seconds while plugged in; the system charge limit only at launch, when the panel opens and when the system announces a change

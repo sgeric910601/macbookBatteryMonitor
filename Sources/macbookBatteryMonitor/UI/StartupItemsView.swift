@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 設定視窗「登入項目」分頁
+/// 設定視窗「登入項目」分頁。要在功能管理啟用「登入項目管理」才出現（讀取會要求「自動化」權限），打開這頁時才讀取
 struct StartupItemsView: View {
     let manager: StartupItemsManager
     @State private var pendingRemoval: StartupItem?

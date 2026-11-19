@@ -21,6 +21,8 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case portManager
     case clipboardHistory
     case xdrBrightness
+    case speedTest
+    case startupItems
 
     var id: String { rawValue }
 
@@ -44,6 +46,8 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .portManager: return "Port 管理與結束程式"
         case .clipboardHistory: return "剪貼簿歷史"
         case .xdrBrightness: return "XDR 額外增亮"
+        case .speedTest: return "網路測速"
+        case .startupItems: return "登入項目管理"
         }
     }
 
@@ -65,6 +69,8 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .portManager: return "point.3.connected.trianglepath.dotted"
         case .clipboardHistory: return "doc.on.clipboard"
         case .xdrBrightness: return "sun.max.fill"
+        case .speedTest: return "speedometer"
+        case .startupItems: return "power"
         }
     }
 
@@ -87,6 +93,8 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .portManager: return "系統監控"
         case .clipboardHistory: return "選單列"
         case .xdrBrightness: return "系統監控"
+        case .speedTest: return "系統監控"
+        case .startupItems: return "系統"
         }
     }
 
@@ -109,6 +117,8 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .portManager: return "不需要權限"
         case .clipboardHistory: return "每 0.75 秒看剪貼簿"
         case .xdrBrightness: return "監聽亮度鍵"
+        case .speedTest: return "按下才連網"
+        case .startupItems: return "需要「自動化」權限"
         }
     }
 
@@ -130,20 +140,22 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
         case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼工具標成機密的內容），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
         case .xdrBrightness: return "讓內建 XDR 螢幕額外增亮，亮度鍵到頂後可自動啟用；會增加耗電"
+        case .speedTest: return "網路面板多一個測速卡片，按下才測：約 20～30 秒、會用掉數百 MB 流量，連到 Apple 的測速伺服器；要開著系統監控的網路模組才看得到"
+        case .startupItems: return "列出登入時自動啟動的項目，可以新增、停用或移除；打開頁面時才讀取，要允許「自動化」控制 System Events"
         }
     }
 
     /// 需要「輔助使用」權限（權限頁依這個列出用到的功能）
     var needsAccessibility: Bool {
         switch self {
-        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory: return false
+        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .startupItems: return false
         default: return true
         }
     }
 
-    /// 沒存過加入狀態（從還沒有擴充功能的舊版更新）時：捲動方向，以及開關已經打開過的功能（switchedOn）視為已加入，
+    /// 沒存過加入狀態（從還沒有擴充功能的舊版更新）時：捲動方向、登入項目（舊版本來就看得到），以及開關已經打開過的功能（switchedOn）視為已加入，
     /// 更新不會讓它消失；沒用過的新功能不會自己出現，要到「功能管理」加入
-    func isInstalled(stored: Bool?, switchedOn: Bool) -> Bool { stored ?? (self == .scrollDirection || switchedOn) }
+    func isInstalled(stored: Bool?, switchedOn: Bool) -> Bool { stored ?? (self == .scrollDirection || self == .startupItems || switchedOn) }
 
     /// 每個功能實際的加入狀態，寫進匯出的設定：沒存過、靠規則算出來的也寫出來
     static func installedValues(_ isInstalled: (ExtensionFeature) -> Bool) -> [String: Bool] {

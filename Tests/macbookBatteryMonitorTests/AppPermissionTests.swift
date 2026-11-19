@@ -13,7 +13,7 @@ struct AppPermissionTests {
 
     /// 基本功能用到的權限一直都有人用；每一項都有名稱、說明與系統設定的位置
     func testEveryPermissionIsDescribed() {
-        for permission in [AppPermission.notifications, .bluetooth, .automation] {
+        for permission in [AppPermission.notifications, .bluetooth] {
             XCTAssertTrue(!permission.users(isInstalled: { _ in false }).isEmpty)
         }
         for permission in AppPermission.allCases {

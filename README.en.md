@@ -109,7 +109,7 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
   - Drives without that record (internal drives that aren't NVMe, such as a 2015 MacBook Air's, and most USB enclosures) show the SMART "正常／異常" (OK / failing) status, and totals since boot (since connected for external disks)
 - **Network**: the menu bar shows upload and download speed; the panel shows the current interface (Wi-Fi, Ethernet) and IP, a speed chart and totals since boot
   - **Connection status**: whether a VPN is connected (a tunnel interface with a usable address; the system's own utun interfaces do not count), plus the system's Low Data Mode and metered network flags (for example a phone hotspot). It only looks at local interfaces and the system network path, watches only while the panel is open, and contacts no outside server
-  - **Speed test**: off by default so it isn't started by accident; after turning on 「在網路面板顯示測速」 (show speed test in the network panel) in Settings → Monitoring & power saving, press 「開始測速」 (start test) at the bottom of the panel to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
+  - **Speed test**: off by default so it isn't started by accident; after turning on 「網路測速」 (network speed test) in Settings → 功能管理 (feature management), press 「開始測速」 (start test) at the bottom of the network panel (the network monitor has to be on) to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
 - Child processes (such as browser tabs) are merged into their app
 
 ![Battery plus system monitors: CPU/GPU, memory, disk and network icons in the menu bar and each monitor's panel, with fans, temperatures and external disks](docs/screenshots/edition-status.png)
@@ -140,8 +140,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 |---|---|---|
 | 基本 (Basic) | 一般 (General) | App icon color, notification thresholds, launch at login, settings backup (export, import) |
 | | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
-| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
+| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, combine into one icon, admin CPU sampling |
 | | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
@@ -149,6 +148,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
 | | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
 | | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, Finder shortcuts, quit when the last window closes, click a Dock icon to minimize |
+| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (shown once 登入項目管理 (login item management) is on; see "[Login items](#login-items)") |
 | | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
 | 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
@@ -224,11 +224,11 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you turn it on in Settings → 功能管理 (feature management), and can be turned off again:
 
 - **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
-- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports and clipboard history need no permission
-- **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
+- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports, clipboard history and network speed test need no permission, and login item management needs Automation
+- **Updating from an older version**: scroll direction and login items, which older versions had, and any feature whose own switch was already on (for example the window switcher, the Chinese input method options or the speed test) stay on
 - **Not extension features, always there**: the keep-awake button in the panel, the connection status (VPN, Low Data Mode) in the network panel, the connected-devices list on the peripherals page, and the permissions page and settings backup in Settings. None needs a permission, and each reads only while its panel or page is open
 - **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
-- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history, XDR brightness boost (experimental)
+- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history, XDR brightness boost (experimental), network speed test, login item management
 
 ## XDR brightness boost (experimental)
 
@@ -423,7 +423,7 @@ The "中文輸入法" (Chinese input) card under Settings → 滑鼠、觸控板
 
 ## Login items
 
-Settings → 登入項目 (Login items) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
+Settings → 登入項目 (Login items) (turn on 「登入項目管理」 (login item management) in feature management first; it stays on when updating from an older version) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
 
 - **Sources**: the "open at login" items, `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`. Every row has an icon, and items whose program no longer exists say so
 - **What you can do**: add or remove "open at login" apps; disable or enable your own (user-level) agents. Disabling takes effect at the next login and also stops the copy that is running now. Every action asks first. This app's own login item and agent are listed only and can't be disabled or removed here

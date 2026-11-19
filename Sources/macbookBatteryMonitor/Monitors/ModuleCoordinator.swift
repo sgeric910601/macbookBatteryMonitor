@@ -201,10 +201,11 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private func render(_ kind: MonitorKind, _ item: NSStatusItem) {
         guard let button = item.button else { return }
         let content = menuBarContent(kind)
+        // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
+        button.setToolTipUnlessHovered(content.tooltip)
         guard content.key != lastKeys[kind] else { return }
         lastKeys[kind] = content.key
         button.image = content.image()
-        button.toolTip = content.tooltip
         // 圖示寬度固定（依範本計算），第一次畫好後鎖住長度；
         // 否則每秒換圖都會觸發 _adjustLength，讓整條選單列重新排版
         if item.length == NSStatusItem.variableLength {

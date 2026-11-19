@@ -83,7 +83,9 @@ final class BatteryStore {
     @ObservationIgnored private var chargingSince: Date?
     /// Intel 剛拔電的時間：頭一分鐘的放電電流偏低，不納入平均，否則剩餘時間會一直往下掉（實測 31 秒少 9 分鐘）
     @ObservationIgnored private var dischargingSince: Date?
-    @ObservationIgnored private var processStream: ProcessEnergyStream?
+    /// 面板停在耗電排行時持續跑一個 top，比每次重新啟動省資源（每次啟動要等兩次取樣，約 1 秒），也才能真的每秒更新
+    @ObservationIgnored private var processStream: TopStream?
+    @ObservationIgnored private var processStreamInterval = 0
     /// 面板開著才允許跑 top，避免關掉後還在背景取樣
     @ObservationIgnored var panelVisible = false
 
@@ -322,14 +324,19 @@ final class BatteryStore {
             processStream?.stop()
             return
         }
-        let interval = Int(AppSettings.shared.sampleInterval)
+        let interval = max(1, Int(AppSettings.shared.sampleInterval))
         // 切換省電模式後，用新的間隔重新啟動 top
-        if let stream = processStream, stream.interval != interval {
+        if let stream = processStream, processStreamInterval != interval {
             stream.stop()
             processStream = nil
         }
         if processStream == nil {
-            processStream = ProcessEnergyStream(interval: interval) { [weak self] result in
+            processStreamInterval = interval
+            let arguments = ["-l", "0", "-s", "\(interval)", "-o", "power", "-stats", "pid,command,power", "-n", "20"]
+            processStream = TopStream(arguments: arguments) { [weak self] text in
+                // 第一段取樣的 POWER 全是 0（還沒有差值），解析結果為空時保留上一次的排行
+                let result = ProcessEnergy.parse(text, limit: 5)
+                guard !result.isEmpty else { return }
                 MainActor.assumeIsolated {
                     self?.topProcesses = result
                     self?.processesLoaded = true

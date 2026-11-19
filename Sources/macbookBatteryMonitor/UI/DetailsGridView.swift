@@ -12,7 +12,7 @@ struct DetailsGridView: View {
     private var settings: AppSettings { .shared }
 
     var body: some View {
-        Card(expand: true) {
+        Card() {
             // 只顯示設定裡勾選的欄位，依序每列兩欄
             let fields = DetailField.available(limitSlider: limitSlider).filter { settings.isVisible($0) }
             if fields.isEmpty {
@@ -102,5 +102,36 @@ struct DetailsGridView: View {
             }
         }
         .lineLimit(1)
+    }
+}
+
+
+struct ChargerSpecificationsCard: View {
+    let adapter: AdapterInfo?
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                CardTitle("充電器規格", systemImage: "powerplug.fill")
+                Text(adapter?.name ?? "充電器（系統未回報名稱）")
+                    .font(.callout.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let maker = adapter?.manufacturer { line("製造商", maker) }
+                if let connection = adapter?.connection { line("連接方式", connection) }
+                if let watts = adapter?.watts { line("供電能力", "\(watts) W") }
+                if let spec = adapter?.specification { line("協商規格", spec) }
+                Text("供電能力與協商規格不是即時充入電池的功率。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func line(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title).foregroundStyle(.secondary)
+            Spacer(minLength: 12)
+            Text(value).monospacedDigit()
+        }
+        .font(.callout)
     }
 }

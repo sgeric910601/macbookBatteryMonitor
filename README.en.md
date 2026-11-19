@@ -86,12 +86,13 @@ The app is named "電池與系統監控" (Battery & System Monitor on English sy
 - **Charging companion and smart charging**: the companion sits left of the slider and the smart charging status (waiting, charging, ready and so on) below it; click either to open the smart charging page (see "[Smart charging](#smart-charging)")
 - **Power flow**: watts between the power adapter, the system and the battery. Click "系統" (System) to split it into display backlight, chip, and other (estimated), then click the chip for CPU/GPU/ANE; items the model doesn't have are hidden (see "[How power flow is measured](#how-power-flow-is-measured)")
 - **Details**: battery voltage, current and power, system power, system estimate, battery temperature, health, computed health (full charge capacity ÷ design capacity), cycle count, battery condition, remaining, full charge and design capacity (mAh), Low Power Mode, power adapter rating, live adapter voltage and current, charge limit (shown only on the slider on Macs that have one)
+- **Charger specifications**: while plugged in, a card below the fields on the Details tab lists what the system reports about the charger: name, maker, connection (MagSafe 3 or USB-C), rating and the negotiated voltage and current. Without a reported name it says 「系統未回報名稱」 (name not reported) and never guesses the brand from the wattage; the rating and negotiated values are not the power going into the battery right now. While charging, the connection also appears next to the state (not shown with more than one power source or when the port can't be told)
 - **Tabs**:
   - charge history (1 hour / 24 hours / 7 days; the first launch backfills the past few days from `pmset`);
   - today's recap: charge used and regained today, net change, plug-ins, total and longest time on battery;
   - top energy users: the top 5 apps, with child processes merged into their app;
   - peripherals.
-- Every power flow item and every details field can be hidden in Settings → Display items
+- Every power flow item, every details field and the charger specifications card can be hidden in Settings → Display items
 - When the panel is taller than the screen (small screens or zoomed display), it scrolls instead of being cut off
 
 ![Smart charging: plugged in and held at the 80% care limit, charging to the original 95% limit by 7:30 tomorrow; today's recap on the left, the smart charging page on the right](docs/screenshots/smart-charging.png)
@@ -545,7 +546,7 @@ CPU usage measured on an M1 MacBook Air:
 - **Slower when nobody can see it**: while the screens are off (display sleep) or another user is active, timed updates are at least 30 seconds apart, the system monitors don't redraw the menu bar, and hardware power and per-process energy sampling pause; smart charging and battery notifications are checked about every 30 seconds too. If any CPU, memory or disk alert is on, the monitors that are on keep sampling every 30 seconds so alerts still work; with none on, sampling stops. Everything updates right away when the screen wakes or you switch back
 - The panel is built each time it opens and released entirely when it closes, so nothing draws in the background. Component details, SMC temperatures and the optional admin CPU sampling are only read while the panel is open
 - `top` only runs while the top energy users tab or a CPU/memory panel is open
-- Each SMC key's format is looked up once and remembered; only `PDTR` and `PSTR` are read every second. Adapter details are read every 30 seconds while plugged in; the system charge limit only at launch, when the panel opens and when the system announces a change
+- Each SMC key's format is looked up once and remembered; only `PDTR` and `PSTR` are read every second. Adapter details come from the same battery read on every update, with a separate system query only when the battery data has none; the charger connection is checked only while the panel is open; the system charge limit only at launch, when the panel opens and when the system announces a change
 - Smart charging does nothing without a schedule and only calls the system when the limit has to change
 - Flow and charge bar animations are composited by Core Animation, not redrawn frame by frame; the charging companion is a small transparent HEVC video decoded once on first display and then played frame by frame (the desktop pet animating nonstop adds about 0.2% CPU and about 16 MB of memory on an M1)
 - Only enabled monitors sample; with the master switch off, no monitor icons or timers are created at all
@@ -567,6 +568,8 @@ CPU usage measured on an M1 MacBook Air:
 | Battery power | Adapter input − system power; if either is missing, IORegistry voltage × current (`PPBR` is never used) |
 | CPU/GPU/ANE power | Apple silicon: IOReport energy model, with `powermetrics` for the CPU under admin CPU sampling; Intel: SMC `PCPC`/`PCPG` (read-only) |
 | System time estimate, whether on power | IOKit Power Sources |
+| Charger name, maker, rating, negotiated voltage and current | `AdapterDetails` in IORegistry `AppleSmartBattery` (read together with the battery data); IOKit Power Sources if missing |
+| Charger connection (MagSafe 3 / USB-C) | `ConnectionActive` and `PortTypeDescription` in IORegistry `IOAccessoryManager`, read only while the panel is open; not shown with more than one power source or when the port can't be told |
 | Whether it's charging | Mainly SMC live battery power; the battery chip's charging flags when the value is ambiguous |
 | Health (maximum capacity), battery condition | `system_profiler SPPowerDataType` |
 | Battery temperature | `Temperature` in IORegistry `AppleSmartBattery` (`VirtualTemperature` if missing), or SMC (read-only, `TB0T`–`TB2T`) when neither exists |

@@ -7,6 +7,44 @@ struct AdapterInfo: Codable, Equatable {
     var voltage_mV: Int?
     var current_mA: Int?
     var name: String?
+    var manufacturer: String?
+    var model: String?
+    var connection: String?
+
+    static func parse(_ details: [String: Any]) -> AdapterInfo {
+        func positive(_ key: String) -> Int? {
+            guard let n = details[key] as? NSNumber, n.intValue > 0 else { return nil }
+            return n.intValue
+        }
+        func text(_ key: String) -> String? {
+            guard let value = details[key] as? String else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        func productName(_ value: String?) -> String? {
+            guard let value else { return nil }
+            let generic = ["pd charger", "usb pd charger", "usb-c charger", "charger"]
+            return generic.contains(value.lowercased()) ? nil : value
+        }
+        return AdapterInfo(watts: positive("Watts"), voltage_mV: positive("AdapterVoltage") ?? positive("Voltage"),
+            current_mA: positive("Current"), name: productName(text("Name")) ?? productName(text("Description")),
+            manufacturer: text("Manufacturer"), model: text("Model"))
+    }
+    var specification: String? {
+        guard let v = voltage_mV, let a = current_mA, v > 0, a > 0 else { return nil }
+        return String(format: "%g V · %g A", Double(v) / 1000, Double(a) / 1000)
+    }
+    /// 多種連接埠同時啟用時不猜測哪個正在供電。
+    static func connectionLabel(activeTypes: [String], chargerCount: Int? = nil) -> String? {
+        let types = Set(activeTypes)
+        let magSafe = types.filter { $0.localizedCaseInsensitiveContains("MagSafe") }
+        // MagSafe 只有供電用途；系統只認到一個充電器時，USB-C 的活動連線可能只是周邊。
+        // 有多個充電來源時，不能從連線狀態判斷實際選中的來源。
+        if let chargerCount, chargerCount > 1 { return nil }
+        if magSafe.count == 1, types.count == 1 || chargerCount == 1 { return magSafe.first }
+        guard types.count == 1 else { return nil }
+        return types.contains("USB-C") ? "USB-C" : nil
+    }
 }
 
 /// 某一時間點讀到的原始電池資料。時間單位都是分鐘，nil 代表系統沒提供或還在計算。
@@ -159,7 +197,8 @@ enum BatteryReader {
         return current
     }
 
-    static func read(includeTemperature: Bool = true, includeLivePower: Bool = true) -> BatterySnapshot? {
+    /// includeConnection：掃連接埠辨識 MagSafe／USB-C。只顯示在面板裡，面板關著時不用掃
+    static func read(includeTemperature: Bool = true, includeLivePower: Bool = true, includeConnection: Bool = true) -> BatterySnapshot? {
         // 桌上型 Mac 的電池元件是空的，不讀，改走桌上型的系統耗電
         guard hasBattery, let reg = registryProperties() else { return nil }
         let data = reg["BatteryData"] as? [String: Any] ?? [:]
@@ -226,9 +265,10 @@ enum BatteryReader {
         }
 
         if s.externalConnected {
-            s.adapter = adapterInfo()
+            s.adapter = adapterInfo(registryDetails: reg["AdapterDetails"] as? [String: Any],
+                                    chargerCount: int(reg["ChargerCount"]), includeConnection: includeConnection)
         } else {
-            adapterCache = nil
+            s.adapter = nil
         }
         return s
     }
@@ -279,22 +319,29 @@ enum BatteryReader {
         return Double(load) / 1000
     }
 
-    /// 變壓器規格（額定瓦數等）不會每秒變；接上電源後先查一次，之後每 30 秒更新
-    private static var adapterCache: (info: AdapterInfo?, date: Date)?
-
-    private static func adapterInfo() -> AdapterInfo? {
-        if let cache = adapterCache, Date().timeIntervalSince(cache.date) < 30 { return cache.info }
-        var info: AdapterInfo?
-        if let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any] {
-            info = AdapterInfo(
-                watts: int(details["Watts"]),
-                voltage_mV: int(details["AdapterVoltage"]) ?? int(details["Voltage"]),
-                current_mA: int(details["Current"]),
-                name: (details["Name"] as? String) ?? (details["Description"] as? String)
-            )
-        }
-        adapterCache = (info, Date())
+    /// 變壓器規格：每次更新都從同一次讀到的電池資料取（不另外查），換充電器後不會顯示舊資料
+    private static func adapterInfo(registryDetails: [String: Any]?, chargerCount: Int?, includeConnection: Bool) -> AdapterInfo? {
+        // 單次快照只使用一份詳細資料，避免換充電器時混用系統不同步的名稱與規格。
+        let details = registryDetails ?? (IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any])
+        var info = details.map(AdapterInfo.parse)
+        if info == nil { info = AdapterInfo() }
+        if includeConnection { info?.connection = adapterConnection(chargerCount: chargerCount) }
         return info
+    }
+
+    private static func adapterConnection(chargerCount: Int?) -> String? {
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccessoryManager"), &iterator) == KERN_SUCCESS else { return nil }
+        defer { IOObjectRelease(iterator) }
+        var types: [String] = []
+        while case let service = IOIteratorNext(iterator), service != 0 {
+            defer { IOObjectRelease(service) }
+            guard let active = IORegistryEntryCreateCFProperty(service, "ConnectionActive" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSNumber,
+                  active.boolValue,
+                  let type = IORegistryEntryCreateCFProperty(service, "PortTypeDescription" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String else { continue }
+            types.append(type)
+        }
+        return AdapterInfo.connectionLabel(activeTypes: types, chargerCount: chargerCount)
     }
 
     private static func registryProperties() -> [String: Any]? {

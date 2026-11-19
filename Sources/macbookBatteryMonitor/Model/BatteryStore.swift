@@ -94,8 +94,8 @@ final class BatteryStore {
     }
 
     func refresh() {
-        // 溫度要另外問 SMC，只有面板開著時才需要
-        guard var s = BatteryReader.read(includeTemperature: panelVisible) else {
+        // 溫度要另外問 SMC、充電器連接方式要掃連接埠，都只有面板開著時才需要
+        guard var s = BatteryReader.read(includeTemperature: panelVisible, includeConnection: panelVisible) else {
             snapshot = nil
             estimates = nil
             chargingPresentation = ChargingPresentation()

@@ -134,6 +134,11 @@ final class EventTapAccess: @unchecked Sendable {
         if idle {
             timer?.cancel()
             timer = nil
+            // 攔截都停了（不是停用中）：權限變動通知也不再需要，下次建立攔截時再註冊
+            if locked({ ports.isEmpty && state == .normal }), let token = tccToken {
+                notify_cancel(token)
+                tccToken = nil
+            }
             return
         }
         if TapAccess.wakeGraceLeft(lastWake: locked({ lastWake }), now: Date()) != nil { return }

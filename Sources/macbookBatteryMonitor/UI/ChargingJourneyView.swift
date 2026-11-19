@@ -165,6 +165,7 @@ struct CompanionFigure: View {
     var liveEyes = false
     var mood: CatMood = .awake
     var followsCursor = true
+    var blinks = true
 
     var body: some View {
         Group {
@@ -181,7 +182,7 @@ struct CompanionFigure: View {
             case .energy:
                 energyBar
             case .photo:
-                CompanionPhotoFigure(presentation: presentation, width: width, liveEyes: liveEyes, mood: mood, followsCursor: followsCursor)
+                CompanionPhotoFigure(presentation: presentation, width: width, liveEyes: liveEyes, mood: mood, followsCursor: followsCursor, blinks: blinks)
             case .customPhoto:
                 CompanionPhotoFigure(presentation: presentation, width: width, custom: true)
             }

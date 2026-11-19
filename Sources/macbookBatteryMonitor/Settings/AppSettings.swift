@@ -522,8 +522,9 @@ final class AppSettings {
 
     /// 每天自動檢查一次 GitHub 上有沒有新版本（只檢查，不會自動安裝）
     var autoCheckUpdates: Bool {
-        didSet { defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates) }
+        didSet { defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates); onAutoCheckUpdatesChange?() }
     }
+    @ObservationIgnored var onAutoCheckUpdatesChange: (() -> Void)?
     /// 自動檢查發現新版本時發通知（每個版本只通知一次）
     var updateNotification: Bool {
         didSet { defaults.set(updateNotification, forKey: Keys.updateNotification) }

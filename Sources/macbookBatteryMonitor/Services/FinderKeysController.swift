@@ -27,9 +27,10 @@ final class FinderKeysController {
             tap.stop()
             if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
             activationObserver = nil
+            KeyboardLetters.shared.stop(for: "finderKeys")
             return !enabled
         }
-        KeyboardLetters.shared.start()
+        KeyboardLetters.shared.start(for: "finderKeys")
         if activationObserver == nil {
             activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main

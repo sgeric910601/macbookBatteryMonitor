@@ -199,10 +199,16 @@ final class ChargingWakeScheduler {
             Task { @MainActor in
                 guard let self else { return }
                 if hadWake { self.log("精準喚醒：已取消") }
-                guard removeHelperIfUnused,
-                      !ChargingWakePolicy.keepsHelper(cpuSampling: AppSettings.shared.adminCPUSampling,
-                                                      chargingWake: AppSettings.shared.chargingWakeEnabled) else { return }
-                helper.uninstall { _ in }
+                guard removeHelperIfUnused else { return }
+                guard !ChargingWakePolicy.keepsHelper(cpuSampling: AppSettings.shared.adminCPUSampling,
+                                                      chargingWake: AppSettings.shared.chargingWakeEnabled) else {
+                    // 功能關了、服務留給管理員 CPU 取樣用：這邊的連線不再需要（回覆到之前又打開了就留著）
+                    if !AppSettings.shared.chargingWakeEnabled { self.connection?.invalidate() }
+                    return
+                }
+                helper.uninstall { _ in
+                    Task { @MainActor [weak self] in self?.connection?.invalidate() }
+                }
                 self.log("精準喚醒：已關閉，移除管理員服務")
             }
         }

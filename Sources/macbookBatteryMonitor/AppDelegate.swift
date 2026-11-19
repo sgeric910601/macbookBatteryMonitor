@@ -46,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var adapterPreReadTimer: Timer?
     private var processTimer: Timer?
     private var timers: [Timer] = []
+    /// 只在有對應功能開著時才存在的計時器（關掉功能就停）
+    private var accessCheckTimer: Timer?
+    private var updateCheckTimer: Timer?
     /// 上次畫到選單列的內容，沒變就不重畫
     private var lastStatusKey = ""
     private var chargingIconFlow: ChargingIconFlowView?
@@ -155,19 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
         applyLastWindowQuit(prompt: false)
-        // 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
-        // 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。都沒啟用時什麼都不做
-        timers.append(repeating(every: 5) { delegate in
-            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
-            let shift = delegate.inputAllowed && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
-                && InputSourceFix.shared.isRunning
-            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
-            let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
-            guard features.contains(where: delegate.settings.isInstalled) else { return }
-            delegate.applyQuitGuard(prompt: false)
-            delegate.applyMouseButtons(prompt: false)
-            delegate.applyLastWindowQuit(prompt: false)
-        })
+        updateAccessCheck()
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -185,10 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             guard let self, self.settings.autoCheckUpdates else { return }
             self.store.updater.checkIfDue()
         }
-        timers.append(repeating(every: 6 * 3600) { delegate in
-            guard delegate.settings.autoCheckUpdates, !delegate.sleeping else { return }
-            delegate.store.updater.checkIfDue()
-        })
+        settings.onAutoCheckUpdatesChange = { [weak self] in self?.updateUpdateCheck() }
+        updateUpdateCheck()
         timers.append(repeating(every: PeripheralStore.interval) { delegate in
             guard !delegate.sleeping else { return }
             delegate.store.peripherals.refresh(includeAllBluetooth: delegate.ui.isVisible && delegate.ui.page == .main && delegate.ui.tab == .peripherals)
@@ -314,6 +303,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func applyFeature(_ feature: ExtensionFeature) {
+        defer { updateAccessCheck() }
         switch feature {
         case .xdrBrightness: applyXDRBrightness()
         case .scrollDirection: applyScrollDirection(prompt: true)
@@ -322,8 +312,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .quitGuard: applyQuitGuard(prompt: true)
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: applyLastWindowQuit(prompt: true)
         case .mouseButtons: applyMouseButtons(prompt: true)
-        // 只在面板上多一個按鈕，加入或移除時面板自己會更新
-        case .audioSwitch: break
+        // 只在面板上多一個按鈕，加入或移除時面板自己會更新；移除時把調到 0 的輸入音量還原（按鈕不見了就沒辦法自己取消）
+        case .audioSwitch:
+            if !settings.isInstalled(.audioSwitch) { AudioSwitchController.shared.restoreInputVolumes() }
         case .quickMenu: applyQuickMenu()
         // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
         case .portManager: break
@@ -446,6 +437,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func applyInputSourceFix(prompt: Bool) {
         InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         applyShiftHalfWidth(prompt: prompt)
+        updateAccessCheck()
+    }
+
+    /// 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
+    /// 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。這些功能都沒開時連計時器都不建立
+    private func updateAccessCheck() {
+        let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
+        let shiftWanted = settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
+        guard features.contains(where: settings.isInstalled) || shiftWanted else {
+            accessCheckTimer?.invalidate()
+            accessCheckTimer = nil
+            return
+        }
+        guard accessCheckTimer == nil else { return }
+        accessCheckTimer = repeating(every: 5) { delegate in
+            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
+            let shift = delegate.inputAllowed && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
+                && InputSourceFix.shared.isRunning
+            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
+            guard features.contains(where: delegate.settings.isInstalled) else { return }
+            delegate.applyQuitGuard(prompt: false)
+            delegate.applyMouseButtons(prompt: false)
+            delegate.applyLastWindowQuit(prompt: false)
+        }
+    }
+
+    /// 自動檢查更新開著時每 6 小時看一次（距離上次超過一天才真的連線）；關掉就停
+    private func updateUpdateCheck() {
+        guard settings.autoCheckUpdates else {
+            updateCheckTimer?.invalidate()
+            updateCheckTimer = nil
+            return
+        }
+        guard updateCheckTimer == nil else { return }
+        updateCheckTimer = repeating(every: 6 * 3600) { delegate in
+            guard !delegate.sleeping else { return }
+            delegate.store.updater.checkIfDue()
+        }
     }
 
     private func applyShiftHalfWidth(prompt: Bool) {

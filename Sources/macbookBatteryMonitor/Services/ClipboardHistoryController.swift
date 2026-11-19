@@ -1,19 +1,21 @@
 import AppKit
+import Observation
 
 /// 剪貼簿歷史（整理在 ClipboardHistory）。macOS 沒有剪貼簿改變的通知，只能定時看變更次數：
 /// 啟用時每 0.75 秒讀一個整數，有變才讀內容；停用、鎖定螢幕、睡眠時清空。內容只放在記憶體
 @MainActor
+@Observable
 final class ClipboardHistoryController {
     static let shared = ClipboardHistoryController()
 
     private(set) var history = ClipboardHistory()
-    private var timer: Timer?
-    private var lastChange = NSPasteboard.general.changeCount
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var lastChange = NSPasteboard.general.changeCount
     /// 背景正在讀內容；讀完前不開始下一次
-    private var reading = false
+    @ObservationIgnored private var reading = false
     /// 每次清空加一：讀到一半時鎖定螢幕或睡眠，讀完的內容不能在清空之後才加進去
-    private var generation = 0
-    private var clearObservers: [(NotificationCenter, NSObjectProtocol)] = []
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var clearObservers: [(NotificationCenter, NSObjectProtocol)] = []
 
     var isRunning: Bool { timer != nil }
 

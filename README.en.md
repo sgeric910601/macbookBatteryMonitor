@@ -351,7 +351,7 @@ Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a
 Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
 
 - **⌘X to cut, ⌘V to move**: select files in Finder, press ⌘X, then ⌘V in another folder to move them (Finder's ⌥⌘V "Move Item Here"). If something else is copied after cutting, ⌘V pastes the clipboard as usual and never moves the files by mistake
-- **F2 to rename**: press F2 on a selected file to rename it (same as Return)
+- **F2 to rename**: press F2 on a selected file to rename it (same as Return); on a MacBook keyboard press fn + F2, since F2 alone changes the brightness
 - **Only in Finder, never while typing**: when Finder is not frontmost, or while renaming or typing in the search field, ⌘X, ⌘V and F2 behave as usual; if Finder does not answer where the focus is, it counts as typing
 - **Keyboard layouts**: works on the US positions of X, C and V, and only when those keys really type X, C and V (ABC, US, Zhuyin, Pinyin, German and French layouts do); layouts such as Dvorak are left alone
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is off

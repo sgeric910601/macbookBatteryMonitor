@@ -59,4 +59,14 @@ struct FinderKeysTests {
         XCTAssertEqual(keys.keyDown(keyCode: x, command: true, otherModifiers: true, finderFront: true, editingText: false, pasteboardChange: 1), .pass)
         XCTAssertEqual(press(&keys, v), .pass)
     }
+
+    /// 只有 ⌘X／⌘C／⌘V 和不按 ⌘ 的 F2 要查 Finder 焦點；一般打字的 x、c、v 和 ⌘F2 直接放行
+    func testMayRewrite() {
+        for key in [FinderKeys.xKey, FinderKeys.cKey, FinderKeys.vKey] {
+            XCTAssertTrue(FinderKeys.mayRewrite(keyCode: key, command: true))
+            XCTAssertTrue(!FinderKeys.mayRewrite(keyCode: key, command: false))
+        }
+        XCTAssertTrue(FinderKeys.mayRewrite(keyCode: FinderKeys.f2Key, command: false))
+        XCTAssertTrue(!FinderKeys.mayRewrite(keyCode: FinderKeys.f2Key, command: true))
+    }
 }

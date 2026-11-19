@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 
 struct AudioDevicesTests {
@@ -25,10 +26,20 @@ struct AudioDevicesTests {
         XCTAssertEqual(AudioDevices.mutePlan(hasMuteSwitch: false, volume: nil), .unsupported)
     }
 
+    /// 裝置圖示依連接方式：內建、藍牙、螢幕、虛擬裝置各有圖示，不認得的用一般喇叭
+    func testDeviceSymbol() {
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeBuiltIn), "laptopcomputer")
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeBluetoothLE), "headphones")
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeHDMI), "display")
+        XCTAssertEqual(AudioDevices.symbol(transport: kAudioDeviceTransportTypeVirtual), "waveform")
+        XCTAssertEqual(AudioDevices.symbol(transport: 0), "hifispeaker")
+        XCTAssertEqual(AudioDevices.outputs([AudioDevices.Device(id: 1, name: "a", outputs: true, inputs: false, transport: kAudioDeviceTransportTypeHDMI)], current: nil).first?.transport, kAudioDeviceTransportTypeHDMI)
+    }
+
     /// 只有需要「輔助使用」的擴充功能才列在權限頁的輔助使用底下
     func testAccessibilityNeeds() {
-        XCTAssertTrue(!ExtensionFeature.audioSwitch.needsAccessibility && !ExtensionFeature.quickMenu.needsAccessibility && !ExtensionFeature.portManager.needsAccessibility && !ExtensionFeature.clipboardHistory.needsAccessibility)
-        XCTAssertTrue(ExtensionFeature.allCases.filter { ![.audioSwitch, .quickMenu, .portManager, .clipboardHistory].contains($0) }.allSatisfy(\.needsAccessibility))
+        XCTAssertTrue(!ExtensionFeature.audioSwitch.needsAccessibility && !ExtensionFeature.quickMenu.needsAccessibility && !ExtensionFeature.portManager.needsAccessibility && !ExtensionFeature.clipboardHistory.needsAccessibility && !ExtensionFeature.speedTest.needsAccessibility && !ExtensionFeature.startupItems.needsAccessibility)
+        XCTAssertTrue(ExtensionFeature.allCases.filter { ![.audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .startupItems].contains($0) }.allSatisfy(\.needsAccessibility))
         XCTAssertEqual(AppPermission.accessibility.users(isInstalled: { $0 == .audioSwitch }), [])
     }
 }

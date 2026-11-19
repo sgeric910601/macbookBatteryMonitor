@@ -11,6 +11,8 @@ final class KeyboardLetters: @unchecked Sendable {
     /// 還沒算出來之前當作 US
     private var letters: [Int: Character] = KeyLayout.usLetters
     private var observer: NSObjectProtocol?
+    /// 正在用的功能；都停了就不再跟著輸入法更新（只在主執行緒存取）
+    private var users: Set<String> = []
 
     func letter(at keyCode: Int) -> String? {
         lock.lock()
@@ -20,12 +22,22 @@ final class KeyboardLetters: @unchecked Sendable {
 
     /// 開始跟著輸入法更新；重複呼叫沒有影響
     @MainActor
-    func start() {
+    func start(for user: String) {
+        users.insert(user)
         guard observer == nil else { return }
         update()
         observer = DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil, queue: .main
         ) { _ in MainActor.assumeIsolated { KeyboardLetters.shared.update() } }
+    }
+
+    /// 這個功能不再需要；所有功能都停了才移除監聽
+    @MainActor
+    func stop(for user: String) {
+        users.remove(user)
+        guard users.isEmpty, let observer else { return }
+        DistributedNotificationCenter.default().removeObserver(observer)
+        self.observer = nil
     }
 
     @MainActor

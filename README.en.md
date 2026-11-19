@@ -110,7 +110,7 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
   - Drives without that record (internal drives that aren't NVMe, such as a 2015 MacBook Air's, and most USB enclosures) show the SMART "正常／異常" (OK / failing) status, and totals since boot (since connected for external disks)
 - **Network**: the menu bar shows upload and download speed; the panel shows the current interface (Wi-Fi, Ethernet) and IP, a speed chart and totals since boot
   - **Connection status**: whether a VPN is connected (a tunnel interface with a usable address; the system's own utun interfaces do not count), plus the system's Low Data Mode and metered network flags (for example a phone hotspot). It only looks at local interfaces and the system network path, watches only while the panel is open, and contacts no outside server
-  - **Speed test**: off by default so it isn't started by accident; after turning on 「在網路面板顯示測速」 (show speed test in the network panel) in Settings → Monitoring & power saving, press 「開始測速」 (start test) at the bottom of the panel to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
+  - **Speed test**: off by default so it isn't started by accident; after turning on 「網路測速」 (network speed test) in Settings → 功能管理 (feature management), press 「開始測速」 (start test) at the bottom of the network panel (the network monitor has to be on) to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
 - Child processes (such as browser tabs) are merged into their app
 
 ![Battery plus system monitors: CPU/GPU, memory, disk and network icons in the menu bar and each monitor's panel, with fans, temperatures and external disks](docs/screenshots/edition-status.png)
@@ -141,8 +141,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 |---|---|---|
 | 基本 (Basic) | 一般 (General) | App icon color, notification thresholds, launch at login, settings backup (export, import) |
 | | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, network speed test, combine into one icon, admin CPU sampling |
-| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (see "[Login items](#login-items)") |
+| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, combine into one icon, admin CPU sampling |
 | | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
@@ -150,6 +149,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
 | | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
 | | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, Finder shortcuts, quit when the last window closes, click a Dock icon to minimize |
+| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (shown once 登入項目管理 (login item management) is on; see "[Login items](#login-items)") |
 | | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
 | 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
 
@@ -225,11 +225,11 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you turn it on in Settings → 功能管理 (feature management), and can be turned off again:
 
 - **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
-- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports and clipboard history need no permission
-- **Updating from an older version**: scroll direction, which older versions had, and any feature whose own switch was already on (for example the window switcher or the Chinese input method options) stay on
+- **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports, clipboard history and network speed test need no permission, and login item management needs Automation
+- **Updating from an older version**: scroll direction and login items, which older versions had, and any feature whose own switch was already on (for example the window switcher, the Chinese input method options or the speed test) stay on
 - **Not extension features, always there**: the keep-awake button in the panel, the connection status (VPN, Low Data Mode) in the network panel, the connected-devices list on the peripherals page, and the permissions page and settings backup in Settings. None needs a permission, and each reads only while its panel or page is open
 - **Fast user switching**: all keyboard and mouse taps stop while you switch to another user and start again when you come back, so a background tap never slows down the foreground user's input
-- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history, XDR brightness boost (experimental)
+- Available: scroll direction, window switching, Chinese input methods, hold ⌘Q / ⌘W, quit when the last window closes, click a Dock icon to minimize, keyboard cleaning mode, mouse side buttons, audio switcher, green button maximizes, window snapping, Finder shortcuts, cat quick menu, ports and quitting processes, clipboard history, XDR brightness boost (experimental), network speed test, login item management
 
 ## XDR brightness boost (experimental)
 
@@ -252,7 +252,7 @@ See the [XDR design and local verification notes](docs/design/xdr-brightness.md)
 
 ## Monitor alerts
 
-"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. While the screens are off or another user is active and any alert is on, the monitors that are on are sampled every 30 seconds and still checked. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
 
 ## Mouse and trackpad scroll directions
 
@@ -298,7 +298,7 @@ The system integration uses private macOS functions, all loaded at run time and 
 
 Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
 
-- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch
+- **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch. Virtual devices that cannot be the default output (for example a device some audio tools add for system alert sounds) are not listed, as in the system Sound menu
 - **Mute microphone**: uses the device's mute switch, or, if there is no switch, the menu says "輸入音量調到 0" (set input volume to 0) and the volume is restored when unmuted or when the app quits. A meeting app's automatic gain may turn it back up, so use the meeting app's own mute for such devices. The button shows a crossed-out microphone while muted
 - **Permission**: uses the public Core Audio API and needs no permission; devices are read only when the menu opens
 
@@ -320,12 +320,13 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 
 ## Clipboard history
 
-Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu:
+Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu (collapsed by default; click its title to list them):
 
 - **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
 - **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
+- **Paused while locked or with the screens off**: the clipboard isn't checked; checking resumes with an immediate check once the screen is unlocked and on
 - **Power**: macOS has no clipboard change notification, so while on it reads the clipboard's change count every 0.75 s and reads the content only when it changed; when off nothing is checked
-- The menu can clear the history; no permission needed
+- The panel can clear the history; it stays open and the list empties; no permission needed
 
 ## Ports and quitting processes
 
@@ -338,21 +339,23 @@ Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings 
 
 ## Cat quick menu
 
-Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar with:
+Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar. Clicking it opens a panel with:
 
-- **Keep awake**: pick a duration, stop, or keep the display on too; the title shows the time left while active
-- **Audio output** and **mute microphone**
-- **Start keyboard cleaning** (when keyboard cleaning mode is on)
-- **Extension features**: turn each one on or off directly
-- **Settings…** and **Quit**
-- The menu reads the current state only when it opens and does nothing otherwise; no permission needed
+- **Three large buttons**: keep awake (with the time left), mute microphone (with the audio switcher on) and start keyboard cleaning (with keyboard cleaning mode on)
+- **Keep-awake duration**: 30 min, 1 h, 2 h or until turned off, with the running one highlighted; the display can stay on too
+- **Audio output**: the same device list as the audio switcher; click one to switch
+- **Clipboard history** (when on): collapsed by default and showing only the item count, so opening the panel (for example while sharing your screen) doesn't reveal what you copied; click the title to list the last 30 items (four rows visible, the rest scroll). It starts collapsed every time the panel opens. Click an item to put it back on the clipboard; once expanded it can be cleared, and clearing keeps the panel open
+- **功能管理** (manage features): switches the panel to an extension features page where each feature has its own switch; "返回" (back) or Esc returns. A feature that needs Accessibility opens the permissions page if it is not allowed yet. The cat quick menu itself is turned off in Settings, since turning it off here would remove the panel
+- **Settings** and **Quit** at the bottom
+- Clicking outside closes the panel; the battery and system monitor panels also close when you click elsewhere or on another menu bar icon
+- The panel reads the current state when it opens and keeps it up to date while open; when closed it does nothing; no permission needed
 
 ## Finder shortcuts
 
 Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
 
 - **⌘X to cut, ⌘V to move**: select files in Finder, press ⌘X, then ⌘V in another folder to move them (Finder's ⌥⌘V "Move Item Here"). If something else is copied after cutting, ⌘V pastes the clipboard as usual and never moves the files by mistake
-- **F2 to rename**: press F2 on a selected file to rename it (same as Return)
+- **F2 to rename**: press F2 on a selected file to rename it (same as Return); on a MacBook keyboard press fn + F2, since F2 alone changes the brightness
 - **Only in Finder, never while typing**: when Finder is not frontmost, or while renaming or typing in the search field, ⌘X, ⌘V and F2 behave as usual; if Finder does not answer where the focus is, it counts as typing
 - **Keyboard layouts**: works on the US positions of X, C and V, and only when those keys really type X, C and V (ABC, US, Zhuyin, Pinyin, German and French layouts do); layouts such as Dvorak are left alone
 - **Permission**: needs Accessibility; nothing is intercepted while the feature is off
@@ -422,7 +425,7 @@ The "中文輸入法" (Chinese input) card under Settings → 滑鼠、觸控板
 
 ## Login items
 
-Settings → 登入項目 (Login items) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
+Settings → 登入項目 (Login items) (turn on 「登入項目管理」 (login item management) in feature management first; it stays on when updating from an older version) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
 
 - **Sources**: the "open at login" items, `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`. Every row has an icon, and items whose program no longer exists say so
 - **What you can do**: add or remove "open at login" apps; disable or enable your own (user-level) agents. Disabling takes effect at the next login and also stops the copy that is running now. Every action asks first. This app's own login item and agent are listed only and can't be disabled or removed here
@@ -540,6 +543,7 @@ CPU usage measured on an M1 MacBook Air:
 | CPU or memory monitor panel open | About 3%, plus about 6% for `top` | About 2%, plus about 3% for `top` |
 
 - With the panel closed, only what the menu bar needs is read (charge, state, power, time remaining); plugging and unplugging update immediately through system notifications. Menu bar icons are only redrawn when a number, time or state changes
+- **Slower when nobody can see it**: while the screens are off (display sleep) or another user is active, timed updates are at least 30 seconds apart, the system monitors don't redraw the menu bar, and hardware power and per-process energy sampling pause; smart charging and battery notifications are checked about every 30 seconds too. If any CPU, memory or disk alert is on, the monitors that are on keep sampling every 30 seconds so alerts still work; with none on, sampling stops. Everything updates right away when the screen wakes or you switch back
 - The panel is built each time it opens and released entirely when it closes, so nothing draws in the background. Component details, SMC temperatures and the optional admin CPU sampling are only read while the panel is open
 - `top` only runs while the top energy users tab or a CPU/memory panel is open
 - Each SMC key's format is looked up once and remembered; only `PDTR` and `PSTR` are read every second. Adapter details come from the same battery read on every update, with a separate system query only when the battery data has none; the charger connection is checked only while the panel is open; the system charge limit only at launch, when the panel opens and when the system announces a change

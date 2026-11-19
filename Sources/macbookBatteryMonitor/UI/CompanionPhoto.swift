@@ -104,6 +104,7 @@ struct CompanionPhotoFigure: View {
     var liveEyes = false
     var mood: CatMood = .awake
     var followsCursor = true
+    var blinks = true
 
     var body: some View {
         let unit = width / 48
@@ -147,7 +148,7 @@ struct CompanionPhotoFigure: View {
 
     @ViewBuilder private var eyesOverlay: some View {
         if liveEyes, !custom, let photo = CompanionPhoto.bundledCGImage {
-            CatEyesOverlay(photo: photo, eyes: CatEye.bundled, key: 0, mood: mood, followsCursor: followsCursor)
+            CatEyesOverlay(photo: photo, eyes: CatEye.bundled, key: 0, mood: mood, followsCursor: followsCursor, blinks: blinks)
         }
     }
 }

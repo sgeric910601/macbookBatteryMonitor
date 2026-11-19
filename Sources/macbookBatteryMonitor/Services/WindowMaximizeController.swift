@@ -390,6 +390,8 @@ final class WindowMaximizeTap: @unchecked Sendable {
             }
             var element: AXUIElement?
             guard AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) == .success, let element else { return pass }
+            // 子元素不會沿用 App 元素的等待上限（預設約 6 秒）：那個 App 剛好卡住時，整台 Mac 的點擊都會等它
+            AXUIElementSetMessagingTimeout(element, 0.015)
             var subrole: AnyObject?
             guard AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole) == .success,
                   subrole as? String == kAXFullScreenButtonSubrole as String else { return pass }

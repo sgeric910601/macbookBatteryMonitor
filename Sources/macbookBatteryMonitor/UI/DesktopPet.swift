@@ -133,6 +133,8 @@ final class DesktopPetController {
         bubble = nil
         bubbleHost = nil
         pet?.orderOut(nil)
+        // 先把內容拿掉，眼睛收到「離開視窗」才會停掉游標監聽與眨眼計時器（視窗被釋放時不保證會通知）
+        pet?.contentView = nil
         pet = nil
     }
 
@@ -450,7 +452,8 @@ struct DesktopPetFigureView: View {
                                     liveEyes: (settings.desktopPetLiveEyes || settings.desktopPetFollowCursor) && !settings.powerSavingActive,
                                     mood: !settings.desktopPetLiveEyes ? .awake
                                         : presentation.badge == .sleeping && !state.hovering ? .sleeping : .awake,
-                                    followsCursor: settings.desktopPetFollowCursor)
+                                    followsCursor: settings.desktopPetFollowCursor,
+                                    blinks: settings.desktopPetLiveEyes)
                 }
             }
         }

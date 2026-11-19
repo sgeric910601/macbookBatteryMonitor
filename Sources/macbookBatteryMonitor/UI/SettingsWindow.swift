@@ -21,7 +21,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case windowSwitcher
     /// 視窗與 Dock 的其他擴充功能（關閉最後視窗時結束 App 等）
     case windows
-    /// 登入時自動啟動的項目
+    /// 登入時自動啟動的項目（擴充功能「登入項目管理」，啟用了才出現）
     case startup
     /// 用到的系統權限與狀態
     case permissions
@@ -118,7 +118,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .windowSwitcher: return .windowSwitcher
         case .xdrBrightness: return .xdrBrightness
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
-        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory: return nil
+        case .startupItems: return .startup
+        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest: return nil
         }
     }
 
@@ -126,7 +127,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// 最後一組「關於」只有「更新」，單獨放在最下面
     static func sidebar(hasBattery: Bool, isInstalled: (ExtensionFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
         [
-            ("基本", [.general, .display, .monitors, .startup, .permissions]),
+            ("基本", [.general, .display, .monitors, .permissions]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
             ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).compactMap(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
             ("關於", [.update]),

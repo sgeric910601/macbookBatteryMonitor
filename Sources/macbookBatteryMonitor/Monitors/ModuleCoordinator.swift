@@ -22,8 +22,12 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     /// 每次打開都建立新的，關閉後整個釋放
     private var popover: NSPopover?
     private var openKind: MonitorKind?
+    /// 從選單列圖示打開的面板：系統的 .transient 打開過選單（例如快捷選單）後常不會自己收起來，自己監聽面板外的點擊
+    private var outsideClickMonitors: [Any] = []
     private var topStream: TopStream?
     private var sleeping = false
+    /// 螢幕關著或切到其他使用者：不畫選單列；有開警示時每 30 秒取樣一次，警示照常（見 RefreshPacing）
+    private var unseen = false
     private var cpuAlert = SustainedAlert(duration: MonitorAlertRules.cpuDuration)
     private var memoryAlert = SustainedAlert(duration: MonitorAlertRules.memoryDuration)
     private var diskAlert = SustainedAlert(duration: 0)
@@ -113,7 +117,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
             }
         }
         // 關掉測速開關或網路模組後就看不到測速卡片，正在跑的測速也一起停掉
-        if !(settings.networkSpeedTest && settings.isMonitorEnabled(.network)) {
+        if !(settings.isInstalled(.speedTest) && settings.isMonitorEnabled(.network)) {
             network.speedTest.cancel()
         }
         tick()
@@ -136,6 +140,20 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         updateTimer()
     }
 
+    func setUnseen(_ value: Bool) {
+        guard value != unseen else { return }
+        unseen = value
+        timer?.invalidate()
+        timer = nil
+        if value {
+            topStream?.stop()
+        } else if !sleeping {
+            tick()
+            if openKind != nil { startTop() }
+        }
+        updateTimer()
+    }
+
     /// 更新頻率或省電模式改變後，計時器與 top 改用新的間隔
     func applySampleInterval() {
         timer?.invalidate()
@@ -147,13 +165,15 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     // MARK: - 定時取樣（依設定的更新頻率）
 
     private func updateTimer() {
-        let shouldRun = (!items.isEmpty || stripActive) && !sleeping
+        let alerting = settings.alertCPU || settings.alertMemory || settings.alertDisk
+        let shouldRun = (!items.isEmpty || stripActive) && !sleeping && (!unseen || alerting)
         if shouldRun, timer == nil {
-            let interval = settings.sampleInterval
+            let base = settings.sampleInterval
+            let interval = RefreshPacing.interval(base: base, unseen: unseen)
             let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }
             }
-            timer.tolerance = interval * 0.1
+            timer.tolerance = unseen ? RefreshPacing.tolerance(base: base, unseen: true) : interval * 0.1
             RunLoop.main.add(timer, forMode: .common)
             self.timer = timer
         } else if !shouldRun {
@@ -174,6 +194,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         if active(.disk) { disk.sample(at: now) }
         if active(.network) { network.sample(at: now) }
         checkAlerts(cpu: active(.cpu), memory: active(.memory), disk: active(.disk), at: now)
+        guard !unseen else { return }
         for (kind, item) in items { render(kind, item) }
         // top 意外結束時（例如被強制結束），面板還開著就重新啟動
         if let topStream, !topStream.isRunning, !sleeping { topStream.start() }
@@ -201,10 +222,11 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private func render(_ kind: MonitorKind, _ item: NSStatusItem) {
         guard let button = item.button else { return }
         let content = menuBarContent(kind)
+        // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
+        button.setToolTipUnlessHovered(content.tooltip)
         guard content.key != lastKeys[kind] else { return }
         lastKeys[kind] = content.key
         button.image = content.image()
-        button.toolTip = content.tooltip
         // 圖示寬度固定（依範本計算），第一次畫好後鎖住長度；
         // 否則每秒換圖都會觸發 _adjustLength，讓整條選單列重新排版
         if item.length == NSStatusItem.variableLength {
@@ -302,13 +324,15 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     }
 
     private func showPopover(_ kind: MonitorKind, from button: NSView, behavior: NSPopover.Behavior = .transient) {
+        // 舊面板的 popoverDidClose 可能在新面板接手後才到，那時不會拆它的點擊監聽：先拆，免得作用在新面板上
+        stopOutsideClickMonitoring()
         openKind = kind
         cpu.setThermalActive(kind == .cpu)
         disk.setHealthActive(kind == .disk || (kind == .memory && settings.memoryDiskMerged))
         tick()
         let root = MonitorPanel(kind: kind, cpu: cpu, memory: memory, disk: disk, network: network,
                                 memoryDiskMerged: settings.memoryDiskMerged,
-                                showsSpeedTest: settings.networkSpeedTest,
+                                showsSpeedTest: settings.isInstalled(.speedTest),
                                 onSettings: { [weak self] in
                                     self?.popover?.closeNow(animated: false)
                                     self?.openSettings?()
@@ -325,14 +349,40 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         popover.allowInFullScreen()
         NSApp.activate()
         popover.contentViewController?.view.window?.makeKey()
+        if behavior == .transient, popover.isShown { startOutsideClickMonitoring(button: button) }
         startTop()
+    }
+
+    /// 點其他 App、桌面或本 App 其他視窗（電池面板、快捷選單的圖示等）就收起來。
+    /// 面板本身與打開它的圖示交給原本的處理（再點一次圖示是收起）
+    private func startOutsideClickMonitoring(button: NSView) {
+        stopOutsideClickMonitoring()
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.popover?.closeNow() }
+        }) {
+            outsideClickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { [weak self, weak button] event in
+            guard let self, let popover = self.popover else { return event }
+            let inside = event.window === popover.contentViewController?.view.window || event.window === button?.window
+            if !inside { popover.closeNow() }
+            return event
+        }) {
+            outsideClickMonitors.append(local)
+        }
+    }
+
+    private func stopOutsideClickMonitoring() {
+        outsideClickMonitors.forEach(NSEvent.removeMonitor)
+        outsideClickMonitors.removeAll()
     }
 
     /// CPU 與記憶體面板開著時，持續跑一個 top 更新程序排行（間隔同設定）
     private func startTop() {
         topStream?.stop()
         topStream = nil
-        guard !sleeping, let openKind else { return }
+        guard !sleeping, !unseen, let openKind else { return }
         let column: String
         switch openKind {
         case .cpu:
@@ -358,6 +408,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         guard let closed = notification.object as? NSPopover else { return }
         // 切換到另一個模組時，新面板已經接手；這裡只釋放舊的
         if closed === popover {
+            stopOutsideClickMonitoring()
             topStream?.stop()
             topStream = nil
             openKind = nil

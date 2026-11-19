@@ -46,10 +46,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var adapterPreReadTimer: Timer?
     private var processTimer: Timer?
     private var timers: [Timer] = []
+    /// 只在有對應功能開著時才存在的計時器（關掉功能就停）
+    private var accessCheckTimer: Timer?
+    private var updateCheckTimer: Timer?
     /// 上次畫到選單列的內容，沒變就不重畫
     private var lastStatusKey = ""
     private var chargingIconFlow: ChargingIconFlowView?
     private var sleeping = false
+    /// 啟動時螢幕可能已經關著（例如夜裡被重新開啟）：先讀一次，之後靠通知更新
+    private var screensAsleep = CGDisplayIsAsleep(CGMainDisplayID()) != 0
+    /// 螢幕關著或切到其他使用者時沒人看得到：監控只留警示、定時更新拉長（見 RefreshPacing）
+    private var unseen: Bool { screensAsleep || !sessionActive }
     private var powerTransitionTask: Task<Void, Never>?
 
     /// 所有資訊依設定的更新頻率更新（預設每秒，省電模式至少 2 秒）；面板關著時也一樣（插拔電源另由 IOPS 通知立即更新）。
@@ -155,19 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         applyMouseButtons(prompt: false)
         settings.onLastWindowQuitChange = { [weak self] in self?.applyLastWindowQuit(prompt: false) }
         applyLastWindowQuit(prompt: false)
-        // 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
-        // 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。都沒啟用時什麼都不做
-        timers.append(repeating(every: 5) { delegate in
-            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
-            let shift = delegate.inputAllowed && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
-                && InputSourceFix.shared.isRunning
-            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
-            let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
-            guard features.contains(where: delegate.settings.isInstalled) else { return }
-            delegate.applyQuitGuard(prompt: false)
-            delegate.applyMouseButtons(prompt: false)
-            delegate.applyLastWindowQuit(prompt: false)
-        })
+        updateAccessCheck()
         desktopPet.openPanel = { [weak self] in self?.showPopover(page: .main) }
         desktopPet.openSettings = { [weak self] in self?.showSettings(.companion) }
         desktopPet.sync()
@@ -185,10 +180,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             guard let self, self.settings.autoCheckUpdates else { return }
             self.store.updater.checkIfDue()
         }
-        timers.append(repeating(every: 6 * 3600) { delegate in
-            guard delegate.settings.autoCheckUpdates, !delegate.sleeping else { return }
-            delegate.store.updater.checkIfDue()
-        })
+        settings.onAutoCheckUpdatesChange = { [weak self] in self?.updateUpdateCheck() }
+        updateUpdateCheck()
         timers.append(repeating(every: PeripheralStore.interval) { delegate in
             guard !delegate.sleeping else { return }
             delegate.store.peripherals.refresh(includeAllBluetooth: delegate.ui.isVisible && delegate.ui.page == .main && delegate.ui.tab == .peripherals)
@@ -207,6 +200,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(sessionBecameActive), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(screensDidSleep), name: NSWorkspace.screensDidSleepNotification, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(screensDidWake), name: NSWorkspace.screensDidWakeNotification, object: nil
+        )
+        if unseen { monitors.setUnseen(true) }
         KeepAwakeController.shared.battery = { [weak self] in
             guard let s = self?.store.snapshot else { return (nil, false) }
             return (s.percent, !s.externalConnected)
@@ -314,6 +314,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func applyFeature(_ feature: ExtensionFeature) {
+        defer { updateAccessCheck() }
         switch feature {
         case .xdrBrightness: applyXDRBrightness()
         case .scrollDirection: applyScrollDirection(prompt: true)
@@ -322,11 +323,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .quitGuard: applyQuitGuard(prompt: true)
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: applyLastWindowQuit(prompt: true)
         case .mouseButtons: applyMouseButtons(prompt: true)
-        // 只在面板上多一個按鈕，加入或移除時面板自己會更新
-        case .audioSwitch: break
+        // 只在面板上多一個按鈕，加入或移除時面板自己會更新；移除時把調到 0 的輸入音量還原（按鈕不見了就沒辦法自己取消）
+        case .audioSwitch:
+            if !settings.isInstalled(.audioSwitch) { AudioSwitchController.shared.restoreInputVolumes() }
         case .quickMenu: applyQuickMenu()
         // 只在網路面板與 CPU／記憶體清單多出操作，面板自己會依啟用狀態顯示
         case .portManager: break
+        case .speedTest: settings.onMonitorsChange?()
+        // 只在打開「登入項目」頁時讀取，沒有背景工作
+        case .startupItems: break
         case .clipboardHistory: applyQuickMenu()
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
@@ -446,6 +451,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func applyInputSourceFix(prompt: Bool) {
         InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
         applyShiftHalfWidth(prompt: prompt)
+        updateAccessCheck()
+    }
+
+    /// 「輔助使用」被收回又給回、或攔截重建失敗時，各功能自己的看門狗救不回來：每 5 秒重新套用一次（比照 InputController.check），
+    /// 沒權限就停、有權限而且沒在運作就重新開始，設定頁的「運作中」也跟著更新。這些功能都沒開時連計時器都不建立
+    private func updateAccessCheck() {
+        let features: [ExtensionFeature] = [.quitGuard, .mouseButtons, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys]
+        let shiftWanted = settings.shiftHalfWidth && settings.isInstalled(.inputMethod)
+        guard features.contains(where: settings.isInstalled) || shiftWanted else {
+            accessCheckTimer?.invalidate()
+            accessCheckTimer = nil
+            return
+        }
+        guard accessCheckTimer == nil else { return }
+        accessCheckTimer = repeating(every: 5) { delegate in
+            // Shift 半形由自己的檢查停止、重新開始，不會通知畫面：設定頁的「運作中」在這裡跟上（值有變才寫，免得每 5 秒重畫）
+            let shift = delegate.inputAllowed && delegate.settings.shiftHalfWidth && delegate.settings.isInstalled(.inputMethod)
+                && InputSourceFix.shared.isRunning
+            if delegate.ui.shiftRunning != shift { delegate.ui.shiftRunning = shift }
+            guard features.contains(where: delegate.settings.isInstalled) else { return }
+            delegate.applyQuitGuard(prompt: false)
+            delegate.applyMouseButtons(prompt: false)
+            delegate.applyLastWindowQuit(prompt: false)
+        }
+    }
+
+    /// 自動檢查更新開著時每 6 小時看一次（距離上次超過一天才真的連線）；關掉就停
+    private func updateUpdateCheck() {
+        guard settings.autoCheckUpdates else {
+            updateCheckTimer?.invalidate()
+            updateCheckTimer = nil
+            return
+        }
+        guard updateCheckTimer == nil else { return }
+        updateCheckTimer = repeating(every: 6 * 3600) { delegate in
+            guard !delegate.sleeping else { return }
+            delegate.store.updater.checkIfDue()
+        }
     }
 
     private func applyShiftHalfWidth(prompt: Bool) {
@@ -611,7 +654,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             settings.onACPower = true
         }
         scheduleAdapterPreRead()
-        store.setHardwareSampling(active: ui.isVisible && ui.page == .main && !sleeping)
+        store.setHardwareSampling(active: ui.isVisible && ui.page == .main && !sleeping && !unseen)
         updateStatusItem()
         if let s = store.snapshot, let e = store.estimates {
             Notifier.shared.evaluate(s, state: e.state, settings: settings)
@@ -630,15 +673,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func scheduleRefresh(every interval: TimeInterval) {
         refreshTimer?.invalidate()
-        refreshTimer = repeating(every: interval) { $0.refresh() }
-        // 誤差不超過 0.3 秒，下一次更新才配得到 1 秒前預先讀的變壓器輸入
-        refreshTimer?.tolerance = min(interval * 0.2, 0.3)
+        refreshTimer = repeating(every: RefreshPacing.interval(base: interval, unseen: unseen)) { $0.refresh() }
+        refreshTimer?.tolerance = RefreshPacing.tolerance(base: interval, unseen: unseen)
     }
 
     private func scheduleAdapterPreRead() {
         adapterPreReadTimer?.invalidate()
         adapterPreReadTimer = nil
-        guard interval > 1, !sleeping else { return }
+        guard interval > 1, !sleeping, !unseen else { return }
         let timer = Timer(fire: Date().addingTimeInterval(interval - 1), interval: 0, repeats: false) { _ in
             MainActor.assumeIsolated { BatteryReader.recordAdapterInput() }
         }
@@ -689,11 +731,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         sessionActive = false
         KeyboardCleaningController.shared.stop()
         applyInputFeatures()
+        visibilityChanged()
     }
 
     @objc private func sessionBecameActive() {
         sessionActive = true
         applyInputFeatures()
+        visibilityChanged()
+    }
+
+    @objc private func screensDidSleep() {
+        screensAsleep = true
+        visibilityChanged()
+    }
+
+    @objc private func screensDidWake() {
+        screensAsleep = false
+        visibilityChanged()
+    }
+
+    /// 螢幕關著（例如插電過夜）或切到其他使用者時，每秒更新沒人看得到：監控只留警示、定時更新拉長；回來時馬上更新一次
+    private func visibilityChanged() {
+        guard !sleeping else { return }
+        monitors.setUnseen(unseen)
+        // 面板開著時螢幕睡著，面板不會自己收起：硬體與 top 取樣也停
+        if unseen {
+            store.setHardwareSampling(active: false)
+            store.setProcessSampling(active: false)
+        }
+        scheduleRefresh(every: interval)
+        scheduleAdapterPreRead()
+        if !unseen { refresh() }
     }
 
     /// 依設定（與工作階段是否在前景）重新開始或停止所有按鍵與滑鼠攔截
@@ -751,7 +819,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if store.chargingPlan.isActive { ChargingPlanLog.shared.write("系統已喚醒") }
         sleeping = false
         applyBluetooth(bluetoothSleep.didWake())
+        // 闔蓋接外接螢幕等情況醒來時螢幕可能還關著
+        monitors.setUnseen(unseen)
         monitors.setSleeping(false)
+        scheduleRefresh(every: interval)
         store.evaluateChargingPlan(.didWake)
         // hidutil 的設定在睡眠後可能被重設
         InputSourceFix.applyCapsLockDelay(short: settings.capsLockNoDelay && settings.isInstalled(.inputMethod))
@@ -766,6 +837,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func updateDesktopStatusItem(_ button: NSStatusBarButton, watts: Double) {
         let text = "\(Int(watts.rounded())) W"
         let key = "desktop|\(text)|\(settings.display)"
+        // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
+        button.setToolTipUnlessHovered("系統耗電 \(Format.watts(watts))")
         guard key != lastStatusKey else { return }
         lastStatusKey = key
         // 和 MacBook 的「78% 加電池圖示」一樣，數字在圖示左邊
@@ -773,7 +846,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         button.image = settings.display == .percentOnly ? nil
             : NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "系統耗電")
         button.title = settings.display == .iconOnly ? "" : text
-        button.toolTip = "系統耗電 \(Format.watts(watts))"
     }
 
     private func updateStatusItem() {
@@ -812,6 +884,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let minutes = e.state == .charging ? e.headlineToFull : e.headlineToEmpty
         let showsTime = settings.display == .iconAndTime || settings.display == .iconPercentAndTime
         let key = "\(s.percent)|\(e.state)|\(low)|\(settings.display)|\(showsTime ? minutes ?? -1 : 0)"
+        // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
+        button.setToolTipUnlessHovered(tooltip(s, e))
         guard key != lastStatusKey else { return }
         lastStatusKey = key
 
@@ -842,7 +916,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             string: text,
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)]
         )
-        button.toolTip = tooltip(s, e)
         chargingIconFlow?.needsLayout = true
     }
 
@@ -972,7 +1045,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func scheduleProcessCheck() {
         processTimer?.invalidate()
         processTimer = repeating(every: interval) { delegate in
-            delegate.store.setProcessSampling(active: !delegate.sleeping && delegate.ui.page == .main && delegate.ui.tab == .processes)
+            delegate.store.setProcessSampling(active: !delegate.sleeping && !delegate.unseen && delegate.ui.page == .main && delegate.ui.tab == .processes)
         }
     }
 
@@ -1012,5 +1085,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             defaults.set(path, forKey: LoginItem.registeredPathKey)
             defaults.set(identity, forKey: LoginItem.registeredCodeKey)
         }
+    }
+}
+
+extension NSView {
+    /// 數字每秒更新時，滑鼠停在上面就先不換提示文字：換了 macOS 會在游標目前的位置重新顯示提示框，看起來像跟著滑鼠跑。
+    /// 滑鼠離開後下一次更新再換
+    func setToolTipUnlessHovered(_ text: String?) {
+        guard toolTip != text else { return }
+        if let window, window.isVisible {
+            let pointer = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+            if bounds.contains(pointer) { return }
+        }
+        toolTip = text
     }
 }

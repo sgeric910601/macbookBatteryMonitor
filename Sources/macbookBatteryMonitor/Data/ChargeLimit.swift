@@ -93,8 +93,12 @@ enum ChargeLimitReader {
     }
 
     private static func read() -> ChargeLimit? {
-        guard let data = try? Data(contentsOf: url),
-              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+        (try? Data(contentsOf: url)).flatMap(parse)
+    }
+
+    /// com.apple.powerd.charging.plist 的內容 → 生效中的使用者上限；格式不符時為 nil
+    static func parse(_ data: Data) -> ChargeLimit? {
+        guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               let archive = plist["policies"] as? Data,
               let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: archive) else { return nil }
         unarchiver.requiresSecureCoding = false

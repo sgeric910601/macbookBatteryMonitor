@@ -135,8 +135,8 @@ final class ScrollTap: @unchecked Sendable {
     private var runLoop: CFRunLoop?
     /// 最近一次觸控板上有兩指以上的時間（主執行緒寫入）；捲動在這之後 0.3 秒內就算觸控板
     private var lastTrackpadTouches: TimeInterval = 0
-    /// 連續捲動的這段手勢（含放開手指後的慣性）是不是觸控板；一般滾輪的事件不會改到它
-    private var gestureIsTrackpad = false
+    /// 觸控板或滑鼠的判斷（見 ScrollSource）
+    private var source = ScrollSource()
     /// 這個事件判斷成哪一種（記錄用）
     private var currentIsTrackpad = false
     /// 只在主執行緒使用
@@ -317,23 +317,12 @@ final class ScrollTap: @unchecked Sendable {
         event.post(tap: .cgSessionEventTap)
     }
 
-    /// 判斷這個捲動事件來自觸控板還是滑鼠。
-    /// - 一般滾輪（不連續）一定是滑鼠，而且不會改到觸控板那邊的判斷：觸控板的慣性還在跑時轉一下滾輪，
-    ///   之後的慣性事件仍算觸控板（以前會被改判成滑鼠，跟著滑鼠的設定反向，畫面突然往反方向滑）
-    /// - 放開手指後的慣性沿用同一段手勢的判斷
-    /// - 手勢開始時（或沒有階段的連續捲動）看最近 0.3 秒內觸控板上有沒有兩指；同一段手勢中途只會從滑鼠改成觸控板、
-    ///   不會反過來，主執行緒慢一點、一時沒數到手指也不會中途改判
+    /// 判斷這個捲動事件來自觸控板還是滑鼠（見 ScrollSource）
     private func classify(_ event: CGEvent, now: TimeInterval) -> Bool {
-        guard event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 else { return false }
-        if event.getIntegerValueField(.scrollWheelEventMomentumPhase) != 0 { return gestureIsTrackpad }
-        let recentTouches = now - locked { lastTrackpadTouches } < 0.3
-        switch event.getIntegerValueField(.scrollWheelEventScrollPhase) {
-        case 2, 4, 8:   // 手指移動中、放開、取消：同一段手勢
-            gestureIsTrackpad = gestureIsTrackpad || recentTouches
-        default:        // 剛放上手指（1、128）或沒有階段：新的一段
-            gestureIsTrackpad = recentTouches
-        }
-        return gestureIsTrackpad
+        source.isTrackpad(continuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
+                          momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase),
+                          scrollPhase: event.getIntegerValueField(.scrollWheelEventScrollPhase),
+                          recentTouches: now - self.locked { self.lastTrackpadTouches } < 0.3)
     }
 
     /// 捲動量的欄位：公開的行數、像素、精細值，加上沒有公開文件、但也帶著同一份捲動量的 175～178

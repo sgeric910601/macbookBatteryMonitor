@@ -192,15 +192,6 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    SwitchRow("在網路面板顯示測速", isOn: Binding(get: { settings.isInstalled(.speedTest) }, set: { settings.setInstalled(.speedTest, $0) }))
-                        .disabled(!settings.systemMonitors || !settings.monitorNetwork)
-                    if settings.systemMonitors {
-                        Text(settings.monitorNetwork
-                             ? "打開後網路面板最下面才有「開始測速」。測一次約 20～30 秒、會用掉數百 MB 流量，預設關閉以免誤按。"
-                             : "網路模組開著時才能使用。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                     Divider()
                     SwitchRow("合併成一個圖示", isOn: binding(\.menuBarCombined))
                         .disabled(!settings.systemMonitors)

@@ -192,7 +192,7 @@ features.testBackupWritesEveryInstalledState()
 features.testAutomationPermissionFollowsLoginItems()
 features.testFreshInstallAddsNothing()
 features.testEveryFeatureIsDescribed()
-print("6 feature availability tests passed")
+print("7 feature availability tests passed")
 
 let monitorAlerts = MonitorAlertTests()
 monitorAlerts.testSustainedFiresOnceAndRearms()

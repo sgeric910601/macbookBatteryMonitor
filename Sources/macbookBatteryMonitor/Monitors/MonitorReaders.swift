@@ -44,20 +44,42 @@ enum CPUReader {
     }
 }
 
+struct GPUReading {
+    var utilization: Double?
+    var memory: UInt64?
+    /// Apple 晶片才有：繪製（Renderer）與分塊（Tiler）的使用率（0～1）
+    var renderer: Double?
+    var tiler: Double?
+}
+
 enum GPUReader {
-    /// 使用率（0～1）與 GPU 佔用的記憶體
-    static func read() -> (utilization: Double?, memory: UInt64?) {
+    /// GPU 核心數（Apple 晶片的 gpu-core-count；Intel 內顯沒有）。硬體固定，只讀一次
+    static let coreCount: Int? = {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOAccelerator"))
-        guard service != IO_OBJECT_NULL else { return (nil, nil) }
+        guard service != IO_OBJECT_NULL else { return nil }
+        defer { IOObjectRelease(service) }
+        return (IORegistryEntryCreateCFProperty(service, "gpu-core-count" as CFString, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? NSNumber)?.intValue
+    }()
+
+    private static func fraction(_ value: Any?) -> Double? {
+        (value as? NSNumber).map { min(1, max(0, $0.doubleValue / 100)) }
+    }
+
+    /// 使用率（0～1）、GPU 佔用的記憶體與 Renderer／Tiler 使用率
+    static func read() -> GPUReading {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOAccelerator"))
+        guard service != IO_OBJECT_NULL else { return GPUReading() }
         defer { IOObjectRelease(service) }
         guard let performance = IORegistryEntryCreateCFProperty(service, "PerformanceStatistics" as CFString, kCFAllocatorDefault, 0)?
-            .takeRetainedValue() as? [String: Any] else { return (nil, nil) }
-        let utilization = (performance["Device Utilization %"] as? NSNumber).map { min(1, max(0, $0.doubleValue / 100)) }
+            .takeRetainedValue() as? [String: Any] else { return GPUReading() }
+        let utilization = fraction(performance["Device Utilization %"])
         // Apple 晶片是 "In use system memory"，Intel 內顯是 inUseSysMemoryBytes；
         // Intel 負載時偶爾會讀到負數被當成極大值（實測 2⁶⁴ − 1.7 億），超過實體記憶體就當成讀不到
         let raw = (performance["In use system memory"] ?? performance["inUseSysMemoryBytes"]) as? NSNumber
         let memory = raw.map { $0.uint64Value }.flatMap { $0 <= ProcessInfo.processInfo.physicalMemory ? $0 : nil }
-        return (utilization, memory)
+        return GPUReading(utilization: utilization, memory: memory,
+                          renderer: fraction(performance["Renderer Utilization %"]), tiler: fraction(performance["Tiler Utilization %"]))
     }
 }
 

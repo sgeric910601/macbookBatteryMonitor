@@ -18,12 +18,19 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private var lastKeys: [MonitorKind: String] = [:]
     /// 選單列的記憶體圖示目前是不是和磁碟合併的兩行版本
     private var memoryItemMerged = false
+    /// 選單列圖示目前畫的是不是不加底色的標籤
+    private var plainLabels = false
     private var timer: Timer?
     /// 每次打開都建立新的，關閉後整個釋放
     private var popover: NSPopover?
     private var openKind: MonitorKind?
     /// 從選單列圖示打開的面板：系統的 .transient 打開過選單（例如快捷選單）後常不會自己收起來，自己監聽面板外的點擊
     private var outsideClickMonitors: [Any] = []
+    /// 不加底色時 GPU 是選單列上獨立的一個圖示（點了開 GPU 面板）
+    private var gpuItem: NSStatusItem?
+    private var lastGPUKey: String?
+    /// 開著的是 GPU 圖示的面板
+    private var openGPU = false
     private var topStream: TopStream?
     private var sleeping = false
     /// 螢幕關著或切到其他使用者：不畫選單列；有開警示時每 30 秒取樣一次，警示照常（見 RefreshPacing）
@@ -90,16 +97,10 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         for kind in MonitorKind.allCases.reversed() {
             let enabled = settings.isMonitorEnabled(kind) && !settings.menuBarCombined
                 && !(kind == .disk && settings.memoryDiskMerged)
+            // GPU 要比 CPU 先建，執行中切換和重啟後的順序才一致
+            if kind == .cpu { syncGPUItem(cpuEnabled: enabled) }
             if enabled, items[kind] == nil {
-                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                item.autosaveName = "monitor.\(kind.rawValue)"
-                if let button = item.button {
-                    button.target = self
-                    button.action = #selector(itemClicked(_:))
-                    button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-                    button.imagePosition = .imageOnly
-                }
-                items[kind] = item
+                items[kind] = makeItem(autosaveName: "monitor.\(kind.rawValue)")
             } else if !enabled, let item = items[kind] {
                 if openKind == kind { popover?.closeNow() }
                 NSStatusBar.system.removeStatusItem(item)
@@ -116,12 +117,53 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
                 lastKeys[.memory] = nil
             }
         }
+        // 換標籤樣式後每個圖示的寬度都不同：鎖住的長度全部放開重新量
+        if settings.monitorPlainLabels != plainLabels {
+            plainLabels = settings.monitorPlainLabels
+            for (kind, item) in items {
+                item.length = NSStatusItem.variableLength
+                lastKeys[kind] = nil
+            }
+            lastGPUKey = nil
+        }
         // 關掉測速開關或網路模組後就看不到測速卡片，正在跑的測速也一起停掉
         if !(settings.isInstalled(.speedTest) && settings.isMonitorEnabled(.network)) {
             network.speedTest.cancel()
         }
         tick()
         updateTimer()
+    }
+
+    private func makeItem(autosaveName: String) -> NSStatusItem {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = autosaveName
+        if let button = item.button {
+            button.target = self
+            button.action = #selector(itemClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.imagePosition = .imageOnly
+        }
+        return item
+    }
+
+    /// 不加底色時 CPU 與 GPU 各一個圖示；彩色底塊時兩行畫在 CPU 圖示裡
+    private func syncGPUItem(cpuEnabled: Bool) {
+        let wanted = cpuEnabled && settings.monitorPlainLabels
+        if wanted, gpuItem == nil {
+            // 順序由建立先後決定：CPU 已經在時先拿掉，讓 syncItems 接著重建，排法才會和重啟後一樣
+            if let cpu = items[.cpu] {
+                if openKind == .cpu { popover?.closeNow() }
+                NSStatusBar.system.removeStatusItem(cpu)
+                items[.cpu] = nil
+                lastKeys[.cpu] = nil
+            }
+            gpuItem = makeItem(autosaveName: "monitor.gpu")
+        } else if !wanted, let item = gpuItem {
+            if openGPU { popover?.closeNow() }
+            NSStatusBar.system.removeStatusItem(item)
+            gpuItem = nil
+            lastGPUKey = nil
+        }
     }
 
     /// App 結束時一起結束測速，networkQuality 不會隨 app 結束，否則會繼續用掉流量
@@ -196,6 +238,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         checkAlerts(cpu: active(.cpu), memory: active(.memory), disk: active(.disk), at: now)
         guard !unseen else { return }
         for (kind, item) in items { render(kind, item) }
+        if let gpuItem { renderGPU(gpuItem) }
         // top 意外結束時（例如被強制結束），面板還開著就重新啟動
         if let topStream, !topStream.isRunning, !sleeping { topStream.start() }
     }
@@ -221,54 +264,86 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
 
     private func render(_ kind: MonitorKind, _ item: NSStatusItem) {
         guard let button = item.button else { return }
-        let content = menuBarContent(kind)
+        // GPU 有自己的圖示時，CPU 圖示只畫 CPU
+        let content = kind == .cpu && gpuItem != nil ? plainCPUOnly : menuBarContent(kind)
         // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
         button.setToolTipUnlessHovered(content.tooltip)
         guard content.key != lastKeys[kind] else { return }
         lastKeys[kind] = content.key
-        button.image = content.image()
+        apply(content.image(), to: item)
+    }
+
+    private func renderGPU(_ item: NSStatusItem) {
+        let g = cpu.gpu.map(ByteFormat.percent) ?? "—"
+        item.button?.setToolTipUnlessHovered("GPU \(g)")
+        guard g != lastGPUKey else { return }
+        lastGPUKey = g
+        apply(MonitorMenuBarRenderer.columns([("GPU", g, nil)], valueTemplate: MonitorMenuBarRenderer.plainTemplate), to: item)
+    }
+
+    private var plainCPUOnly: (key: String, tooltip: String, image: () -> NSImage) {
+        let c = cpu.usage.map { ByteFormat.percent($0.total) } ?? "—"
+        return ("cpuOnly|\(c)", "CPU \(c)", { MonitorMenuBarRenderer.columns([("CPU", c, nil)], valueTemplate: MonitorMenuBarRenderer.plainTemplate) })
+    }
+
+    private func apply(_ image: NSImage, to item: NSStatusItem) {
+        guard let button = item.button else { return }
+        button.image = image
         // 圖示寬度固定（依範本計算），第一次畫好後鎖住長度；
         // 否則每秒換圖都會觸發 _adjustLength，讓整條選單列重新排版
         if item.length == NSStatusItem.variableLength {
-            let width = button.fittingSize.width
+            let width = settings.monitorPlainLabels ? image.size.width + MonitorMenuBarRenderer.plainItemPadding
+                                                    : button.fittingSize.width
             if width > 0 { item.length = ceil(width) }
         }
     }
 
     private func menuBarContent(_ kind: MonitorKind) -> (key: String, tooltip: String, image: () -> NSImage) {
+        let content = menuBarParts(kind)
+        let plain = settings.monitorPlainLabels
+        // 樣式也放進 key：換樣式時一定重畫
+        return ((plain ? "plain|" : "") + content.key, content.tooltip, {
+            plain ? content.plain() : content.badge()
+        })
+    }
+
+    /// 每個模組兩種畫法：彩色底塊的標籤（badge）與不加底色、標籤在上數值在下（plain）
+    private func menuBarParts(_ kind: MonitorKind) -> (key: String, tooltip: String, badge: () -> NSImage, plain: () -> NSImage) {
+        typealias R = MonitorMenuBarRenderer
         switch kind {
         case .cpu:
             let c = cpu.usage.map { ByteFormat.percent($0.total) } ?? "—"
             let g = cpu.gpu.map(ByteFormat.percent) ?? "—"
-            return ("\(c)|\(g)", "CPU \(c)・GPU \(g)", {
-                MonitorMenuBarRenderer.twoLines([("CPU", c, MonitorMenuBarRenderer.green), ("GPU", g, MonitorMenuBarRenderer.orange)], valueTemplate: "100%")
-            })
+            return ("\(c)|\(g)", "CPU \(c)・GPU \(g)",
+                    { R.twoLines([("CPU", c, R.green), ("GPU", g, R.orange)], valueTemplate: "100%") },
+                    { R.columns([("CPU", c, nil), ("GPU", g, nil)], valueTemplate: MonitorMenuBarRenderer.plainTemplate) })
         case .memory where settings.memoryDiskMerged:
             let m = memory.usage.map { ByteFormat.percent($0.usedFraction) } ?? "—"
             let d = diskUsedText
             let pressure = memory.usage?.pressure ?? .normal
-            return ("merged|\(m)|\(d)|\(pressure.rawValue)", "\(memoryTooltip)\n\(diskTooltip)", {
-                MonitorMenuBarRenderer.memoryDisk(memory: m, disk: d, pressure: pressure)
-            })
+            return ("merged|\(m)|\(d)|\(pressure.rawValue)", "\(memoryTooltip)\n\(diskTooltip)",
+                    { R.memoryDisk(memory: m, disk: d, pressure: pressure) },
+                    { R.columns([("MEM", m, R.pressureColor(pressure)), ("DISK", d, nil)], valueTemplate: MonitorMenuBarRenderer.plainTemplate) })
         case .memory:
             let value = memory.usage.map { ByteFormat.percent($0.usedFraction) } ?? "—"
             let pressure = memory.usage?.pressure ?? .normal
-            return ("\(value)|\(pressure.rawValue)", memoryTooltip, {
-                MonitorMenuBarRenderer.symbolValue(symbol: "memorychip", value: value, valueTemplate: "100%",
-                                                   color: MonitorMenuBarRenderer.pressureColor(pressure))
-            })
+            return ("\(value)|\(pressure.rawValue)", memoryTooltip,
+                    { R.symbolValue(symbol: "memorychip", value: value, valueTemplate: "100%", color: R.pressureColor(pressure)) },
+                    { R.columns([("MEM", value, R.pressureColor(pressure))], valueTemplate: MonitorMenuBarRenderer.plainTemplate) })
         case .disk:
             let value = diskUsedText
-            return (value, diskTooltip, {
-                MonitorMenuBarRenderer.symbolValue(symbol: "internaldrive", value: value, valueTemplate: "100%")
-            })
+            return (value, diskTooltip,
+                    { R.symbolValue(symbol: "internaldrive", value: value, valueTemplate: "100%") },
+                    { R.columns([("DISK", value, nil)], valueTemplate: MonitorMenuBarRenderer.plainTemplate) })
         case .network:
             let up = ByteFormat.compactRate(network.uploadRate)
             let down = ByteFormat.compactRate(network.downloadRate)
             let tooltip = "上傳 \(ByteFormat.rate(network.uploadRate))・下載 \(ByteFormat.rate(network.downloadRate))"
-            return ("\(up)|\(down)", tooltip, {
-                MonitorMenuBarRenderer.twoLines([("↑", up, MonitorMenuBarRenderer.orange), ("↓", down, MonitorMenuBarRenderer.green)], valueTemplate: "999K")
-            })
+            // 不加底色時帶單位（「4 KB/s」），上下用彩色圓點區分
+            let withUnit = { (rate: String) in rate.replacingOccurrences(of: #"([KMG])$"#, with: " $1B/s", options: .regularExpression) }
+            return ("\(up)|\(down)", tooltip,
+                    { R.twoLines([("↑", up, R.orange), ("↓", down, R.green)], valueTemplate: "999K") },
+                    { R.twoLines([("", withUnit(up), R.orange), ("", withUnit(down), R.green)], valueTemplate: "99 KB/s", plain: true) })
         }
     }
 
@@ -310,28 +385,31 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     // MARK: - 面板
 
     @objc private func itemClicked(_ sender: NSStatusBarButton) {
-        guard let kind = items.first(where: { $0.value.button === sender })?.key else { return }
+        let isGPU = gpuItem?.button === sender
+        guard let kind = isGPU ? .cpu : items.first(where: { $0.value.button === sender })?.key else { return }
         if NSApp.currentEvent?.type == .rightMouseUp {
-            showMenu(for: kind)
+            showMenu(on: isGPU ? gpuItem : items[kind])
             return
         }
         if let popover, popover.isShown {
-            let sameModule = openKind == kind
+            let sameModule = openKind == kind && openGPU == isGPU
             popover.closeNow()
             if sameModule { return }
         }
-        showPopover(kind, from: sender)
+        showPopover(kind, from: sender, gpu: isGPU)
     }
 
-    private func showPopover(_ kind: MonitorKind, from button: NSView, behavior: NSPopover.Behavior = .transient) {
+    private func showPopover(_ kind: MonitorKind, from button: NSView, behavior: NSPopover.Behavior = .transient,
+                             gpu: Bool = false) {
         // 舊面板的 popoverDidClose 可能在新面板接手後才到，那時不會拆它的點擊監聽：先拆，免得作用在新面板上
         stopOutsideClickMonitoring()
         openKind = kind
+        openGPU = gpu
         cpu.setThermalActive(kind == .cpu)
         disk.setHealthActive(kind == .disk || (kind == .memory && settings.memoryDiskMerged))
         tick()
         let root = MonitorPanel(kind: kind, cpu: cpu, memory: memory, disk: disk, network: network,
-                                memoryDiskMerged: settings.memoryDiskMerged,
+                                memoryDiskMerged: settings.memoryDiskMerged, gpuOnly: gpu, separateGPU: gpuItem != nil,
                                 showsSpeedTest: settings.isInstalled(.speedTest),
                                 onSettings: { [weak self] in
                                     self?.popover?.closeNow(animated: false)
@@ -382,7 +460,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private func startTop() {
         topStream?.stop()
         topStream = nil
-        guard !sleeping, !unseen, let openKind else { return }
+        // GPU、磁碟那一欄的面板沒有程序排行
+        guard !sleeping, !unseen, let openKind, !openGPU else { return }
         let column: String
         switch openKind {
         case .cpu:
@@ -412,6 +491,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
             topStream?.stop()
             topStream = nil
             openKind = nil
+            openGPU = false
             cpu.setThermalActive(false)
             disk.setHealthActive(false)
         }
@@ -421,8 +501,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         }
     }
 
-    private func showMenu(for kind: MonitorKind) {
-        guard let item = items[kind] else { return }
+    private func showMenu(on item: NSStatusItem?) {
+        guard let item else { return }
         let menu = NSMenu()
         menu.addItem(withTitle: "設定…", action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
         menu.addItem(.separator())
@@ -459,6 +539,18 @@ enum MonitorMenuBarRenderer {
     private static let labelFont = NSFont.systemFont(ofSize: 8, weight: .heavy)
     private static let lineFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .medium)
     private static let valueFont = NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)
+    /// 不加底色時同一個圖示裡欄位之間的間距（第二條狀態列的 CPU／GPU、記憶體／磁碟）
+    static let plainSpacing: CGFloat = 8
+    /// 不加底色時每個圖示左右合計的留白：圖示之間的距離都一樣
+    static let plainItemPadding: CGFloat = 0
+    /// 不加底色時欄位寬度固定以兩位數預留；100% 時字稍微縮小塞進去，選單列不會橫移
+    static let plainTemplate = "88%"
+    // 選單列只有約 20 點高：標籤約 6 點、數值約 9 點的字高，中間留約 4 點
+    private static let columnLabelFont = NSFont.systemFont(ofSize: 9, weight: .regular)
+    /// 不加底色時網路上下行的圓點直徑
+    private static let plainDot: CGFloat = 6
+    private static let plainLineFont = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium)
+    private static let columnValueFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
 
     private static var height: CGFloat { max(18, NSStatusBar.system.thickness - 2) }
 
@@ -479,11 +571,14 @@ enum MonitorMenuBarRenderer {
     /// 兩行，每行「彩色底塊的標籤＋靠右的數值」；寬度依 valueTemplate 固定，數字變動時圖示不會左右晃。
     /// 標籤是白字配實心色塊（CPU 與下載用綠、GPU 與上傳用橘，與面板圖表一致），在任何桌布與深淺色選單列上都清楚。
     /// valueColors 依行指定數值的顏色（例如記憶體壓力），沒有指定的行用一般文字顏色
+    /// plain：標籤位置改畫實心彩色圓點（細的彩色箭頭壓在桌布上的半透明選單列會看不清楚）
     static func twoLines(_ lines: [(label: String, value: String, color: NSColor)], valueTemplate: String,
-                         valueColors: [NSColor?] = []) -> NSImage {
-        let labelWidth = lines.map { ($0.label as NSString).size(withAttributes: [.font: labelFont]).width }.max() ?? 0
-        let badgeWidth = ceil(labelWidth + 5)
-        let valueWidth = (valueTemplate as NSString).size(withAttributes: [.font: lineFont]).width
+                         valueColors: [NSColor?] = [], plain: Bool = false) -> NSImage {
+        let font = labelFont
+        let labelWidth = lines.map { ($0.label as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        let badgeWidth = plain ? plainDot + 2 : ceil(labelWidth + 5)
+        let valueFont = plain ? plainLineFont : lineFont
+        let valueWidth = (valueTemplate as NSString).size(withAttributes: [.font: valueFont]).width
         let size = NSSize(width: ceil(badgeWidth + 3 + valueWidth), height: height)
         return NSImage(size: size, flipped: true) { rect in
             let scale = pixelsPerPoint
@@ -491,17 +586,74 @@ enum MonitorMenuBarRenderer {
             for (index, line) in lines.prefix(2).enumerated() {
                 let y = CGFloat(index) * lineHeight
                 let badge = snap(NSRect(x: 0, y: y + 0.75, width: badgeWidth, height: lineHeight - 1.5), scale: scale)
+                if plain {
+                    line.color.setFill()
+                    NSBezierPath(ovalIn: snap(NSRect(x: 0, y: y + (lineHeight - plainDot) / 2, width: plainDot, height: plainDot), scale: scale)).fill()
+                    let valueColor = (index < valueColors.count ? valueColors[index] : nil) ?? NSColor.labelColor
+                    let value = NSAttributedString(string: line.value, attributes: [.font: fitted(valueFont, line.value, width: valueWidth),
+                                                                                    .foregroundColor: valueColor])
+                    let valueSize = value.size()
+                    value.draw(at: NSPoint(x: snap(rect.width - valueSize.width, scale: scale),
+                                           y: snap(y + (lineHeight - valueSize.height) / 2, scale: scale)))
+                    continue
+                }
                 line.color.setFill()
                 NSBezierPath(roundedRect: badge, xRadius: 2.5, yRadius: 2.5).fill()
-                let label = NSAttributedString(string: line.label, attributes: [.font: labelFont, .foregroundColor: NSColor.white])
+                let label = NSAttributedString(string: line.label, attributes: [.font: font,
+                                                                                .foregroundColor: plain ? NSColor.labelColor : NSColor.white])
                 let labelSize = label.size()
                 label.draw(at: NSPoint(x: snap(badge.midX - labelSize.width / 2, scale: scale),
                                        y: snap(badge.midY - labelSize.height / 2, scale: scale)))
                 let valueColor = (index < valueColors.count ? valueColors[index] : nil) ?? NSColor.labelColor
-                let value = NSAttributedString(string: line.value, attributes: [.font: lineFont, .foregroundColor: valueColor])
+                let value = NSAttributedString(string: line.value, attributes: [.font: valueFont, .foregroundColor: valueColor])
                 let valueSize = value.size()
                 value.draw(at: NSPoint(x: snap(rect.width - valueSize.width, scale: scale),
                                        y: snap(y + (lineHeight - valueSize.height) / 2, scale: scale)))
+            }
+            return true
+        }
+    }
+
+    /// 不加底色的欄位（像 Stats）：每欄上面是小字標籤、下面是數值，多欄並排；寬度依 valueTemplate 固定，數字變動時不會左右晃。
+    /// valueColor 沒有指定時用一般文字顏色（記憶體壓力升高時變橘、變紅）
+    /// 文字比給的寬度寬時，等比例縮小字級到剛好放得下（最小 70%）
+    private static func fitted(_ font: NSFont, _ text: String, width: CGFloat) -> NSFont {
+        let natural = (text as NSString).size(withAttributes: [.font: font]).width
+        guard natural > width, natural > 0 else { return font }
+        return font.withSize(font.pointSize * max(0.7, width / natural))
+    }
+
+    /// 每一欄的寬度
+    static func columnWidths(_ labels: [String], valueTemplate: String) -> [CGFloat] {
+        let templateWidth = (valueTemplate as NSString).size(withAttributes: [.font: columnValueFont]).width
+        return labels.map { max(templateWidth, ($0 as NSString).size(withAttributes: [.font: columnLabelFont]).width) }
+    }
+
+    static func columns(_ items: [(label: String, value: String, valueColor: NSColor?)], valueTemplate: String) -> NSImage {
+        let widths = columnWidths(items.map(\.label), valueTemplate: valueTemplate)
+        let spacing = plainSpacing
+        let size = NSSize(width: ceil(widths.reduce(0, +) + spacing * CGFloat(max(0, items.count - 1))), height: height)
+        // 上下撐滿：標籤的字頂貼齊上緣、數值的底線貼齊下緣，中間留下的就是兩行的間距
+        let labelTop = 0.5 - (columnLabelFont.ascender - columnLabelFont.capHeight)
+        let valueTop = size.height - 0.5 - columnValueFont.ascender
+        return NSImage(size: size, flipped: true) { rect in
+            let scale = pixelsPerPoint
+            var x: CGFloat = 0
+            for (index, item) in items.enumerated() {
+                let width = widths[index]
+                // 標籤用一般文字色：次要色在桌布上的半透明選單列太淡
+                let label = NSAttributedString(string: item.label, attributes: [.font: columnLabelFont,
+                                                                                .foregroundColor: NSColor.labelColor])
+                let labelSize = label.size()
+                label.draw(at: NSPoint(x: snap(x + (width - labelSize.width) / 2, scale: scale), y: snap(labelTop, scale: scale)))
+                // 寬度固定：比範本寬的數值（例如 100%）字稍微縮小塞進去，選單列不會跟著橫移；底線仍和其他數字對齊
+                let font = fitted(columnValueFont, item.value, width: width)
+                let value = NSAttributedString(string: item.value, attributes: [.font: font,
+                                                                                .foregroundColor: item.valueColor ?? NSColor.labelColor])
+                let valueSize = value.size()
+                value.draw(at: NSPoint(x: snap(x + (width - valueSize.width) / 2, scale: scale),
+                                       y: snap(valueTop + columnValueFont.ascender - font.ascender, scale: scale)))
+                x += width + spacing
             }
             return true
         }

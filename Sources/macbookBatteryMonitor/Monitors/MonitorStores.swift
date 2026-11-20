@@ -10,6 +10,8 @@ final class CPUMonitor {
     private(set) var cores: [CPUUsage] = []
     private(set) var gpu: Double?
     private(set) var gpuMemory: UInt64?
+    private(set) var gpuRenderer: Double?
+    private(set) var gpuTiler: Double?
     private(set) var load: [Double] = []
     /// a：CPU 總使用率、b：GPU 使用率（0～1）
     private(set) var history = MonitorHistory()
@@ -44,6 +46,8 @@ final class CPUMonitor {
         let gpuReading = GPUReader.read()
         gpu = gpuReading.utilization
         gpuMemory = gpuReading.memory
+        gpuRenderer = gpuReading.renderer
+        gpuTiler = gpuReading.tiler
         load = CPUReader.loadAverage()
         if let usage { history.append(usage.total, gpu ?? 0, at: now) }
         // 風扇與溫度變化慢，每 2 秒讀一次就夠；在背景讀，上一次還沒回來就跳過
@@ -328,6 +332,8 @@ extension CPUMonitor {
             + (0..<p).map { CPUUsage(user: 0.20 - Double($0) * 0.04, system: 0.05) }
         gpu = 0.12
         gpuMemory = 512 * 1024 * 1024
+        gpuRenderer = 0.11
+        gpuTiler = 0.12
         load = [2.35, 2.10, 1.98]
         history = previewHistory(now: now) { (0.25 + 0.08 * sin($0 / 7) + 0.04 * sin($0 / 2.3), 0.10 + 0.05 * sin($0 / 11)) }
         topProcesses = previewApps([34.5, 12.2, 8.1, 3.4, 1.6])

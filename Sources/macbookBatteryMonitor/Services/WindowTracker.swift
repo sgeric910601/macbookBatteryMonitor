@@ -25,6 +25,8 @@ final class WindowTracker {
     private var observers: [pid_t: AXObserver] = [:]
     private var refreshing = Set<pid_t>()
     private var refreshAgain = Set<pid_t>()
+    /// 已經排了「標題變了」的延後重讀的 App
+    private var titleRefreshPending = Set<pid_t>()
     private var recency = WindowRecency()
     private var workspaceTokens: [NSObjectProtocol] = []
     /// 自己的視窗不用「輔助使用」追蹤（不問自己），改聽 AppKit 的通知
@@ -79,6 +81,7 @@ final class WindowTracker {
         keyWindowToken = nil
         for pid in Array(observers.keys) { untrack(pid) }
         cache = [:]
+        titleRefreshPending = []
         Self.log.notice("停止追蹤視窗")
     }
 
@@ -106,6 +109,7 @@ final class WindowTracker {
         if let removed = cache.removeValue(forKey: pid) {
             for id in removed.keys { recency.remove(id) }
         }
+        titleRefreshPending.remove(pid)
     }
 
     fileprivate func axEvent(_ notification: String, _ element: AXUIElement) {
@@ -117,6 +121,18 @@ final class WindowTracker {
         if notification == kAXUIElementDestroyedNotification, let id = cache[pid]?.first(where: { CFEqual($0.value.element, element) })?.key {
             cache[pid]?[id] = nil
             recency.remove(id)
+        }
+        // 標題可能一秒變好幾次（終端機輸出、播放器進度）：同一個 App 的標題變化合併成 0.5 秒後讀一次。
+        // 視窗開關、焦點等其他變化照常立刻重讀（也會一併讀到新標題）
+        if notification == kAXTitleChangedNotification {
+            guard titleRefreshPending.insert(pid).inserted else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.titleRefreshPending.remove(pid) != nil, self.observers[pid] != nil else { return }
+                    self.refresh(pid)
+                }
+            }
+            return
         }
         refresh(pid)
     }

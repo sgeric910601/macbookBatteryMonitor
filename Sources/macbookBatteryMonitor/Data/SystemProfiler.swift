@@ -24,8 +24,13 @@ struct SystemHealth: Codable, Equatable {
 
 enum SystemProfiler {
     static func readSync() -> SystemHealth? {
-        guard let output = Shell.runSync("/usr/sbin/system_profiler", ["SPPowerDataType", "-json"], timeout: 15),
-              let data = output.data(using: .utf8),
+        guard let output = Shell.runSync("/usr/sbin/system_profiler", ["SPPowerDataType", "-json"], timeout: 15) else { return nil }
+        return parse(output)
+    }
+
+    /// system_profiler SPPowerDataType -json 的輸出；沒有電池或格式不符時是 nil
+    static func parse(_ output: String) -> SystemHealth? {
+        guard let data = output.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["SPPowerDataType"] as? [[String: Any]],
               let battery = items.first(where: { $0["_name"] as? String == "spbattery_information" }),
@@ -48,6 +53,11 @@ enum SystemProfiler {
 enum PowerLog {
     static func lastUnpluggedDateSync() -> Date? {
         guard let output = Shell.runSync("/bin/sh", ["-c", "pmset -g log | grep -E 'Using (AC|Batt)'"]) else { return nil }
+        return lastUnpluggedDate(in: output)
+    }
+
+    /// 最後一筆「Using AC」的下一筆就是拔掉電源的時間；最後還插著電時是 nil
+    static func lastUnpluggedDate(in output: String) -> Date? {
         let lines = output.split(separator: "\n")
         guard let lastAC = lines.lastIndex(where: { $0.contains("Using AC") }) else { return nil }
         let next = lines.index(after: lastAC)
@@ -61,6 +71,10 @@ enum PowerLog {
     /// pmset 紀錄裡的「Using Batt(Charge: 87)」，用來回填歷史電量
     static func chargeHistorySync() -> [HistorySample] {
         guard let output = Shell.runSync("/bin/sh", ["-c", "pmset -g log | grep -E 'Using (AC|Batt)\\(Charge'"]) else { return [] }
+        return chargeHistory(in: output)
+    }
+
+    static func chargeHistory(in output: String) -> [HistorySample] {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"

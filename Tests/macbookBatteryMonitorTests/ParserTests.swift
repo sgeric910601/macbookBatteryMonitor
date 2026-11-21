@@ -82,4 +82,52 @@ struct ParserTests {
         XCTAssertEqual(ProcessEnergy.parse(nil, limit: 5), [])
         XCTAssertEqual(ProcessEnergy.parse("no header here", limit: 5), [])
     }
+
+    /// system_profiler：取電池的最大容量（去掉 %）、狀況與循環次數
+    func testSystemProfilerHealth() {
+        let output = """
+        {"SPPowerDataType": [
+          {"_name": "sppower_ac_charger_information"},
+          {"_name": "spbattery_information",
+           "sppower_battery_health_info": {"sppower_battery_health": "Good",
+                                           "sppower_battery_health_maximum_capacity": "92%",
+                                           "sppower_battery_cycle_count": 123}}
+        ]}
+        """
+        XCTAssertEqual(SystemProfiler.parse(output), SystemHealth(maxCapacityPercent: 92, condition: "Good", cycleCount: 123))
+        XCTAssertEqual(SystemProfiler.parse(output)?.conditionText, "良好")
+    }
+
+    /// 沒有電池（桌上型 Mac）或輸出不是 JSON 時不回傳健康度
+    func testSystemProfilerWithoutBattery() {
+        XCTAssertNil(SystemProfiler.parse(#"{"SPPowerDataType": [{"_name": "sppower_ac_charger_information"}]}"#))
+        XCTAssertNil(SystemProfiler.parse("system_profiler: timed out"))
+    }
+
+    /// pmset 紀錄：最後一次接上電源之後的下一筆是拔掉的時間；最後一筆還是接著電就沒有
+    func testPowerLogLastUnplugged() {
+        let log = """
+        2026-01-05 08:00:00 +0000 Wake   Using AC(Charge: 70)
+        2026-01-05 09:30:00 +0000 Sleep  Using Batt(Charge: 95)
+        2026-01-05 11:00:00 +0000 Wake   Using Batt(Charge: 81)
+        """
+        XCTAssertEqual(PowerLog.lastUnpluggedDate(in: log), Date(timeIntervalSince1970: 1_767_605_400))
+        XCTAssertNil(PowerLog.lastUnpluggedDate(in: "2026-01-05 08:00:00 +0000 Wake   Using AC(Charge: 70)"))
+        XCTAssertNil(PowerLog.lastUnpluggedDate(in: ""))
+    }
+
+    /// pmset 紀錄回填電量：接著電且未滿算充電中；日期或格式不符的行略過
+    func testPowerLogChargeHistory() {
+        let log = """
+        2026-01-05 08:00:00 +0000 Wake   Using AC(Charge: 70)
+        garbage line Using Batt(Charge: 50)
+        2026-01-05 09:30:00 +0000 Sleep  Using Batt(Charge:95)
+        2026-01-05 10:00:00 +0000 Wake   Using AC(Charge: 100)
+        """
+        let samples = PowerLog.chargeHistory(in: log)
+        XCTAssertEqual(samples.map(\.pct), [70, 95, 100])
+        XCTAssertEqual(samples.map(\.plugged), [true, false, true])
+        XCTAssertEqual(samples.map(\.charging), [true, false, false])
+        XCTAssertEqual(samples.first?.t, Date(timeIntervalSince1970: 1_767_600_000))
+    }
 }

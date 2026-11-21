@@ -311,8 +311,8 @@ final class AppSettings {
     /// 合併現在是否生效：開關打開，且記憶體與磁碟都有開
     /// 不加底色時每個數值各自一個圖示，不合併
     var memoryDiskMerged: Bool {
-        !monitorPlainLabels
-            && MonitorKind.mergesMemoryDisk(merge: mergeMemoryDisk, memory: isMonitorEnabled(.memory), disk: isMonitorEnabled(.disk))
+        MonitorKind.mergesMemoryDisk(merge: mergeMemoryDisk, memory: isMonitorEnabled(.memory), disk: isMonitorEnabled(.disk),
+                                     plainLabels: monitorPlainLabels)
     }
 
     /// 系統監控總開關：關閉時選單列只有電池（桌上型為耗電）圖示，四個模組都不取樣，和以前的電池版一樣省電

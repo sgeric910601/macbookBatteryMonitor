@@ -30,7 +30,10 @@ enum MonitorKind: String, CaseIterable, Identifiable, Codable {
 
 extension MonitorKind {
     /// 記憶體與磁碟合併成一個圖示：開關打開，且兩個模組都開著
-    static func mergesMemoryDisk(merge: Bool, memory: Bool, disk: Bool) -> Bool { merge && memory && disk }
+    /// 不加底色時每個數值各自一個圖示，不合併
+    static func mergesMemoryDisk(merge: Bool, memory: Bool, disk: Bool, plainLabels: Bool = false) -> Bool {
+        !plainLabels && merge && memory && disk
+    }
 
     /// 合併時磁碟併入記憶體的圖示，不再單獨出現
     static func shown(_ enabled: [MonitorKind], memoryDiskMerged: Bool) -> [MonitorKind] {

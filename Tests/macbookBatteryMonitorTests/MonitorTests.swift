@@ -6,6 +6,8 @@ final class MonitorTests {
         XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: true, memory: true, disk: false))
         XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: true, memory: false, disk: true))
         XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: false, memory: true, disk: true))
+        // 標籤不加底色時不合併，即使合併開關打開
+        XCTAssertTrue(!MonitorKind.mergesMemoryDisk(merge: true, memory: true, disk: true, plainLabels: true))
     }
 
     func testMergedMemoryDiskDropsDiskIcon() {

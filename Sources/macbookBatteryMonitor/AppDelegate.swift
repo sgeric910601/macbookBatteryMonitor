@@ -1087,38 +1087,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 }
-
-/// 提示框要顯示時才向它要文字
-private final class LiveToolTip: NSObject, NSViewToolTipOwner {
-    var text = ""
-    var tag: NSView.ToolTipTag?
-    var rect = NSRect.zero
-
-    func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String { text }
-}
-
-private var liveToolTipKey: UInt8 = 0
-
-extension NSView {
-    /// setLiveToolTip 設的最新文字（合併成一個圖示時要複製過去）
-    var liveToolTip: String? { (objc_getAssociatedObject(self, &liveToolTipKey) as? LiveToolTip)?.text }
-
-    /// 數字每秒更新的提示框：不設 toolTip 屬性（一換文字 macOS 就在游標目前的位置重新顯示提示框，
-    /// 滑鼠剛離開時也會，提示框就出現在畫面中間），改成系統要顯示時才來拿最新文字
-    func setLiveToolTip(_ text: String?) {
-        let live: LiveToolTip
-        if let existing = objc_getAssociatedObject(self, &liveToolTipKey) as? LiveToolTip {
-            live = existing
-        } else {
-            live = LiveToolTip()
-            // addToolTip 不保留 owner，由 view 保留
-            objc_setAssociatedObject(self, &liveToolTipKey, live, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        }
-        live.text = text ?? ""
-        // 選單列圖示寬度會變：範圍跟著 bounds 重新登記（只在寬度變了時）
-        guard live.tag == nil || live.rect != bounds else { return }
-        if let tag = live.tag { removeToolTip(tag) }
-        live.tag = addToolTip(bounds, owner: live, userData: nil)
-        live.rect = bounds
-    }
-}

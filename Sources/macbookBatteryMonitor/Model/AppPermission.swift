@@ -7,6 +7,7 @@ enum AppPermission: CaseIterable, Identifiable {
     case notifications
     case bluetooth
     case automation
+    case audioCapture
 
     var id: Self { self }
 
@@ -17,6 +18,7 @@ enum AppPermission: CaseIterable, Identifiable {
         case .notifications: return "通知"
         case .bluetooth: return "藍牙"
         case .automation: return "自動化（System Events）"
+        case .audioCapture: return "系統錄音（只錄聲音）"
         }
     }
 
@@ -27,6 +29,7 @@ enum AppPermission: CaseIterable, Identifiable {
         case .notifications: return "bell"
         case .bluetooth: return "dot.radiowaves.left.and.right"
         case .automation: return "gearshape.2"
+        case .audioCapture: return "waveform"
         }
     }
 
@@ -38,6 +41,7 @@ enum AppPermission: CaseIterable, Identifiable {
         case .notifications: return ["電量提醒", "監控警示", "新版本通知"]
         case .bluetooth: return ["周邊設備電量"]
         case .automation: return isInstalled(.startupItems) ? ["登入項目的「登入時打開」"] : []
+        case .audioCapture: return isInstalled(.appVolume) ? ["各 App 音量"] : []
         }
     }
 
@@ -49,6 +53,7 @@ enum AppPermission: CaseIterable, Identifiable {
         case .notifications: pane = "com.apple.Notifications-Settings.extension"
         case .bluetooth: pane = "com.apple.preference.security?Privacy_Bluetooth"
         case .automation: pane = "com.apple.preference.security?Privacy_Automation"
+        case .audioCapture: pane = "com.apple.preference.security?Privacy_AudioCapture"
         }
         return URL(string: "x-apple.systempreferences:" + pane)!
     }

@@ -332,7 +332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .speedTest: settings.onMonitorsChange?()
         // 只在打開「登入項目」頁時讀取，沒有背景工作
         case .startupItems: break
-        case .clipboardHistory: applyQuickMenu()
+        case .clipboardHistory, .appVolume: applyQuickMenu()
         case .keyboardCleaning:
             // 清潔時才攔截；加入時先要權限，移除時結束進行中的清潔
             if settings.isInstalled(.keyboardCleaning) {
@@ -380,6 +380,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         // 剪貼簿歷史只在快捷選單裡看得到、清得掉，沒開快捷選單時不記錄
         ClipboardHistoryController.shared.apply(enabled: settings.isInstalled(.clipboardHistory) && settings.isInstalled(.quickMenu))
+        applyAppVolume()
+    }
+
+    /// 各 App 音量只在快捷選單裡調得到：沒開快捷選單時不擷取任何 App，聲音維持原本的樣子
+    private func applyAppVolume() {
+        let controller = AppVolumeController.shared
+        controller.onSettingsChange = { [weak self] in self?.settings.appVolumes = $0 }
+        controller.apply(enabled: settings.isInstalled(.appVolume) && settings.isInstalled(.quickMenu), settings: settings.appVolumes)
     }
 
     /// 滑鼠側鍵。需要「輔助使用」：剛設定時跳出系統的詢問，允許之後每 2 秒檢查一次就開始
@@ -635,6 +643,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         XDRBrightnessController.shared.disable()
         // 結束或更新重啟前停止攔截；剛好按著 Shift 時，還排在主佇列的按鍵會被丟掉，不會晚到別的 App
         InputSourceFix.shared.applyShift(false)
+        // 拆掉擷取：被調低的 App 立刻恢復原本的聲音
+        AppVolumeController.shared.stopAll()
         store.adminCPU.stop()
         store.chargingWake.stop()
         store.history.save()

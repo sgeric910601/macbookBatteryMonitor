@@ -119,7 +119,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .xdrBrightness: return .xdrBrightness
         case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
         case .startupItems: return .startup
-        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest: return nil
+        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .appVolume: return nil
         }
     }
 

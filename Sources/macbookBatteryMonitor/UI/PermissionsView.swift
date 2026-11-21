@@ -65,6 +65,8 @@ struct PermissionsView: View {
         statuses[.bluetooth] = BLEBatteryReader.authorized ? .granted : BLEBatteryReader.denied ? .denied : .askWhenUsed
         // 自動化的狀態要實際詢問 System Events 才知道，查詢本身可能跳出系統詢問，所以不查
         statuses[.automation] = .askWhenUsed
+        // 系統錄音沒有公開的查詢方式：建立擷取時才知道，被拒時各 App 音量的卡片會說明
+        statuses[.audioCapture] = AppVolumeController.shared.problem ? .denied : .askWhenUsed
         Notifier.shared.checkBlocked { blocked in statuses[.notifications] = blocked ? .denied : .granted }
     }
 }

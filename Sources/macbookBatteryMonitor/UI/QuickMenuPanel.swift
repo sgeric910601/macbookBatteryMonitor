@@ -28,6 +28,7 @@ struct QuickMenuPanel: View {
     private var showsMic: Bool { showsAudio && audio.micSupported }
     private var showsCleaning: Bool { settings.isInstalled(.keyboardCleaning) }
     private var showsClipboard: Bool { settings.isInstalled(.clipboardHistory) }
+    private var showsAppVolume: Bool { settings.isInstalled(.appVolume) && AppVolumeController.supported }
     /// 直接讀最新的歷史：面板開著時複製或清除，清單會跟著更新
     private var clipboard: [String] { ClipboardHistoryController.shared.history.items }
 
@@ -55,6 +56,7 @@ struct QuickMenuPanel: View {
             }
             awakeCard
             if showsAudio, !audio.outputs.isEmpty { audioCard }
+            if showsAppVolume { appVolumeCard }
             if showsClipboard { clipboardCard }
             footer
         }
@@ -201,6 +203,44 @@ struct QuickMenuPanel: View {
                     QuickRow(symbol: AudioDevices.symbol(transport: output.transport), tint: .blue,
                              title: output.name, selected: output.isCurrent) {
                         audio.select(output.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private var appVolumeCard: some View {
+        let controller = AppVolumeController.shared
+        return Card {
+            VStack(alignment: .leading, spacing: 6) {
+                QuickCardTitle("App 音量", symbol: "slider.horizontal.3", tint: .pink)
+                    .padding(.bottom, 2)
+                if controller.problem {
+                    Text("沒有「系統錄音」權限，或擷取一直收不到聲音，已讓所有 App 恢復原本的音量。請到系統設定 → 隱私權與安全性 →「螢幕與系統錄音」允許「只錄音」，再按「再試一次」。")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("打開系統設定") { NSWorkspace.shared.open(AppPermission.audioCapture.settingsURL) }
+                        Button("再試一次") { controller.retry() }
+                    }
+                    .controlSize(.small)
+                } else {
+                    if controller.mayLackPermission {
+                        // 第一次收不到聲音就先提示（約 5 秒）；連續三次才停掉，免得 App 剛好沒聲音時被誤判
+                        Text("被調低的 App 收不到聲音，可能還沒允許「系統錄音」。請到系統設定 → 隱私權與安全性 →「螢幕與系統錄音」允許「只錄音」。")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("打開系統設定") { NSWorkspace.shared.open(AppPermission.audioCapture.settingsURL) }
+                            .controlSize(.small)
+                    }
+                    if controller.playing.isEmpty {
+                        Text("沒有 App 在播放聲音")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(controller.playing) { app in AppVolumeRow(app: app, controller: controller) }
                     }
                 }
             }
@@ -415,6 +455,49 @@ private struct FeatureRow: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()
+        }
+    }
+}
+
+/// 一個正在播放的 App：圖示、名稱、靜音按鈕、音量滑桿
+private struct AppVolumeRow: View {
+    let app: AppVolumeController.PlayingApp
+    let controller: AppVolumeController
+
+    var body: some View {
+        let setting = controller.setting(for: app.bundleID)
+        HStack(spacing: 6) {
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .frame(width: 18, height: 18)
+            }
+            Text(app.name)
+                .font(.caption)
+                .lineLimit(1)
+                .frame(width: 84, alignment: .leading)
+                // 暫停中的調整過的 App：淡一點，但一樣可以調回
+                .foregroundStyle(app.isPlaying ? Color.primary : Color.secondary)
+                .help(app.isPlaying ? "" : "\(app.name) 目前沒有在播放")
+            Button {
+                controller.toggleMute(app.bundleID)
+            } label: {
+                Image(systemName: setting.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .foregroundStyle(setting.muted ? Color.red : Color.secondary)
+                    .frame(width: 18)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(setting.muted ? "取消\(app.name)靜音" : "把\(app.name)靜音")
+            Slider(value: Binding(get: { controller.setting(for: app.bundleID).volume },
+                                  set: { controller.setVolume($0, for: app.bundleID) }), in: 0...1)
+                .controlSize(.small)
+                .disabled(setting.muted)
+                .accessibilityLabel("\(app.name)音量")
+            Text("\(Int((setting.muted ? 0 : setting.volume) * 100))%")
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 32, alignment: .trailing)
         }
     }
 }

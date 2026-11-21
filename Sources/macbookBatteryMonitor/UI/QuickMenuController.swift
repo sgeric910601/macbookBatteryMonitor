@@ -3,7 +3,7 @@ import SwiftUI
 
 /// 選單列的貓咪快捷面板：點開直接操作常用功能（防止休眠、麥克風、鍵盤清潔、音訊輸出、剪貼簿歷史）。
 /// 和電池、系統監控的面板同一套規則：點圖示開、再點收；點其他圖示直接換過去；點其他地方收起。
-/// 面板每次打開才建立、關掉就釋放，平常不做任何事；不需要權限
+/// 面板每次打開才建立、關掉就釋放，平常不做任何事；不需要權限（啟用「各 App 音量」時例外：要「系統錄音」權限，有調整的 App 會在背景檢查聲音）
 @MainActor
 final class QuickMenuController: NSObject, NSPopoverDelegate {
     static let shared = QuickMenuController()
@@ -67,6 +67,7 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
         state.page = .main
         // 每次打開都從收起開始，上次展開過也不會直接露出內容
         state.clipboardExpanded = false
+        AppVolumeController.shared.setPanelVisible(true)
         let root = QuickMenuPanel(settings: settings, state: state, awake: .shared, audio: .shared,
                                   close: { [weak self] in self?.popover?.closeNow() },
                                   openSettings: { [weak self] section in
@@ -116,6 +117,7 @@ final class QuickMenuController: NSObject, NSPopoverDelegate {
 
     func popoverDidClose(_ notification: Notification) {
         guard let closed = notification.object as? NSPopover else { return }
+        AppVolumeController.shared.setPanelVisible(false)
         if closed === popover { stopOutsideClickMonitoring() }
         DispatchQueue.main.async { [weak self] in
             closed.contentViewController = nil

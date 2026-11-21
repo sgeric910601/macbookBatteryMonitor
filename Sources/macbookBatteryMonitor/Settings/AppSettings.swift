@@ -441,6 +441,10 @@ final class AppSettings {
             if capsLockNoDelay != oldValue { onInputSourceFixChange?() }
         }
     }
+    /// 各 App 音量：[套件識別碼: 設定]，只存調低或靜音的。shortcut: 沒放進設定檔匯出入（存的是 App 識別碼），要時再加進 backupSchema
+    var appVolumes: [String: AppVolume.Setting] {
+        didSet { defaults.set(AppVolume.stored(appVolumes), forKey: Keys.appVolumes) }
+    }
     /// 中文輸入法按住 Shift 打半形英文
     var shiftHalfWidth: Bool {
         didSet {
@@ -610,6 +614,7 @@ final class AppSettings {
         static let switcher = "windowSwitcherSettings"
         static let capsLockNoDelay = "capsLockNoDelay"
         static let shiftHalfWidth = "shiftHalfWidth"
+        static let appVolumes = "appVolumes"
         static let chargingTargetPercent = "chargingTargetPercent"
         static let chargingHoldPercent = "chargingHoldPercent"
         static let chargingSleepStrategy = "chargingSleepStrategy"
@@ -769,6 +774,7 @@ final class AppSettings {
         switcher = SwitcherSettings(stored: defaults.dictionary(forKey: Keys.switcher) ?? [:])
         capsLockNoDelay = defaults.bool(forKey: Keys.capsLockNoDelay)
         shiftHalfWidth = defaults.bool(forKey: Keys.shiftHalfWidth)
+        appVolumes = AppVolume.settings(stored: defaults.dictionary(forKey: Keys.appVolumes) ?? [:])
         let storedTarget = defaults.integer(forKey: Keys.chargingTargetPercent)
         let target = storedTarget == Self.originalLimitTarget ? Self.originalLimitTarget : ChargingPlan.clamp(storedTarget)
         chargingTargetPercent = target

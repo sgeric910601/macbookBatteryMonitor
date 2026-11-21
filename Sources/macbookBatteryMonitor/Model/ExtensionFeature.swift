@@ -23,6 +23,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     case xdrBrightness
     case speedTest
     case startupItems
+    case appVolume
 
     var id: String { rawValue }
 
@@ -48,6 +49,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .xdrBrightness: return "XDR 額外增亮"
         case .speedTest: return "網路測速"
         case .startupItems: return "登入項目管理"
+        case .appVolume: return "各 App 音量"
         }
     }
 
@@ -71,6 +73,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .xdrBrightness: return "sun.max.fill"
         case .speedTest: return "speedometer"
         case .startupItems: return "power"
+        case .appVolume: return "slider.horizontal.3"
         }
     }
 
@@ -95,6 +98,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .xdrBrightness: return "系統監控"
         case .speedTest: return "系統監控"
         case .startupItems: return "系統"
+        case .appVolume: return "聲音"
         }
     }
 
@@ -119,6 +123,7 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .xdrBrightness: return "監聽亮度鍵"
         case .speedTest: return "按下才連網"
         case .startupItems: return "需要「自動化」權限"
+        case .appVolume: return "擷取調低的 App 聲音"
         }
     }
 
@@ -136,19 +141,20 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         case .greenButton: return "點視窗的綠色按鈕改成填滿螢幕（不進全螢幕），再按一次還原"
         case .windowSnap: return "把視窗拖到螢幕邊緣或角落，放開後排成半邊、填滿或四分之一"
         case .finderKeys: return "在 Finder 用 ⌘X、⌘V 剪下搬移檔案，按 F2 重新命名"
-        case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、麥克風、鍵盤清潔、音訊輸出、剪貼簿歷史與功能開關"
+        case .quickMenu: return "選單列多一個貓咪圖示，點開直接操作防止休眠、麥克風、鍵盤清潔、音訊輸出、App 音量、剪貼簿歷史與功能開關"
         case .portManager: return "網路面板列出監聽中的連接埠，可以結束對應的程式；CPU、記憶體清單可以右鍵結束 App"
         case .clipboardHistory: return "記住最近 30 筆複製的文字（只在記憶體、不記密碼工具標成機密的內容），從貓咪快捷選單選回來（要一起啟用貓咪快捷選單）"
         case .xdrBrightness: return "讓內建 XDR 螢幕額外增亮，亮度鍵到頂後可自動啟用；會增加耗電"
         case .speedTest: return "網路面板多一個測速卡片，按下才測：約 20～30 秒、會用掉數百 MB 流量，連到 Apple 的測速伺服器；要開著系統監控的網路模組才看得到"
         case .startupItems: return "列出登入時自動啟動的項目，可以新增、停用或移除；打開頁面時才讀取，要允許「自動化」控制 System Events"
+        case .appVolume: return "在貓咪快捷選單裡分別調整正在播放的 App 音量或靜音；只擷取調低或靜音的 App，要允許「系統錄音」（macOS 14.2 以上，要一起啟用貓咪快捷選單）"
         }
     }
 
     /// 需要「輔助使用」權限（權限頁依這個列出用到的功能）
     var needsAccessibility: Bool {
         switch self {
-        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .startupItems: return false
+        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest, .startupItems, .appVolume: return false
         default: return true
         }
     }

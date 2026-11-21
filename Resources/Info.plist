@@ -14,6 +14,8 @@
     <string>macbookBatteryMonitor</string>
     <key>LSHasLocalizedDisplayName</key>
     <true/>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>「電池與系統監控」只在你調低或靜音某個 App 時，擷取那個 App 的聲音、調整音量後即時重新播放；聲音只在記憶體裡經過，不會儲存或傳送。</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>「電池與系統監控」需要使用藍牙，才能讀取已連線的藍牙滑鼠、鍵盤等設備回報的電量。App 不會配對、連線或控制這些設備。</string>
     <key>CFBundleIconFile</key>

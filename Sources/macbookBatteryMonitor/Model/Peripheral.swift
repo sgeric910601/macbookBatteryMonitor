@@ -14,6 +14,8 @@ struct PeripheralBattery: Identifiable, Equatable {
     var left: Int?
     var right: Int?
     var caseLevel: Int?
+    /// Apple 耳機的藍牙 Product ID（system_profiler 的 device_productID），用來顯示對應款式的圖示
+    var appleProductID: Int?
 
     /// 通知與顯示用的代表電量：耳機取左右耳較低者（不含充電盒）
     var lowest: Int? { [left, right].compactMap { $0 }.min() ?? level }
@@ -25,11 +27,26 @@ struct PeripheralBattery: Identifiable, Equatable {
         case .trackpad: return "rectangle.and.hand.point.up.left"
         case .gameController: return "gamecontroller"
         case .headphones:
+            if let id = appleProductID, let symbol = Self.headphoneSymbol(productID: id) { return symbol }
             if name.localizedCaseInsensitiveContains("AirPods Max") { return "airpodsmax" }
             if name.localizedCaseInsensitiveContains("AirPods Pro") { return "airpodspro" }
             if name.localizedCaseInsensitiveContains("AirPods") { return "airpods" }
             return "headphones"
         case .other: return "dot.radiowaves.left.and.right"
+        }
+    }
+
+    /// AirPods 的 Product ID → 系統內建的款式圖示（SF Symbols）；不認得的回 nil，改用名稱判斷
+    static func headphoneSymbol(productID: Int) -> String? {
+        switch productID {
+        case 0x2002, 0x200F: return "airpods"              // AirPods 第 1、2 代
+        case 0x2013: return "airpods.gen3"                 // AirPods 第 3 代
+        case 0x2019, 0x201B:                               // AirPods 4（含主動降噪款）
+            if #available(macOS 15, *) { return "airpods.gen4" }
+            return "airpods.gen3"
+        case 0x200E, 0x2014, 0x2024: return "airpodspro"   // AirPods Pro、Pro 2（Lightning、USB-C）
+        case 0x200A, 0x201F: return "airpodsmax"           // AirPods Max（Lightning、USB-C）
+        default: return nil
         }
     }
 
@@ -80,12 +97,22 @@ enum PeripheralParse {
                         level: percent(info["device_batteryLevelMain"]) ?? percent(info["device_batteryLevel"]),
                         left: percent(info["device_batteryLevelLeft"]),
                         right: percent(info["device_batteryLevelRight"]),
-                        caseLevel: percent(info["device_batteryLevelCase"]))
+                        caseLevel: percent(info["device_batteryLevelCase"]),
+                        appleProductID: appleProductID(info))
                     if device.lowest != nil || device.caseLevel != nil { result.append(device) }
                 }
             }
         }
         return mergeSameName(result)
+    }
+
+    /// 廠商是 Apple（0x004C）時的 Product ID："0x2013" → 0x2013
+    static func appleProductID(_ info: [String: Any]) -> Int? {
+        func hex(_ key: String) -> Int? {
+            guard let text = info[key] as? String, text.lowercased().hasPrefix("0x") else { return nil }
+            return Int(text.dropFirst(2), radix: 16)
+        }
+        return hex("device_vendorID") == 0x004C ? hex("device_productID") : nil
     }
 
     /// 新款 AirPods 在系統藍牙資訊裡可能列兩次（兩個位址，其中一筆只有部分電量），同名的合併成一行：
@@ -107,6 +134,7 @@ enum PeripheralParse {
             primary.left = primary.left ?? other.left
             primary.right = primary.right ?? other.right
             primary.caseLevel = primary.caseLevel ?? other.caseLevel
+            primary.appleProductID = primary.appleProductID ?? other.appleProductID
             if primary.kind == .other { primary.kind = other.kind }
             merged[index] = primary
         }

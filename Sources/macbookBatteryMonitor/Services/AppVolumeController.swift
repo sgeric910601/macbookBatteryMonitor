@@ -191,7 +191,7 @@ final class AppVolumeEngine: @unchecked Sendable {
     /// 還沒確認權限前，擷取一直無聲而先放掉的次數；連續幾次都這樣多半是沒有權限
     private var silentStrikes = 0
     /// 每個 App 最後一次正在輸出聲音的時間
-    private var lastPlaying: [String: Date] = [:]
+    private var lastPlaying: [String: TimeInterval] = [:]
     /// 建立失敗（例如輸出格式不支援）或無聲而放掉的 App：程序或輸出裝置沒變之前不再試，免得每 2 秒被靜音一下
     private var skipped: [String: (objects: Set<AudioObjectID>, output: String, until: Date)] = [:]
 
@@ -225,10 +225,10 @@ final class AppVolumeEngine: @unchecked Sendable {
             objects[owner, default: []].insert(process.objectID)
             if process.isRunningOutput { playing.insert(owner) }
         }
-        let now = Date()
+        let now = ProcessInfo.processInfo.systemUptime
         for owner in playing { lastPlaying[owner] = now }
         lastPlaying = lastPlaying.filter { objects[$0.key] != nil }
-        func idle(_ bundleID: String) -> Bool { AppVolume.isIdle(lastPlaying: lastPlaying[bundleID], now: now) }
+        func idle(_ bundleID: String) -> Bool { AppVolume.isIdle(lastPlaying: lastPlaying[bundleID], now: now, gain: targets[bundleID] ?? 1) }
         // 不再需要、App 已經沒有程序、或安靜太久的：拆掉，聲音回到原本的樣子
         for (bundleID, tap) in taps where targets[bundleID] == nil || objects[bundleID] == nil || idle(bundleID) {
             taps[bundleID] = nil

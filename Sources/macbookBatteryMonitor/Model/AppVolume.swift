@@ -57,10 +57,13 @@ enum AppVolume {
     /// 調整過的 App 安靜這麼久就拆掉擷取，輸出裝置才能休息；再出聲時重新接上
     static let idleTeardown: TimeInterval = 10
 
-    /// 從沒出聲過、或已經安靜超過 idleTeardown：不需要擷取
-    static func isIdle(lastPlaying: Date?, now: Date) -> Bool {
+    /// 從沒出聲過、或已經安靜超過 idleTeardown：不需要擷取。
+    /// 靜音的 App 一律保留：短促的提示音在 2 秒輪詢抓到前就播完了，拆掉的話靜音等於沒作用
+    /// 時間用開機後的秒數（systemUptime），改系統時間不影響
+    static func isIdle(lastPlaying: TimeInterval?, now: TimeInterval, gain: Float) -> Bool {
+        guard gain > 0 else { return false }
         guard let lastPlaying else { return true }
-        return now.timeIntervalSince(lastPlaying) >= idleTeardown
+        return now - lastPlaying >= idleTeardown
     }
 
     static let safari = "com.apple.Safari"

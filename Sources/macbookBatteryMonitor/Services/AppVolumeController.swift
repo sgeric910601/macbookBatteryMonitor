@@ -190,6 +190,8 @@ final class AppVolumeEngine: @unchecked Sendable {
     private var verified = false
     /// 還沒確認權限前，擷取一直無聲而先放掉的次數；連續幾次都這樣多半是沒有權限
     private var silentStrikes = 0
+    /// 每個 App 最後一次正在輸出聲音的時間
+    private var lastPlaying: [String: Date] = [:]
     /// 建立失敗（例如輸出格式不支援）或無聲而放掉的 App：程序或輸出裝置沒變之前不再試，免得每 2 秒被靜音一下
     private var skipped: [String: (objects: Set<AudioObjectID>, output: String, until: Date)] = [:]
 
@@ -223,8 +225,12 @@ final class AppVolumeEngine: @unchecked Sendable {
             objects[owner, default: []].insert(process.objectID)
             if process.isRunningOutput { playing.insert(owner) }
         }
-        // 不再需要、或 App 已經沒有程序的：拆掉，聲音回到原本的樣子
-        for (bundleID, tap) in taps where targets[bundleID] == nil || objects[bundleID] == nil {
+        let now = Date()
+        for owner in playing { lastPlaying[owner] = now }
+        lastPlaying = lastPlaying.filter { objects[$0.key] != nil }
+        func idle(_ bundleID: String) -> Bool { AppVolume.isIdle(lastPlaying: lastPlaying[bundleID], now: now) }
+        // 不再需要、App 已經沒有程序、或安靜太久的：拆掉，聲音回到原本的樣子
+        for (bundleID, tap) in taps where targets[bundleID] == nil || objects[bundleID] == nil || idle(bundleID) {
             taps[bundleID] = nil
             if objects[bundleID] == nil {
                 tap.invalidate()
@@ -255,7 +261,8 @@ final class AppVolumeEngine: @unchecked Sendable {
         }
         guard let output = AudioProcess.defaultOutputUID() else { return Result(playing: playing, problem: false) }
         for (bundleID, gain) in targets {
-            guard let ids = objects[bundleID] else { continue }
+            // 只替最近有出聲的 App 建立：沒聲音的 App 不佔用輸出裝置
+            guard let ids = objects[bundleID], !idle(bundleID) else { continue }
             var old = taps[bundleID]
             if let old, old.processObjects == ids, old.outputUID == output, old.isAlive {
                 old.setGain(gain)

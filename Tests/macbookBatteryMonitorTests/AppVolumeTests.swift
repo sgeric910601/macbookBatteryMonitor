@@ -106,6 +106,14 @@ struct AppVolumeTests {
         XCTAssertTrue(AppVolume.listed(playing: [], adjusted: [], running: ["a.music"]).isEmpty)
     }
 
+    /// 沒出聲過或安靜滿 10 秒才拆
+    func testIdle() {
+        let now = Date()
+        XCTAssertTrue(AppVolume.isIdle(lastPlaying: nil, now: now))
+        XCTAssertTrue(!AppVolume.isIdle(lastPlaying: now.addingTimeInterval(-9.9), now: now))
+        XCTAssertTrue(AppVolume.isIdle(lastPlaying: now.addingTimeInterval(-10), now: now))
+    }
+
     /// 第一次建立：等到收到聲音才接手、從 100% 開始；重建且舊的已接手：收到聲音或等 0.5 秒後接手、從目前設定開始；舊的還沒接手時當成第一次
     func testArmDecision() {
         XCTAssertEqual(AppVolume.armDecision(heardSound: false, oldArmed: false, waited: 10), .wait)

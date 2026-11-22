@@ -54,6 +54,15 @@ enum AppVolume {
         return .wait
     }
 
+    /// 調整過的 App 安靜這麼久就拆掉擷取，輸出裝置才能休息；再出聲時重新接上
+    static let idleTeardown: TimeInterval = 10
+
+    /// 從沒出聲過、或已經安靜超過 idleTeardown：不需要擷取
+    static func isIdle(lastPlaying: Date?, now: Date) -> Bool {
+        guard let lastPlaying else { return true }
+        return now.timeIntervalSince(lastPlaying) >= idleTeardown
+    }
+
     static let safari = "com.apple.Safari"
     /// 存起來的 App 數量上限
     static let maxStored = 256

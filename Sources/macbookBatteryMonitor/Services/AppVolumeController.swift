@@ -36,7 +36,6 @@ final class AppVolumeController {
     @ObservationIgnored private var enabled = false
     @ObservationIgnored private var panelVisible = false
     @ObservationIgnored private var wakeObserver: NSObjectProtocol?
-    @ObservationIgnored private var signalSources: [DispatchSourceSignal] = []
     @ObservationIgnored private var saveWork: DispatchWorkItem?
     @ObservationIgnored var onSettingsChange: (([String: AppVolume.Setting]) -> Void)?
 
@@ -70,7 +69,6 @@ final class AppVolumeController {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) { MainActor.assumeIsolated { AppVolumeController.shared.sync() } }
                 }
             }
-            restoreOnSignals()
             engine.queue.async { [engine] in engine.listenForDeviceChanges() }
         }
         sync()
@@ -106,7 +104,7 @@ final class AppVolumeController {
     }
 
     /// App 結束前拆掉所有擷取，被擷取的 App 立刻恢復原本的聲音
-    /// 最多等 1 秒：Core Audio 卡住時不讓 App 卡在結束（本程序結束時系統也會收回私有的擷取）
+    /// 最多等 1 秒：Core Audio 卡住時不讓 App 卡在結束（本程序結束時系統會收回私有的擷取，被 kill 時聲音也會恢復，實測）
     func stopAll() {
         let done = DispatchSemaphore(value: 0)
         engine.queue.async { [engine] in
@@ -178,27 +176,6 @@ final class AppVolumeController {
                     if controller.mayLackPermission != result.mayLackPermission { controller.mayLackPermission = result.mayLackPermission }
                 }
             }
-        }
-    }
-
-    /// 被 kill、登出時送來的結束訊號：先拆掉擷取，被擷取的 App 不會停在靜音。shortcut: kill -9 攔不到，靠系統在本程序結束時收回擷取
-    private func restoreOnSignals() {
-        guard signalSources.isEmpty else { return }
-        for number in [SIGTERM, SIGINT, SIGHUP] {
-            signal(number, SIG_IGN)
-            // 不在主執行緒收：主執行緒卡住時也會先恢復預設，第二次的結束訊號直接結束
-            let source = DispatchSource.makeSignalSource(signal: number, queue: .global(qos: .userInitiated))
-            source.setEventHandler {
-                signal(number, SIG_DFL)
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        AppVolumeController.shared.stopAll()
-                        NSApp.terminate(nil)
-                    }
-                }
-            }
-            source.resume()
-            signalSources.append(source)
         }
     }
 }

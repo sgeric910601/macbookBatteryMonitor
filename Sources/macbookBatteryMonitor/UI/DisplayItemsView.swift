@@ -35,10 +35,10 @@ struct DisplayItemsView: View {
                             }
                         }
                     }
-                    Toggle("顯示充電器規格卡片", isOn: Binding(
+                    Toggle("顯示充電器規格", isOn: Binding(
                         get: { settings.showChargerSpecifications },
                         set: { settings.showChargerSpecifications = $0 }))
-                    Text("顯示在詳細資訊下方；未連接充電器時自動隱藏。")
+                    Text("顯示在詳細資訊欄位下方；未連接充電器時自動隱藏。")
                         .font(.caption).foregroundStyle(.secondary)
                     if limitSlider {
                         Text("充電上限顯示在主面板的滑桿上，這裡不再重複。")

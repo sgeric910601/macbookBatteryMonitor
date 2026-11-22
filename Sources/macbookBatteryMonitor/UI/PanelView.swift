@@ -67,13 +67,8 @@ struct PanelView: View {
                 Group {
                     switch ui.tab {
                     case .details:
-                        VStack(spacing: 10) {
-                            DetailsGridView(s: s, e: e, health: store.systemHealth, limitSlider: store.chargeLimit.supported,
-                                            openDisplayItems: { ui.openSettings(.display) })
-                            if s.externalConnected, settings.showChargerSpecifications {
-                                ChargerSpecificationsCard(adapter: s.adapter)
-                            }
-                        }
+                        DetailsGridView(s: s, e: e, health: store.systemHealth, limitSlider: store.chargeLimit.supported,
+                                        openDisplayItems: { ui.openSettings(.display) })
                     case .history: HistoryChartView(history: store.history, ui: ui)
                     case .processes: TopProcessesView(store: store)
                     case .peripherals: PeripheralsView(store: store.peripherals, settings: settings)
@@ -210,14 +205,9 @@ private struct HeaderView: View {
                 Text("\(s.percent)%")
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                HStack(spacing: 6) {
-                    Label(e.state.title, systemImage: e.state.symbol)
-                        .foregroundStyle(e.state.tint)
-                    if e.state == .charging, s.externalConnected, let connection = s.adapter?.connection {
-                        Text(connection).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .font(.callout)
+                Label(e.state.title, systemImage: e.state.symbol)
+                    .foregroundStyle(e.state.tint)
+                    .font(.callout)
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 2) {
@@ -337,18 +327,21 @@ private struct TimeCard: View {
     private var charging: some View {
         VStack(alignment: .leading, spacing: 6) {
             CardTitle("充電預估", systemImage: "bolt")
-            // 剛開始充電的頭一分鐘還沒有平均電流，macOS 也還在估算
-            if let limit = s.chargeLimit?.limit {
-                row(limitShownAbove ? "充到上限" : "充到上限 (\(limit)%)", e.toLimit.map { Format.duration($0) } ?? "計算中…")
-            } else {
-                row("充滿 (100%)", e.toFull.map { Format.duration($0) } ?? "計算中…")
-            }
+            // 頂部是還要多久，這裡是幾點充好（同一個目標）；充入功率在電力流向
+            row("預計充好", finishTime ?? "計算中…")
             if fullThreshold < 100, s.percent < fullThreshold {
                 row("充到 \(fullThreshold)%", Format.duration(Estimator.minutesToCharge(to: fullThreshold, snapshot: s, estimates: e)))
             }
+            // 剛開始充電的頭一分鐘還沒有平均電流
             row("近 3 分鐘平均充電電流", e.avgCharge_mA.map { Format.milliamps($0) } ?? "計算中…")
-            row("充入功率", Format.watts(max(0, e.batteryWatts)))
         }
+    }
+
+    /// 和頂部相同的目標：有上限且還沒到時是充到上限，否則是充滿
+    private var finishTime: String? {
+        let limit = s.chargeLimit?.limit
+        let minutes = limit.map { s.percent < $0 ? e.toLimit : e.toFull } ?? e.toFull
+        return minutes.map { s.date.addingTimeInterval(Double($0) * 60).formatted(date: .omitted, time: .shortened) }
     }
 
     private var plugged: some View {
@@ -364,9 +357,6 @@ private struct TimeCard: View {
                 if let minutes = minutesToDrain(to: limit) {
                     row("降到上限約需", Format.duration(minutes))
                 }
-            }
-            if let watts = s.adapter?.watts {
-                row("變壓器", "\(watts) W")
             }
         }
     }

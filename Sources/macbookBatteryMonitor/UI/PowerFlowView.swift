@@ -11,7 +11,8 @@ struct PowerFlowView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 5) {
+        // 和面板各區塊之間的 10 點一致，標題列上下距離相同
+        VStack(spacing: 10) {
             if let ui, let breakdown {
                 HStack {
                     if ui.powerFlowLevel != .overview {
@@ -19,6 +20,7 @@ struct PowerFlowView: View {
                             ui.powerFlowLevel = ui.powerFlowLevel == .chip ? .components : .overview
                         } label: {
                             Label(ui.powerFlowLevel == .chip ? "系統細項" : "電力總覽", systemImage: "chevron.left")
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     } else {
@@ -31,7 +33,14 @@ struct PowerFlowView: View {
                     if ui.powerFlowLevel == .overview {
                         Button {
                             ui.powerFlowLevel = .components
-                        } label: { Label("系統細項", systemImage: "chevron.right") }
+                        } label: {
+                            // 箭頭在文字右邊；整個範圍（含中間空白）都能點
+                            HStack(spacing: 3) {
+                                Text("系統細項")
+                                Image(systemName: "chevron.right")
+                            }
+                            .contentShape(Rectangle())
+                        }
                         .buttonStyle(.plain)
                         .help("展開螢幕背光、晶片運算與其他功耗")
                     } else {

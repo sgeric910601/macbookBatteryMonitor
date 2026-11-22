@@ -738,6 +738,10 @@ final class AppSettings {
         let interval = defaults.integer(forKey: Keys.updateInterval)
         updateInterval = Self.updateIntervals.contains(interval) ? interval : 1
         hiddenFlowItems = Set(defaults.stringArray(forKey: Keys.hiddenFlowItems) ?? [])
+        if !usedBefore, defaults.object(forKey: Keys.hiddenDetailFields) == nil {
+            // 全新安裝不顯示和面板其他地方重複的欄位；從舊版更新的維持原本的選擇
+            defaults.set(DetailField.hiddenOnFreshInstall.map(\.rawValue).sorted(), forKey: Keys.hiddenDetailFields)
+        }
         hiddenDetailFields = Set(defaults.stringArray(forKey: Keys.hiddenDetailFields) ?? [])
         peripheralThresholds = defaults.dictionary(forKey: Keys.peripheralThresholds) as? [String: Int] ?? [:]
         appIconColor = AppIconColor(rawValue: defaults.string(forKey: Keys.appIconColor) ?? "") ?? .mint

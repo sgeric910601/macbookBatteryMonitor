@@ -12,6 +12,10 @@ struct AdapterInfo: Codable, Equatable {
     var connection: String?
     /// 充電器支援的電壓檔位（AdapterDetails 的 UsbHvcMenu），舊快照沒有這欄
     var levels: [Level]?
+    /// 充電器在 USB PD Discover Identity 回報的廠商代碼（USB-IF VID）；沒回報的充電器是 nil
+    var vendorID: Int?
+    /// 辨識同一顆充電器用（自訂名稱的鍵）：VID、PID 加上原始電壓電流檔位，只在面板開著時讀
+    var fingerprint: String?
 
     struct Level: Codable, Equatable {
         var voltage_mV: Int
@@ -46,6 +50,144 @@ struct AdapterInfo: Codable, Equatable {
             return Level(voltage_mV: v, current_mA: a)
         }
         return levels.isEmpty ? nil : levels.sorted { $0.voltage_mV < $1.voltage_mV }
+    }
+
+    /// 正在供電的孔與它收到的原始 PDO。只有一個孔有功率就是它；同時插兩條時，落選的孔也有 MaxPower，
+    /// 改挑 PortControllerLoserReason 為 0 的那個（只有一個孔時 LoserReason 也可能不是 0，所以不能只看它）。仍分不出時回 nil
+    static func powerPort(_ controllers: [[String: Any]]) -> (index: Int, pdos: [UInt32])? {
+        func value(_ i: Int, _ key: String) -> Int { (controllers[i][key] as? NSNumber)?.intValue ?? 0 }
+        let powered = controllers.indices.filter { value($0, "PortControllerMaxPower") > 0 }
+        let active = powered.count == 1 ? powered : powered.filter { value($0, "PortControllerLoserReason") == 0 }
+        guard active.count == 1, let raw = controllers[active[0]]["PortControllerPortPDO"] as? [NSNumber] else { return nil }
+        let pdos = raw.map { UInt32(truncatingIfNeeded: $0.int64Value) }.filter { $0 != 0 }
+        return pdos.isEmpty ? nil : (active[0], pdos)
+    }
+
+    /// 只取電壓電流（固定檔位與 PPS 電壓範圍），不含旗標位元：同一顆充電器換孔或重插時旗標會變。
+    /// 電流無條件進位到 0.1 A、PPS 只看最高電壓：同一顆經 MagSafe 接上時，每檔電流少 10～40 mA，PPS 最低電壓與電流也會變。
+    /// 用進位不用四捨五入：2.25 A 經 MagSafe 變 2.21～2.24 A，四捨五入會一邊 2.3、一邊 2.2
+    static func fingerprint(vendorID: Int, productID: Int, pdos: [UInt32]) -> String {
+        let levels = pdos.compactMap { pdo -> String? in
+            switch pdo >> 30 {
+            case 0: return "\((pdo >> 10 & 0x3FF) * 50)x\(roundUp100((pdo & 0x3FF) * 10))"
+            case 3 where pdo >> 28 & 3 == 0: return "pps\((pdo >> 17 & 0xFF) * 100)"
+            default: return nil
+            }
+        }
+        return String(format: "%04x:%04x|", vendorID, productID) + levels.joined(separator: ",")
+    }
+
+    static func roundUp100<T: BinaryInteger>(_ mA: T) -> T { (mA + 99) / 100 * 100 }
+
+    static func savedName(for fingerprint: String, in names: [String: String]) -> String? {
+        savedEntry(for: fingerprint, in: names)?.name
+    }
+
+    /// 先找完全相同的指紋；找不到時，只要有一邊沒有廠商代碼（MagSafe 讀不到）而檔位相同、且只有一筆，就用那筆。
+    /// 回傳命中的鍵：改名、清除要寫回這個鍵，不然借來的名稱改不掉
+    static func savedEntry(for fingerprint: String, in names: [String: String]) -> (key: String, name: String)? {
+        if let exact = names[fingerprint] { return (fingerprint, exact) }
+        let unknownVendor = "0000:0000"
+        func split(_ key: String) -> (vendor: Substring, levels: Substring)? {
+            guard let bar = key.firstIndex(of: "|") else { return nil }
+            return (key[..<bar], key[key.index(after: bar)...])
+        }
+        guard let mine = split(fingerprint) else { return nil }
+        let matches = names.filter { key, _ in
+            guard let other = split(key) else { return false }
+            return other.levels == mine.levels && (mine.vendor == unknownVendor || other.vendor == unknownVendor)
+        }
+        return matches.count == 1 ? matches.first.map { ($0.key, $0.value) } : nil
+    }
+
+    /// 舊版指紋（電流到 10 mA、PPS 含最低電壓與電流）轉成目前格式，已存的名稱才找得到；已是新格式的不變
+    static func migratedFingerprint(_ key: String) -> String {
+        guard let bar = key.firstIndex(of: "|") else { return key }
+        let levels = key[key.index(after: bar)...].split(separator: ",").map { part -> String in
+            if part.hasPrefix("pps") {
+                // pps5000-21000x5000 → pps21000
+                guard let range = part.dropFirst(3).split(separator: "x").first,
+                      let maxVoltage = range.split(separator: "-").last else { return String(part) }
+                return "pps" + maxVoltage
+            }
+            let pair = part.split(separator: "x")
+            guard pair.count == 2, let mA = Int(pair[1]), plausible.contains(mA) else { return String(part) }
+            return "\(pair[0])x\(roundUp100(mA))"
+        }
+        return key[...bar] + levels.joined(separator: ",")
+    }
+
+    /// 已存名稱：清理名稱、舊格式的鍵轉成新格式。撞在一起時固定挑一筆（新格式優先，否則取排序最前的原鍵），每次啟動結果一樣
+    static func migratedNames(_ stored: [String: String]) -> [String: String] {
+        var result: [String: (name: String, original: String)] = [:]
+        for (key, value) in stored.sorted(by: { $0.key < $1.key }) {
+            guard let name = cleanName(value) else { continue }
+            let newKey = migratedFingerprint(key)
+            guard isValidFingerprint(newKey) else { continue }  // 壞掉或被改過的鍵直接丟掉，免得之後解析出錯
+            // 依鍵排序走訪：已有一筆時，只有本身就是新格式的才取代它
+            if let kept = result[newKey], kept.original == newKey || key != newKey { continue }
+            result[newKey] = (name, key)
+        }
+        return result.mapValues(\.name)
+    }
+
+    /// 指紋裡的電壓、電流（mV、mA）合理範圍；超出的鍵一定是壞的，也避免相乘、進位時溢位
+    static let plausible = 0...100_000
+
+    /// 目前格式的指紋：「hhhh:hhhh|」加上逗號分隔的「電壓x電流」或「pps最高電壓」，數值都在合理範圍
+    static func isValidFingerprint(_ key: String) -> Bool {
+        let parts = key.split(separator: "|", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return false }
+        let ids = parts[0].split(separator: ":", omittingEmptySubsequences: false)
+        guard ids.count == 2, ids.allSatisfy({ $0.count == 4 && Int($0, radix: 16) != nil }) else { return false }
+        return parts[1].isEmpty || parts[1].split(separator: ",", omittingEmptySubsequences: false).allSatisfy { part in
+            if part.hasPrefix("pps") { return Int(part.dropFirst(3)).map(plausible.contains) ?? false }
+            let pair = part.split(separator: "x", omittingEmptySubsequences: false)
+            return pair.count == 2 && pair.allSatisfy { Int($0).map(plausible.contains) ?? false }
+        }
+    }
+
+    static let maxNameLength = 30
+    static let maxSavedChargers = 100
+
+    /// 設定檔匯入的名稱：只收「廠商:產品|檔位」格式的鍵、名稱照命名規則清理、最多 maxSavedChargers 筆
+    static func importedNames(_ raw: Any?) -> [String: String] {
+        guard let map = raw as? [String: Any] else { return [:] }
+        // 鍵的格式由 migratedNames 檢查（isValidFingerprint）
+        let valid = map.compactMapValues { $0 as? String }.filter { key, _ in key.count <= 200 }
+        return Dictionary(uniqueKeysWithValues: migratedNames(valid).sorted { $0.key < $1.key }.prefix(maxSavedChargers).map { ($0.key, $0.value) })
+    }
+
+    /// 同名多筆時的說明：各筆的廠商代碼（不重複），例如「廠商代碼 0x1A2B」或「廠商代碼 0x1A2B、無廠商代碼」
+    static func vendorSummary(_ fingerprints: [String]) -> String {
+        let vendors = fingerprints.map { Int($0.prefix(4), radix: 16) ?? 0 }
+        let known = Array(Set(vendors.filter { $0 > 0 })).sorted().map { String(format: "0x%04X", $0) }
+        let parts = (known.isEmpty ? [] : ["廠商代碼 " + known.joined(separator: "、")]) + (vendors.contains(0) ? ["無廠商代碼"] : [])
+        return parts.joined(separator: "、")
+    }
+
+    /// 設定頁清單上的一行說明：廠商代碼與最高的固定檔位，例如「廠商代碼 0x1A2B · 最高 20 V 約 5 A」
+    static func describe(fingerprint: String) -> String {
+        let parts = fingerprint.split(separator: "|", maxSplits: 1)
+        let vendor = parts.first.flatMap { Int($0.prefix(4), radix: 16) } ?? 0
+        let top = parts.count == 2 ? parts[1].split(separator: ",").compactMap { part -> (Int, Int)? in
+            let pair = part.split(separator: "x")
+            guard pair.count == 2, let v = Int(pair[0]), let a = Int(pair[1]), plausible.contains(v), plausible.contains(a) else { return nil }
+            return (v, a)
+        }.max { ($0.0 * $0.1, $0.0) < ($1.0 * $1.1, $1.0) } : nil  // 瓦數相同取電壓高的
+        let vendorText = vendor > 0 ? String(format: "廠商代碼 0x%04X", vendor) : "無廠商代碼（MagSafe 或未回報）"
+        guard let top else { return vendorText }
+        // 指紋的電流已進位到 0.1 A，所以標「約」
+        return vendorText + " · 最高 " + String(format: "%g V 約 %g A", Double(top.0) / 1000, Double(top.1) / 1000)
+    }
+
+    /// 使用者取的充電器名稱：去掉前後空白與控制字元、限制長度；空字串表示清除名稱
+    static func cleanName(_ text: String) -> String? {
+        // ZWJ stays so joined emoji survive; other control/format characters (e.g. bidi overrides) are dropped
+        let dropped = CharacterSet.controlCharacters.subtracting(CharacterSet(charactersIn: "\u{200D}"))
+        let cleaned = String(text.unicodeScalars.filter { !dropped.contains($0) })
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : String(cleaned.prefix(maxNameLength))
     }
 
     /// 支援檔位，電流相同的電壓合併成一組：["5／9／15 V 3 A", "20 V 2.25 A"]。
@@ -299,7 +441,8 @@ enum BatteryReader {
 
         if s.externalConnected {
             s.adapter = adapterInfo(registryDetails: reg["AdapterDetails"] as? [String: Any],
-                                    chargerCount: int(reg["ChargerCount"]), includeConnection: includeConnection)
+                                    chargerCount: int(reg["ChargerCount"]), includeConnection: includeConnection,
+                                    portControllers: reg["PortControllerInfo"] as? [[String: Any]])
         } else {
             s.adapter = nil
         }
@@ -353,13 +496,39 @@ enum BatteryReader {
     }
 
     /// 變壓器規格：每次更新都從同一次讀到的電池資料取（不另外查），換充電器後不會顯示舊資料
-    private static func adapterInfo(registryDetails: [String: Any]?, chargerCount: Int?, includeConnection: Bool) -> AdapterInfo? {
+    private static func adapterInfo(registryDetails: [String: Any]?, chargerCount: Int?, includeConnection: Bool,
+                                    portControllers: [[String: Any]]?) -> AdapterInfo? {
         // 單次快照只使用一份詳細資料，避免換充電器時混用系統不同步的名稱與規格。
         let details = registryDetails ?? (IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any])
         var info = details.map(AdapterInfo.parse)
         if info == nil { info = AdapterInfo() }
-        if includeConnection { info?.connection = adapterConnection(chargerCount: chargerCount) }
+        if includeConnection {
+            info?.connection = adapterConnection(chargerCount: chargerCount)
+            if let port = portControllers.flatMap(AdapterInfo.powerPort) {
+                let identity = partnerIdentity(port: port.index + 1)
+                // 供電孔有 USB-C 的 PD 節點就是 USB-C；MagSafe 與 USB-C 都接著同一顆充電器時，連線狀態猜不出是哪條
+                if identity != nil { info?.connection = "USB-C" }
+                let vendorID = identity?.vendorID ?? 0
+                info?.vendorID = vendorID > 0 ? vendorID : nil
+                info?.fingerprint = AdapterInfo.fingerprint(vendorID: vendorID, productID: identity?.productID ?? 0, pdos: port.pdos)
+            }
+        }
         return info
+    }
+
+    /// 充電器對 USB PD Discover Identity 的回覆（IORegistry 的 Port-USB-C@n/CC/SOP）。
+    /// 沒有這個節點（不是 USB-C 孔，例如 MagSafe）回 nil；有節點但沒回覆時兩個都是 0
+    private static func partnerIdentity(port: Int) -> (vendorID: Int, productID: Int)? {
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOPortTransportComponentCCUSBPDSOP"), &iterator) == KERN_SUCCESS else { return nil }
+        defer { IOObjectRelease(iterator) }
+        while case let service = IOIteratorNext(iterator), service != 0 {
+            defer { IOObjectRelease(service) }
+            func value(_ key: String) -> Any? { IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() }
+            guard value("Description") as? String == "Port-USB-C@\(port)/CC/SOP" else { continue }
+            return ((value("Vendor ID") as? NSNumber)?.intValue ?? 0, (value("Product ID") as? NSNumber)?.intValue ?? 0)
+        }
+        return nil
     }
 
     private static func adapterConnection(chargerCount: Int?) -> String? {

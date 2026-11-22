@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct DetailsGridView: View {
     let s: BatterySnapshot
@@ -162,9 +163,15 @@ private struct ChargerSection: View {
                     HStack(alignment: .center, spacing: 10) {
                         ConnectorIcon(connection: adapter?.connection, charging: s.isCharging)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(adapter?.name ?? "充電器（系統未回報名稱）")
-                                .font(.callout.weight(.semibold))
-                                .fixedSize(horizontal: false, vertical: true)
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(customName ?? adapter?.name ?? "未命名充電器")
+                                    .font(.callout.weight(.semibold))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let fingerprint = adapter?.fingerprint {
+                                    Button(customName == nil ? "命名…" : "改名…") { rename(fingerprint) }
+                                        .buttonStyle(.link).font(.caption)
+                                }
+                            }
                             if !identity.isEmpty {
                                 Text(identity.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                                     .lineLimit(1).fixedSize()
@@ -203,9 +210,9 @@ private struct ChargerSection: View {
         }
     }
 
-    /// 名稱下方一行：製造商、連接方式
+    /// 名稱下方一行：製造商、連接方式、廠商代碼
     private var identity: [String] {
-        [adapter?.manufacturer, adapter?.connection].compactMap { $0 }
+        [adapter?.manufacturer, adapter?.connection, adapter?.vendorID.map { String(format: "廠商代碼 0x%04X", $0) }].compactMap { $0 }
     }
 
     /// 只有電壓、電流都是 SMC 同一次量測時才相乘，避免混用不同來源
@@ -225,6 +232,32 @@ private struct ChargerSection: View {
         }
         .monospacedDigit()
         .fixedSize()
+    }
+
+    private var savedEntry: (key: String, name: String)? {
+        adapter?.fingerprint.flatMap { AdapterInfo.savedEntry(for: $0, in: AppSettings.shared.chargerNames) }
+    }
+    private var customName: String? { savedEntry?.name }
+
+    /// 同規格的充電器（同廠商代碼、同檔位）會共用一個名稱
+    private func rename(_ fingerprint: String) {
+        let alert = NSAlert()
+        alert.messageText = "替這個充電器命名"
+        alert.informativeText = "之後接上同一款充電器時會顯示這個名稱（USB-C 與 MagSafe 共用）。同一顆充電器分給多個孔供電時檔位會變，可以從選單選已取過的名稱。檔位相同的充電器，廠商代碼也相同或其中一邊讀不到時分不出來，會共用名稱。留空可清除。"
+        // 可輸入、也可從已取過的名稱選
+        let field = NSComboBox(string: customName ?? "")
+        field.addItems(withObjectValues: Array(Set(AppSettings.shared.chargerNames.values)).sorted())
+        field.completes = true
+        field.placeholderString = "例如：書桌 140W"
+        field.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "儲存")
+        alert.addButton(withTitle: "取消")
+        alert.window.initialFirstResponder = field
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        // 名稱是從另一筆（例如 MagSafe 那筆）借來的，就改那一筆，兩種線才會一直同名
+        AppSettings.shared.setChargerName(field.stringValue, for: savedEntry?.key ?? fingerprint)
     }
 
     /// SMC 即時量測的輸入電壓與電流（和詳細資訊的變壓器電壓／電流同一來源）

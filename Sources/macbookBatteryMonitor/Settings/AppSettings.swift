@@ -121,6 +121,7 @@ final class AppSettings {
             Keys.scrollReverseMouse: .bool, Keys.scrollReverseTrackpad: .bool, Keys.scrollReverseHorizontal: .bool, Keys.scrollLinearLines: .int, Keys.scrollHorizontalKey: .string, Keys.scrollSmooth: .bool, Keys.windowSwitcher: .bool,
             Keys.switcher: .dictionary, Keys.capsLockNoDelay: .bool, Keys.shiftHalfWidth: .bool,
             Keys.chargingTargetPercent: .int, Keys.chargingHoldPercent: .int, Keys.chargingSleepStrategy: .string,
+            Keys.chargerNames: .dictionary,
         ]
         for feature in ExtensionFeature.allCases { schema[feature.installedKey] = .bool }
         return schema
@@ -178,8 +179,12 @@ final class AppSettings {
     func importBackup(_ values: [String: Any]) -> Int {
         for (key, value) in values {
             // 視窗切換的設定先整理成認得的欄位再存，不把檔案裡的原始內容整包存進去
-            let clean = key == Keys.switcher ? (value as? [String: Any]).map { SwitcherSettings(stored: $0).stored } ?? value : value
+            // 充電器名稱同理：只留格式正確的鍵、清理過的名稱
+            let clean = key == Keys.switcher ? (value as? [String: Any]).map { SwitcherSettings(stored: $0).stored } ?? value
+                : key == Keys.chargerNames ? AdapterInfo.importedNames(value) : value
             defaults.set(clean, forKey: key)
+            // 名稱是整包字典：記憶體也要換新，不然重開前再改名會用舊字典把匯入的蓋掉
+            if key == Keys.chargerNames, let names = clean as? [String: String] { chargerNames = names }
         }
         return values.count
     }
@@ -493,6 +498,14 @@ final class AppSettings {
     var hiddenDetailFields: Set<String> {
         didSet { defaults.set(hiddenDetailFields.sorted(), forKey: Keys.hiddenDetailFields) }
     }
+    /// 使用者替充電器取的名稱（AdapterInfo.fingerprint → 名稱）
+    var chargerNames: [String: String] {
+        didSet { defaults.set(chargerNames, forKey: Keys.chargerNames) }
+    }
+    func setChargerName(_ text: String, for fingerprint: String) {
+        chargerNames[fingerprint] = AdapterInfo.cleanName(text)
+    }
+
     /// 每個周邊設備的低電量通知門檻（設備 id → %，0 表示關閉）；沒設定過的設備用預設值
     var peripheralThresholds: [String: Int] {
         didSet { defaults.set(peripheralThresholds, forKey: Keys.peripheralThresholds) }
@@ -587,6 +600,7 @@ final class AppSettings {
         static let updateInterval = "updateInterval"
         static let hiddenFlowItems = "hiddenFlowItems"
         static let hiddenDetailFields = "hiddenDetailFields"
+        static let chargerNames = "chargerNames"
         static let peripheralThresholds = "peripheralThresholds"
         static let appIconColor = "appIconColor"
         static let autoCheckUpdates = "autoCheckUpdates"
@@ -743,6 +757,11 @@ final class AppSettings {
             defaults.set(DetailField.hiddenOnFreshInstall.map(\.rawValue).sorted(), forKey: Keys.hiddenDetailFields)
         }
         hiddenDetailFields = Set(defaults.stringArray(forKey: Keys.hiddenDetailFields) ?? [])
+        // 逐筆取字串：有一筆被改壞時不會整包變空（下次改名才不會把其他名稱蓋掉）
+        let stored = (defaults.dictionary(forKey: Keys.chargerNames) ?? [:]).compactMapValues { $0 as? String }
+        let migratedNames = AdapterInfo.migratedNames(stored)
+        chargerNames = migratedNames
+        if migratedNames != stored { defaults.set(migratedNames, forKey: Keys.chargerNames) }
         peripheralThresholds = defaults.dictionary(forKey: Keys.peripheralThresholds) as? [String: Int] ?? [:]
         appIconColor = AppIconColor(rawValue: defaults.string(forKey: Keys.appIconColor) ?? "") ?? .mint
         autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)

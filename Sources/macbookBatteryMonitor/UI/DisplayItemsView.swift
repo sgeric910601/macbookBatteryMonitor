@@ -40,6 +40,7 @@ struct DisplayItemsView: View {
                         set: { settings.showChargerSpecifications = $0 }))
                     Text("顯示在詳細資訊欄位下方；未連接充電器時自動隱藏。")
                         .font(.caption).foregroundStyle(.secondary)
+                    if !settings.chargerNames.isEmpty { namedChargers }
                     if limitSlider {
                         Text("充電上限顯示在主面板的滑桿上，這裡不再重複。")
                             .font(.caption)
@@ -71,5 +72,32 @@ struct DisplayItemsView: View {
     private func checkbox(_ field: DetailField) -> some View {
         Toggle(field.title, isOn: Binding(get: { settings.isVisible(field) }, set: { settings.setVisible(field, $0) }))
             .toggleStyle(.checkbox)
+    }
+
+    /// 已命名的充電器：在面板的充電器規格按「命名…」加入，這裡只能刪除
+    private var namedChargers: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("已命名的充電器").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 4)
+            // 同名的合成一行：同一顆充電器在不同供電情況（分給多個孔、接 MagSafe）會各存一筆
+            ForEach(Dictionary(grouping: settings.chargerNames, by: \.value).sorted { $0.key < $1.key }, id: \.key) { name, entries in
+                let keys = entries.map(\.key).sorted()
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(name)
+                        Text(keys.count == 1 ? AdapterInfo.describe(fingerprint: keys[0]) : "\(keys.count) 種供電組合 · " + AdapterInfo.vendorSummary(keys))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Button(role: .destructive) { keys.forEach { settings.chargerNames[$0] = nil } } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("刪除這個名稱")
+                    .accessibilityLabel("刪除 \(name)")
+                }
+            }
+            Text("刪除會移除這個名稱的所有供電組合；改名請在面板的充電器規格按「改名…」。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

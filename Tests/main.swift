@@ -193,7 +193,7 @@ features.testAutomationPermissionFollowsLoginItems()
 features.testFreshInstallAddsNothing()
 features.testEveryFeatureIsDescribed()
 features.testBlockingTapFeaturesNeedAccessibility()
-print("7 feature availability tests passed")
+print("8 feature availability tests passed")
 
 let monitorAlerts = MonitorAlertTests()
 monitorAlerts.testSustainedFiresOnceAndRearms()

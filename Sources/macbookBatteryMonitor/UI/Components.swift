@@ -69,12 +69,15 @@ struct Card<Content: View>: View {
     /// 填滿父層給的高度（下方分頁用，切換時高度才不會跳）
     var expand = false
     @ViewBuilder var content: Content
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         content
             .padding(12)
             .frame(maxWidth: .infinity, maxHeight: expand ? .infinity : nil, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.045)))
+            // 淺色時疊一層淡黑在半透明面板上會發灰，改用系統的實色卡片底（白色）；深色維持原本的樣子
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(colorScheme == .light ? Color(nsColor: .controlBackgroundColor) : Color.primary.opacity(0.045)))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
     }
 }

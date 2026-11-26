@@ -28,13 +28,8 @@ struct AdapterInfo: Codable, Equatable {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        func productName(_ value: String?) -> String? {
-            guard let value else { return nil }
-            let generic = ["pd charger", "usb pd charger", "usb-c charger", "charger"]
-            return generic.contains(value.lowercased()) ? nil : value
-        }
         return AdapterInfo(watts: positive("Watts"), voltage_mV: positive("AdapterVoltage") ?? positive("Voltage"),
-            current_mA: positive("Current"), name: productName(text("Name")) ?? productName(text("Description")),
+            current_mA: positive("Current"), name: text("Name") ?? text("Description"),
             manufacturer: text("Manufacturer"), model: text("Model"), levels: levels(details["UsbHvcMenu"]))
     }
 

@@ -162,7 +162,7 @@ private struct ChargerSection: View {
                     HStack(alignment: .center, spacing: 10) {
                         ConnectorIcon(connection: adapter?.connection, charging: s.isCharging)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(adapter?.name ?? "充電器（系統未回報名稱）")
+                            Text(adapter?.name ?? "Third-Party Charger")
                                 .font(.callout.weight(.semibold))
                                 .fixedSize(horizontal: false, vertical: true)
                             if !identity.isEmpty {

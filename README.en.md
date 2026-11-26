@@ -76,7 +76,7 @@ The app is named "電池與系統監控" (Battery & System Monitor on English sy
 - A bolt while charging, a plug while plugged in without charging, red at low battery
 - **System monitors**: one menu bar icon each. Left click opens that monitor's panel, right click opens Settings or quits; hold ⌘ and drag to reorder the icons
 - **Plain labels** (「標籤不加底色」 in Settings → Monitoring & power saving, off by default): CPU, GPU, MEM and DISK show a small label above the value instead of a coloured badge, and the network shows coloured dots with units instead of arrows. The memory value still turns orange or red under memory pressure. CPU, GPU, memory and disk each get their own icon (memory and disk are never merged), and the GPU icon opens a GPU-only panel. With "merge into one icon" on, the second status bar shows CPU and GPU as two columns of one item
-- **Memory and disk in one icon** (「記憶體與磁碟放在同一個圖示」 in Settings → Monitoring & power saving, off by default): two lines like CPU/GPU, memory on top and disk below; the memory value still turns orange or red under memory pressure. Its panel shows memory, then disk. Available only while both the memory and disk monitors are on
+- **Memory and disk in one icon** (「記憶體與磁碟放在同一個圖示」 in Settings → Monitoring & power saving, off by default): two lines like CPU/GPU, memory on top and disk below; the memory value still turns orange or red under memory pressure. Its panel shows memory, then disk. Available only while both the memory and disk monitors are on; with plain labels on it is not applied (the switch is greyed out)
 - **Combine into one icon** (Settings → Monitoring & power saving): when the menu bar is full, macOS hides the icons that don't fit (MacBooks with a notch are hit hardest). You can then keep just the battery icon (power on desktops). Clicking it opens a second status bar right below the menu bar with the battery and monitor icons, updated live. Click an icon there to open its panel (click again to collapse it); click anywhere else or press Esc to close the bar. The monitors only sample while the second bar is open. No screen recording or Accessibility permission is needed
 - If you only see the battery icon and no CPU or other icons, check that the system monitor master switch is on in Settings → Monitoring & power saving
 
@@ -105,6 +105,7 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
 - **CPU/GPU**: the menu bar shows CPU and GPU usage. The panel has:
   - the user/system split, a 2-minute chart, per-core usage (performance and efficiency cores), GPU memory, load average and the apps using the most CPU;
   - fans and temperatures: fan speed and share of maximum speed (hidden on fanless models), and CPU/GPU/SoC/battery/storage temperatures (unreadable ones are hidden).
+  - With plain labels on and the icons not combined into one, the GPU has its own icon, which opens a GPU-only panel: the GPU usage chart, chip, GPU core count, usage, Renderer and Tiler usage, GPU memory, and fans and temperatures; the core count and Renderer/Tiler are Apple silicon only. The CPU panel then leaves out the GPU.
 - **Memory**: the menu bar shows usage, turning orange and red as memory pressure rises. The panel shows the breakdown into app memory, wired, compressed, cached files and free, plus a 2-minute chart, swap and the apps using the most memory
 - **Disks**: the menu bar shows how full the startup disk is. The panel lists the startup disk and mounted external disks (USB, Thunderbolt, SD cards; not disk images or network volumes), each with used/free space, file system, connection type, health, read/write speed with charts and total reads/writes
   - NVMe drives keep their own record of how much of their rated life is used and how much has been read and written since they were made. Every Apple silicon Mac's internal drive is NVMe, as are most Intel Macs from 2016 on and Thunderbolt enclosures. Health is 100% minus the life used (3% used means 97%), the totals are the drive's lifetime totals, and power-on time is listed too, with an extra line if there are media errors. When the drive reports a critical warning or its spare blocks fall below the threshold, health shows a red "異常，建議立即備份" (failing, back up now)
@@ -142,7 +143,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 |---|---|---|
 | 基本 (Basic) | 一般 (General) | App icon color, notification thresholds, launch at login, settings backup (export, import) |
 | | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, memory and disk in one icon, combine into one icon, admin CPU sampling |
+| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, plain labels, memory and disk in one icon, combine into one icon, admin CPU sampling |
 | | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
@@ -586,6 +587,7 @@ CPU usage measured on an M1 MacBook Air:
 | CPU usage, per core | Tick deltas from `host_processor_info`; core types from `hw.perflevel0/1` |
 | Load average | `getloadavg` |
 | GPU usage, GPU memory | `PerformanceStatistics` of IORegistry `IOAccelerator` (`inUseSysMemoryBytes` for Intel integrated graphics) |
+| GPU core count, Renderer/Tiler usage | `gpu-core-count` of the same `IOAccelerator` (read once), and `Renderer Utilization %` and `Tiler Utilization %` in its `PerformanceStatistics` (Apple silicon) |
 | Memory breakdown, pressure, swap | `host_statistics64`, `kern.memorystatus_vm_pressure_level`, `vm.swapusage` |
 | Disk space | `statfs()`, plus periodically recalibrated purgeable space (matches Finder) |
 | Disk reads/writes | Cumulative byte counters of IORegistry `IOBlockStorageDriver` |

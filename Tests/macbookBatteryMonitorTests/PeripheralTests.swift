@@ -29,6 +29,26 @@ final class PeripheralTests {
         XCTAssertTrue(PeripheralParse.bluetooth(json: Data("not json".utf8)).isEmpty)
     }
 
+    func testHeadphoneModelIcons() {
+        let json = """
+        {"SPBluetoothDataType":[{"device_connected":[
+          {"我的耳機":{"device_address":"0A:0B:0C:0D:0E:0F","device_batteryLevelLeft":"90%","device_minorType":"Headphones",
+            "device_vendorID":"0x004C","device_productID":"0x2013"}},
+          {"Other Buds":{"device_address":"1A:1B:1C:1D:1E:1F","device_batteryLevelMain":"50%","device_minorType":"Headphones",
+            "device_vendorID":"0x1234","device_productID":"0x2013"}}]}]}
+        """
+        let devices = PeripheralParse.bluetooth(json: Data(json.utf8))
+        // 名稱裡沒有 AirPods，也能依 Product ID 顯示第 3 代的圖示
+        XCTAssertEqual(devices[0].appleProductID, 0x2013)
+        XCTAssertEqual(devices[0].symbol, "airpods.gen3")
+        // 不是 Apple 的廠商不採用 Product ID
+        XCTAssertNil(devices[1].appleProductID)
+        XCTAssertEqual(devices[1].symbol, "headphones")
+        // 不認得的 Product ID 退回名稱判斷
+        let unknown = PeripheralBattery(id: "x", name: "AirPods Pro", kind: .headphones, appleProductID: 0x2999)
+        XCTAssertEqual(unknown.symbol, "airpodspro")
+    }
+
     func testHIDMergeAndDedupe() {
         let hid = PeripheralParse.hid([
             ["Product": "Magic Mouse", "BatteryPercent": 63, "DeviceAddress": "11-22-33-44-55-66"],

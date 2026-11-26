@@ -92,7 +92,7 @@ The app is named "電池與系統監控" (Battery & System Monitor on English sy
   - today's recap: charge used and regained today, net change, plug-ins, total and longest time on battery;
   - top energy users: the top 5 apps, with child processes merged into their app;
   - peripherals.
-- Every power flow item, every details field and the charger specifications can be hidden in Settings → Display items
+- Every power flow item, every details field and the charger specifications can be hidden in Settings → Display items; 「全部顯示」 (show all) turns on every hidden item, including the fields that repeat other parts of the panel (hidden by default on a fresh install)
 - When the panel is taller than the screen (small screens or zoomed display), it scrolls instead of being cut off
 
 ![Smart charging: plugged in and held at the 80% care limit, charging to the original 95% limit by 7:30 tomorrow; today's recap on the left, the smart charging page on the right](docs/screenshots/smart-charging.png)
@@ -516,7 +516,7 @@ Optional, off by default. Some Apple silicon chips (such as M1 and M2 Pro) don't
 - **Adapter input** reads SMC `PDTR` and **system power** SMC `PSTR`; **battery power** is the difference, so the three numbers always add up. If either is missing, the battery's voltage × current is used instead
 - **Whether it's charging** follows SMC's live power: the battery chip's charging flag often sticks to an old value, so it's only consulted when the power is ambiguous
 - **Stable display**: while plugged in, switching between charging, at limit and not charging only takes effect after 10 seconds, so the icon doesn't flicker when macOS pauses and resumes charging near the limit; actually plugging or unplugging updates immediately. For 30 seconds after plugging in, the battery isn't drawn as supplying power (Intel chargers take a dozen seconds to start)
-- **Time estimates**: while macOS is still estimating, it shows "計算中…" (calculating) instead of a straight-line guess (which ignores the slower current above 80%); with a charge limit, both the top right and the details show the time to the limit
+- **Time estimates**: while macOS is still estimating, it shows "計算中…" (calculating) instead of a straight-line guess (which ignores the slower current above 80%); with a charge limit not yet reached, both the top right and the details show the time to the limit, otherwise the time to full. While charging, the 「充電預估」 (charge estimate) card shows the clock time it will be done (same target as the top right); charging power and adapter watts are in the power flow and the charger specifications
 - **Component details**: the display backlight reads SMC `PDBR`/`PBwo`; CPU/GPU/ANE read the IOReport energy model on Apple silicon and SMC `PCPC`/`PCPG` on Intel; "other" is system power minus backlight and chip, an estimate. When details are missing or samples aren't in sync, nothing is forced: it shows "資料不完整" (incomplete) or "取樣不同步" (samples out of sync)
 - The chip total only covers the CPU, GPU and ANE values available, not the whole SoC, and excludes external displays. IOReport is a private system interface whose availability varies by chip and macOS version
 

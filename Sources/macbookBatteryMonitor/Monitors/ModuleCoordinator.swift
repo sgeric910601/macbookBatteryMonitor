@@ -222,7 +222,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
     private func render(_ kind: MonitorKind, _ item: NSStatusItem) {
         guard let button = item.button else { return }
         let content = menuBarContent(kind)
-        // 提示框不跟著比對鍵：文字每次都更新，顯示時才被讀取
+        // 提示框不跟著比對鍵：文字每次都更新，提示框開著時立刻換上新的數值
         button.setLiveToolTip(content.tooltip)
         guard content.key != lastKeys[kind] else { return }
         lastKeys[kind] = content.key

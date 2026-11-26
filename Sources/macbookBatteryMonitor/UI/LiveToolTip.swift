@@ -77,6 +77,8 @@ private final class TipPanel {
         panel.setFrame(NSRect(x: x, y: icon.minY - 6 - frameSize.height, width: frameSize.width, height: frameSize.height), display: true)
         guard !panel.isVisible else { return }
         panel.orderFrontRegardless()
+        // 面板可能被別的東西收起（沒經過 hide）：先拆掉上一次的檢查，不會疊出第二個計時器與監聽
+        stopWatching()
         // 選單列圖示常收不到離開事件（例如全螢幕時選單列收起）：顯示期間自己確認游標還在
         watch = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -93,11 +95,15 @@ private final class TipPanel {
     func hide(_ tip: LiveToolTip?) {
         if let tip, owner !== tip { return }
         owner = nil
+        stopWatching()
+        panel.orderOut(nil)
+    }
+
+    private func stopWatching() {
         watch?.invalidate()
         watch = nil
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
         clickMonitor = nil
-        panel.orderOut(nil)
     }
 }
 
@@ -120,6 +126,9 @@ extension NSView {
             objc_setAssociatedObject(self, &liveToolTipKey, tip, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
         let new = text ?? ""
-        if tip.text != new { tip.text = new }
+        guard tip.text != new else { return }
+        tip.text = new
+        // 不再設系統的 toolTip，旁白（VoiceOver）改從輔助說明讀到同樣的文字
+        setAccessibilityHelp(new.isEmpty ? nil : new)
     }
 }

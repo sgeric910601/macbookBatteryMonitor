@@ -52,6 +52,8 @@ final class ScrollDirection {
             watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
                 MainActor.assumeIsolated { ScrollDirection.shared.check() }
             }
+            // 各功能的 5 秒檢查容許晚 1 秒：系統可以把它們併成同一次喚醒
+            watchdog?.tolerance = 1
         }
         return tap.isRunning
     }

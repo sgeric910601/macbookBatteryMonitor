@@ -838,7 +838,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let text = "\(Int(watts.rounded())) W"
         let key = "desktop|\(text)|\(settings.display)"
         // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
-        button.setToolTipUnlessHovered("系統耗電 \(Format.watts(watts))")
+        button.setLiveToolTip("系統耗電 \(Format.watts(watts))")
         guard key != lastStatusKey else { return }
         lastStatusKey = key
         // 和 MacBook 的「78% 加電池圖示」一樣，數字在圖示左邊
@@ -876,7 +876,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             // 桌上型 Mac（Mac mini、iMac 等）沒有電池：不要畫成空電池，免得看起來像沒電
             button.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "這台 Mac 沒有電池")
             button.title = ""
-            button.toolTip = "這台 Mac 沒有電池・點一下打開面板與設定"
+            button.setLiveToolTip("這台 Mac 沒有電池・點一下打開面板與設定")
             lastStatusKey = "noBattery"
             return
         }
@@ -885,7 +885,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let showsTime = settings.display == .iconAndTime || settings.display == .iconPercentAndTime
         let key = "\(s.percent)|\(e.state)|\(low)|\(settings.display)|\(showsTime ? minutes ?? -1 : 0)"
         // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
-        button.setToolTipUnlessHovered(tooltip(s, e))
+        button.setLiveToolTip(tooltip(s, e))
         guard key != lastStatusKey else { return }
         lastStatusKey = key
 
@@ -1085,18 +1085,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             defaults.set(path, forKey: LoginItem.registeredPathKey)
             defaults.set(identity, forKey: LoginItem.registeredCodeKey)
         }
-    }
-}
-
-extension NSView {
-    /// 數字每秒更新時，滑鼠停在上面就先不換提示文字：換了 macOS 會在游標目前的位置重新顯示提示框，看起來像跟著滑鼠跑。
-    /// 滑鼠離開後下一次更新再換
-    func setToolTipUnlessHovered(_ text: String?) {
-        guard toolTip != text else { return }
-        if let window, window.isVisible {
-            let pointer = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
-            if bounds.contains(pointer) { return }
-        }
-        toolTip = text
     }
 }

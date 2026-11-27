@@ -26,7 +26,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 - **Separate mouse and trackpad scroll directions**: for example natural scrolling on the trackpad and the traditional direction on the mouse wheel
 - **Login items**: lists the apps, agents and daemons that start at login, shows what each one is and where it comes from, and lets you clear the user-level config files an uninstalled app left behind; system-level items are view-only
 - **Light on power**: updates every second by default and uses about 0.2% CPU with the panel closed; slower update intervals and a power saving mode are available
-- **Keep awake**: the cup at the bottom right of the panel keeps the Mac awake for 30 minutes, 1 hour, 2 hours or until turned off, optionally with the display on too, and shows the time left. It stops by itself on battery at 10% or below. You can also list apps in Settings → 監控與省電 that keep the system awake while any of them runs (the display still sleeps), released when they all quit; it only listens for apps launching and quitting, with no polling. Uses the public power management API; quitting the app releases it
+- **Keep awake**: the cup at the bottom right of the panel keeps the Mac awake for 30 minutes, 1 hour, 2 hours or until turned off, optionally with the display on too, and shows the time left. It stops by itself on battery at 10% or below. You can also list apps in Settings → 省電與睡眠 (power saving & sleep) that keep the system awake while any of them runs (the display still sleeps), released when they all quit; it only listens for apps launching and quitting, with no polling. Uses the public power management API; quitting the app releases it
 - **Bluetooth off during sleep** (laptops only; on a desktop Mac idle Bluetooth keyboards and mice disconnect by themselves, so turning Bluetooth off would leave only the power button to wake it): turns Bluetooth off when the Mac sleeps and back on when it wakes, only if it was the one that turned it off. It stays on while a Bluetooth keyboard, mouse or trackpad is connected, and in clamshell mode (lid closed, running on an external display; simply closing the lid to sleep still turns it off), so the Mac can still be woken. After waking it checks that Bluetooth really came back on and retries if not (up to 5 times, then again on the next wake or launch). Uses private macOS functions (loaded at run time; the option is hidden if they are missing), tested on macOS 27 only
 - **One-click updates that keep permissions**: one click in Settings downloads, verifies and installs the new version; only versions carrying the publisher's update signature and signed with the same certificate are installed; Accessibility and Bluetooth permissions don't have to be granted again
 - **Never changes charging behind your back**: the charge limit only changes when you drag the slider or set up smart charging; macOS itself stops charging at the limit
@@ -41,7 +41,7 @@ The app's interface is in Traditional Chinese. This README quotes the Chinese la
 
 - The universal build's file name never changes, so its link above always downloads the latest version; other versions are on [Releases](https://github.com/sgeric910601/macbookBatteryMonitor/releases)
 - The older macOS build is for Macs on macOS 12 or 13 (for example 2015–2017 MacBooks, or older Macs upgraded with OpenCore Legacy Patcher). It stays at v1.7.7 for now, without the features added in v2.0.0. After the system is upgraded to macOS 14, one-click update switches to the universal build by itself
-- Already on v1.7.2 or later: no download needed, use Settings → Update → "一鍵更新" (one-click update)
+- Already on v1.7.2 or later: no download needed, use Settings → 一般 (General) → "更新" (Update) → "一鍵更新" (one-click update)
 - Releases no longer include zips from v2.0.0: v1.7.1 first updates to v1.7.7 (v1.7.2 for the older macOS build) with one click, then one more click brings it to the latest version; one-click update in v1.5.0–v1.6.2 only understands zips, so download the DMG above and install it once
 
 ## Install
@@ -72,13 +72,13 @@ The app is named "電池與系統監控" (Battery & System Monitor on English sy
 ### Menu bar
 
 - **Left click** the icon to open the panel; clicking anywhere else closes it. This also works while another app is in full screen (green button). **Right click**: open the panel, Settings, Quit
-- **Display styles** (Settings → Display items): icon and percentage, icon only, percentage only, icon and time remaining, or percentage inside the icon plus time remaining (the charge inside the battery icon, time remaining or time to full on the right). The last one shows "—" without time data and "已充飽" (full), "接電" (plugged in) or "已達上限" (limit reached) when full, plugged in without charging, or at the charge limit
-- A bolt while charging, a plug while plugged in without charging, red at low battery. The bolt uses the 「百分比文字」 (percentage text) colour from Settings → Display items, white by default
+- **Display styles** (Settings → 選單列 (Menu bar)): icon and percentage, icon only, percentage only, icon and time remaining, or percentage inside the icon plus time remaining (the charge inside the battery icon, time remaining or time to full on the right). The last one shows "—" without time data and "已充飽" (full), "接電" (plugged in) or "已達上限" (limit reached) when full, plugged in without charging, or at the charge limit
+- A bolt while charging, a plug while plugged in without charging, red at low battery. The bolt uses the 「百分比文字」 (percentage text) colour from Settings → 選單列 (Menu bar), white by default
 - **System monitors**: one menu bar icon each. Left click opens that monitor's panel, right click opens Settings or quits; hold ⌘ and drag to reorder the icons
-- **Plain labels** (「標籤不加底色」 in Settings → Monitoring & power saving, off by default): CPU, GPU, MEM and DISK show a small label above the value instead of a coloured badge, and the network shows coloured dots with units instead of arrows. The memory value still turns orange or red under memory pressure. CPU, GPU, memory and disk each get their own icon (memory and disk are never merged), and the GPU icon opens a GPU-only panel. With "merge into one icon" on, the second status bar shows CPU and GPU as two columns of one item
-- **Memory and disk in one icon** (「記憶體與磁碟放在同一個圖示」 in Settings → Monitoring & power saving, off by default): two lines like CPU/GPU, memory on top and disk below; the memory value still turns orange or red under memory pressure. Its panel shows memory, then disk. Available only while both the memory and disk monitors are on; with plain labels on it is not applied (the switch is greyed out)
-- **Combine into one icon** (Settings → Monitoring & power saving): when the menu bar is full, macOS hides the icons that don't fit (MacBooks with a notch are hit hardest). You can then keep just the battery icon (power on desktops). Clicking it opens a second status bar right below the menu bar with the battery and monitor icons, updated live. Click an icon there to open its panel (click again to collapse it); click anywhere else or press Esc to close the bar. The monitors only sample while the second bar is open. No screen recording or Accessibility permission is needed
-- If you only see the battery icon and no CPU or other icons, check that the system monitor master switch is on in Settings → Monitoring & power saving
+- **Plain labels** (「標籤樣式」 (label style) in Settings → 系統監控 (System monitors), off by default): CPU, GPU, MEM and DISK show a small label above the value instead of a coloured badge, and the network shows coloured dots with units instead of arrows. The memory value still turns orange or red under memory pressure. CPU, GPU, memory and disk each get their own icon (memory and disk are never merged), and the GPU icon opens a GPU-only panel. With "merge into one icon" on, the second status bar shows CPU and GPU as two columns of one item
+- **Memory and disk in one icon** (「記憶體與磁碟放在同一個圖示」 under 「進階」 (Advanced) in Settings → 系統監控 (System monitors), off by default): two lines like CPU/GPU, memory on top and disk below; the memory value still turns orange or red under memory pressure. Its panel shows memory, then disk. Available only while both the memory and disk monitors are on; with plain labels on it is not applied (the switch is greyed out)
+- **Combine into one icon** (「進階」 (Advanced) in Settings → 系統監控 (System monitors)): when the menu bar is full, macOS hides the icons that don't fit (MacBooks with a notch are hit hardest). You can then keep just the battery icon (power on desktops). Clicking it opens a second status bar right below the menu bar with the battery and monitor icons, updated live. Click an icon there to open its panel (click again to collapse it); click anywhere else or press Esc to close the bar. The monitors only sample while the second bar is open. No screen recording or Accessibility permission is needed
+- If you only see the battery icon and no CPU or other icons, check that the system monitor master switch is on in Settings → 系統監控 (System monitors)
 
 ### Battery panel
 
@@ -93,14 +93,14 @@ The app is named "電池與系統監控" (Battery & System Monitor on English sy
   - today's recap: charge used and regained today, net change, plug-ins, total and longest time on battery;
   - top energy users: the top 5 apps, with child processes merged into their app;
   - peripherals.
-- Every power flow item, every details field and the charger specifications can be hidden in Settings → Display items; 「全部顯示」 (show all) turns on every hidden item, including the fields that repeat other parts of the panel (hidden by default on a fresh install)
+- Every power flow item, every details field and the charger specifications can be hidden in Settings → 選單列 (Menu bar); 「全部顯示」 (show all) turns on every hidden item, including the fields that repeat other parts of the panel (hidden by default on a fresh install)
 - When the panel is taller than the screen (small screens or zoomed display), it scrolls instead of being cut off
 
 ![Smart charging: plugged in and held at the 80% care limit, charging to the original 95% limit by 7:30 tomorrow; today's recap on the left, the smart charging page on the right](docs/screenshots/smart-charging.png)
 
 ### System monitors
 
-Pick "battery plus system monitors" on the first launch, or turn on the master switch later in Settings → Monitoring & power saving; each of the four monitors has its own switch. With the master switch off nothing is sampled, just like battery only.
+Pick "battery plus system monitors" on the first launch, or turn on the master switch later in Settings → 系統監控 (System monitors); each of the four monitors has its own switch. With the master switch off nothing is sampled, just like battery only.
 
 - **CPU/GPU**: the menu bar shows CPU and GPU usage. The panel has:
   - the user/system split, a 2-minute chart, per-core usage (performance and efficiency cores), GPU memory, load average and the apps using the most CPU;
@@ -141,23 +141,24 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 
 | Group | Section | Contents |
 |---|---|---|
-| 基本 (Basic) | 一般 (General) | App icon color, notification thresholds, launch at login, settings backup (export, import) |
-| | 顯示項目 (Display items) | Menu bar style, power flow items, details fields |
-| | 監控與省電 (Monitoring & power saving) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep, system monitor master switch and each monitor, monitor alerts, plain labels, memory and disk in one icon, combine into one icon, admin CPU sampling |
-| | 權限 (Permissions) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane |
+| 基本 (Basic) | 一般 (General) | Update (one-click update, automatic checks and new-version notifications), notification thresholds, launch at login, app icon color, settings backup (export, import) |
+| | 選單列 (Menu bar) | Menu bar style, charging icon customization, power flow items, details fields |
+| | 系統監控 (System monitors) | System monitor master switch and each monitor, label style, alerts; under 「進階」 (Advanced): memory and disk in one icon, combine all monitors into one icon, network speed test, admin CPU sampling |
+| | 省電與睡眠 (Power saving & sleep) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep |
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
 | | 周邊設備 (Peripherals) | Each device's low-battery notification, and the external displays, USB and Thunderbolt devices connected right now (built-in parts and USB hubs are left out; read only when the page opens) |
-| 擴充功能 (Extensions) | 滑鼠、觸控板與鍵盤 (Mouse, trackpad & keyboard) | Scrolling, mouse side buttons, Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning (shown once one of them is on) |
-| | 視窗切換 (Window switching) | The window switcher that replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions |
-| | 視窗與 Dock (Windows & Dock) | Window snapping, green button maximizes, Finder shortcuts, quit when the last window closes, click a Dock icon to minimize |
-| | 登入項目 (Login items) | What starts at login: list, add and remove, disable, and where each one comes from (shown once 登入項目管理 (login item management) is on; see "[Login items](#login-items)") |
+| 擴充功能 (Extensions) | 鍵盤 (Keyboard) | Chinese input methods, hold ⌘Q / ⌘W, keyboard cleaning |
+| | 滑鼠與觸控板 (Mouse & trackpad) | Scrolling direction, mouse side buttons |
+| | 視窗與 Dock (Windows & Dock) | Window switching (replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions), quit when the last window closes, click a Dock icon to minimize, green button maximizes, window snapping, Finder shortcuts |
+| | 貓咪快捷選單 (Cat quick menu) | The cat quick menu and which items its panel shows, audio switcher, clipboard history |
+| | 網路與螢幕 (Network & display) | Ports and quitting processes, network speed test, XDR brightness |
 | | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
-| 關於 (About) | 更新 (Update) | One-click update, automatic checks and new-version notifications |
+| 系統 (System) | 權限與登入項目 (Permissions & login items) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane; what starts at login (listed once 登入項目管理 (login item management) is on; see "[Login items](#login-items)") |
 
-Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens Update, and the gear in a monitor panel opens Monitoring & power saving.
+Extension pages are always listed; each feature's card has its own on/off switch in its title bar. Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens General, and the gear in a monitor panel opens System monitors.
 
-![Settings window: sections on the left, Display items on the right (menu bar style, power flow items, details fields)](docs/screenshots/settings.png)
+![Settings window: sections on the left, Menu bar on the right (menu bar style, power flow items, details fields)](docs/screenshots/settings.png)
 
 ## Smart charging
 
@@ -250,11 +251,11 @@ See the [XDR design and local verification notes](docs/design/xdr-brightness.md)
 ## Settings backup and permissions
 
 - **Settings backup**: Settings → 一般 → "設定備份" (settings backup) exports the settings to a file you can import on another Mac or after reinstalling. Only known settings with the right types are read and the file size is limited; admin CPU sampling, precise wake (turn them on again on the new Mac), your own photo and the peripherals' low-battery thresholds are not included. If importing would turn on anything that is off now (extension features, Bluetooth off during sleep, keeping awake for chosen apps), it lists those first and asks you to confirm. Imported settings take effect after the app reopens
-- **Permissions**: Settings → 權限 (permissions) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which features that are on use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
+- **Permissions**: Settings → 權限與登入項目 (permissions & login items) lists Accessibility, Screen Recording, Notifications, Bluetooth and Automation with whether each is granted, which features that are on use it, and a button to the matching System Settings pane. It refreshes every 2.5 seconds while open
 
 ## Monitor alerts
 
-"監控警示" (monitor alerts) in Settings → 監控與省電 can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. While the screens are off or another user is active and any alert is on, the monitors that are on are sampled every 30 seconds and still checked. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
+"警示" (alerts) in Settings → 系統監控 (System monitors) can notify you about sustained high CPU load (90% or more for 5 minutes, recovered below 70%), critical memory pressure and less than 10 GB free on the startup disk (checked only once the purgeable space has been measured after launch, so no false alert), each on its own. Only modules that are being sampled are checked (their menu bar icon is shown, or the second status bar is on); alerts never start extra sampling. While the screens are off or another user is active and any alert is on, the monitors that are on are sampled every 30 seconds and still checked. Each condition notifies once and again only after it has recovered; sleep or gaps in sampling restart the timer so missing data never triggers a false alert
 
 ## Mouse and trackpad scroll directions
 
@@ -285,7 +286,7 @@ This usually happens after updating from v1.7.3 or earlier: the "電池與系統
 
 ## Window switcher
 
-Turn on "用視窗切換取代 Cmd+Tab" (replace Cmd+Tab with window switching) in Settings → Window switching, and Cmd+Tab lists the windows of every app (not just apps), most recently used first:
+Turn on "視窗切換" (window switching) in Settings → 視窗與 Dock (Windows & Dock), and Cmd+Tab lists the windows of every app (not just apps), most recently used first:
 
 - **Using it**: hold the modifier and press Tab for the next window, Shift to go back, release to switch; a quick tap goes straight back to the previous window. Arrow keys move, Esc cancels; on the selected window press W to close, M to minimize, F for full screen, H to hide the app, Q to quit it
 - **Settings**: up to 9 shortcuts, each with its own appearance (thumbnails, app icons, titles), size and which windows to list (Space, screen, minimized, hidden, full screen, apps without windows); optionally keep the switcher open after releasing the modifier and confirm with Return; apps on the exception list are never listed
@@ -306,7 +307,7 @@ Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speak
 
 ## Mouse side buttons
 
-Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠、觸控板與鍵盤 to back (⌘[), forward (⌘]) or Mission Control:
+Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠與觸控板 (Mouse & trackpad) to back (⌘[), forward (⌘]) or Mission Control:
 
 - **Only those two, only when set**: a button left at "不處理" (do nothing), and the left, right and middle buttons, go to apps as usual
 - **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor; Mission Control works over any app
@@ -314,7 +315,7 @@ Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then s
 
 ## Keyboard cleaning mode
 
-Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 滑鼠、觸控板與鍵盤 to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
+Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 鍵盤 (Keyboard) to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
 
 - **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown (held-down autorepeat does not), it always ends after at most 5 minutes, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
@@ -406,7 +407,7 @@ Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in 
 
 ## Hold ⌘Q / ⌘W
 
-Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 滑鼠、觸控板與鍵盤 whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
+Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 鍵盤 (Keyboard) whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
 
 - **How it works**: on key down it remembers the frontmost app and shows a progress ring in the middle of the screen. Only when the hold completes does it send ⌘Q / ⌘W directly to that app, not to whatever is frontmost at that moment. Releasing early, switching to another app or pressing another key cancels, so a window behind can never be closed by mistake. Before sending ⌘W it also checks that the app's focused window has not changed; in browsers ⌘W still closes the tab as usual
 - **Keyboard layouts**: works on the US positions of Q and W, and only when those keys really type Q and W (ABC, US, Zhuyin, Pinyin and German layouts do). French AZERTY, Dvorak and other layouts with the letters elsewhere are not protected; keys go through as usual and no other shortcut (such as ⌘A or ⌘Z on AZERTY) is held back by mistake
@@ -414,7 +415,7 @@ Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 
 
 ## Chinese input methods
 
-The "中文輸入法" (Chinese input) card under Settings → 滑鼠、觸控板與鍵盤 has two switches, both off by default:
+The "中文輸入法" (Chinese input) card under Settings → 鍵盤 (Keyboard) has two switches, both off by default:
 
 - **Caps Lock switches without delay**: macOS makes you hold Caps Lock briefly before it switches between Chinese and English, to avoid accidental presses. This runs the built-in `hidutil` (fixed arguments, no shell) to shorten the delay to 30 ms at launch and after wake (0 makes Caps Lock toggle twice and turn on capitals by accident). The original value is read before the first change and restored when the switch is turned off, also after the app restarts; if it cannot be read, 75 ms is written (Apple does not document the default; this is the value read on macOS 27.2). When the system option "Use Caps Lock to switch to and from ABC" is on, macOS handles the built-in keyboard itself (on macOS 27.2 it keeps rewriting this value while you type), so this only affects external keyboards. No extra permission needed
 - **Half-width letters and symbols while holding Shift**: in Chinese input methods such as Zhuyin or Pinyin, holding Shift types full-width characters like Ａ, ！ and ，. With this on, holding Shift behaves like the English keyboard and everything is half-width: letters `A`, the number row `!@#$%^&*()_+`, punctuation `<>?:"{}|~`. You stay in the Chinese input method, so you keep typing Chinese after releasing Shift. If a Zhuyin composition is in progress (underlined), it is committed first and the English follows it. Because every punctuation key is half-width while Shift is held, full-width punctuation that Zhuyin types with Shift (，。？：！（）) has to be typed another way, for example from Zhuyin's punctuation keyboard. Only Chinese input methods are affected; English, Russian, Korean and Japanese keyboards are left alone. So far it has only been tested with the built-in Zhuyin on macOS 27; Pinyin and other Chinese input methods are untested
@@ -427,7 +428,7 @@ The "中文輸入法" (Chinese input) card under Settings → 滑鼠、觸控板
 
 ## Login items
 
-Settings → 登入項目 (Login items) (turn on 「登入項目管理」 (login item management) in feature management first; it stays on when updating from an older version) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
+Settings → 權限與登入項目 (Permissions & login items) (turn on 「登入項目管理」 (login item management) in feature management first; it stays on when updating from an older version) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
 
 - **Sources**: the "open at login" items, `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`. Every row has an icon, and items whose program no longer exists say so
 - **What you can do**: add or remove "open at login" apps; disable or enable your own (user-level) agents. Disabling takes effect at the next login and also stops the copy that is running now. Every action asks first. This app's own login item and agent are listed only and can't be disabled or removed here
@@ -450,7 +451,7 @@ The icon is a Ragdoll cat lying on its back on a wireless charging pad (a cut-ou
 
 ## One-click update
 
-Settings → Update checks GitHub for new versions; when there is one, click "一鍵更新" (one-click update):
+Settings → 一般 (General) → "更新" (Update) checks GitHub for new versions; when there is one, click "一鍵更新" (one-click update):
 
 1. It downloads the DMG (the older macOS build downloads `macbookBatteryMonitor-macOS12.dmg`, or the universal build once the system is macOS 14 or later), only from `github.com` and `githubusercontent.com`
 2. It verifies (any mismatch cancels the update):
@@ -461,7 +462,7 @@ Settings → Update checks GitHub for new versions; when there is one, click "�
 3. When the app quits, the new version replaces it and relaunches; if that fails, the original version is put back. Settings, charge history, smart charging schedules and the app icon color are kept; temporary files are removed if downloading or verification fails or the update is interrupted
 
 - **Check for updates automatically** (on by default): checks at launch and every 6 hours after, but only contacts `api.github.com` if the last check was more than a day ago; it only tells you and never installs by itself. A new release is found within about a day
-- **Notify about new versions** (on by default): when an automatic check finds a new stable release, you get one notification per version; the notification or "有新版本" (new version available) at the bottom of the panel opens Settings → Update
+- **Notify about new versions** (on by default): when an automatic check finds a new stable release, you get one notification per version; the notification or "有新版本" (new version available) at the bottom of the panel opens Settings → 一般 (General) → "更新" (Update)
 - **Betas**: betas marked as pre-releases on GitHub (for example v1.8.0-beta.1) are only listed when you check by hand; automatic checks don't mention them or notify. "檢查更新" (check for updates) lists a beta only when there is no newer stable release; the "安裝 Beta 版…" (install beta…) button next to it looks only for the newest beta (v2.0.1+) and goes straight to the confirmation when it finds one. "安裝 Beta…" (install beta…) first explains that betas may be unstable, and only a second click on "安裝 Beta" installs it. If a stable release newer than the beta exists, only that is listed. To go back to stable, download a stable release from GitHub and reinstall
 - Releases without an update signature are neither offered nor installed (v1.7.5+; v1.7.4 and earlier only check the checksum file and that the signature is intact)
 - **When the app runs from the DMG or from macOS's temporary location**, one-click update updates the copy in Applications and opens it from there (v1.7.6+). The temporary location happens when an app carries the downloaded-file quarantine flag but was never moved with Finder (for example copied with a command): macOS then runs it from a random read-only location every time, even after a restart. At launch the app offers to open the copy in Applications instead; that checks the copy is signed with the same certificate, clears its quarantine flag and reopens it, once; macOS may ask you to click "Open Anyway" one more time. Earlier versions could only be updated by downloading manually or running `xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app`
@@ -504,7 +505,7 @@ The universal build needs macOS 14 or later, roughly 2018 models and newer; olde
 
 ## Admin CPU sampling
 
-Optional, off by default. Some Apple silicon chips (such as M1 and M2 Pro) don't update their CPU energy counter, so the chip details can only show 0 W for the CPU. If you want CPU power, turn on "管理員 CPU 取樣" (admin CPU sampling) under "CPU 功耗" (CPU power) in Settings → Monitoring & power saving, which reads it with the built-in `powermetrics` instead.
+Optional, off by default. Some Apple silicon chips (such as M1 and M2 Pro) don't update their CPU energy counter, so the chip details can only show 0 W for the CPU. If you want CPU power, turn on "管理員 CPU 取樣" (admin CPU sampling) under 「進階」 (Advanced) in Settings → 系統監控 (System monitors), which reads it with the built-in `powermetrics` instead.
 
 - **Turning it on**: the macOS admin authorization prompt only appears when you turn it on yourself in Settings, and installs a system service; no password is stored and sudoers isn't touched. If authorization is cancelled or fails, the option turns itself off again; launching the app or the Mac never asks for a password
 - **Sampling**: it only connects while the main panel is open, at the same interval as everything else. Closing the panel, switching to the smart charging page, sleep or quitting disconnects, and `powermetrics` stops at once; the service exits after 30 seconds idle and doesn't stay resident
@@ -531,7 +532,7 @@ How the sample windows are aligned and when "other" isn't shown: [docs/design/ha
 
 ## Performance and power saving
 
-Everything live updates every second by default; Settings → Monitoring & power saving can change it to every 2, 5 or 10 seconds, and slower uses less power. **Power saving mode** draws the power flow with static icons and arrows, stops the companion and flow animations, and updates at most every 2 seconds; "只在使用電池時啟用" (only on battery) turns it off automatically while plugged in.
+Everything live updates every second by default; Settings → 省電與睡眠 (Power saving & sleep) can change it to every 2, 5 or 10 seconds, and slower uses less power. **Power saving mode** draws the power flow with static icons and arrows, stops the companion and flow animations, and updates at most every 2 seconds; "只在使用電池時啟用" (only on battery) turns it off automatically while plugged in.
 
 ![Power saving mode: static power flow](docs/screenshots/power-saving.png)
 

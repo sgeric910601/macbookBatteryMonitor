@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum Format {
@@ -69,13 +70,24 @@ struct Card<Content: View>: View {
     /// 填滿父層給的高度（下方分頁用，切換時高度才不會跳）
     var expand = false
     @ViewBuilder var content: Content
+    /// 新版設定視窗（值是這頁的主題色）：較大的圓角、平面底色與細框，不用漸層
+    @Environment(\.settingsV2Tint) private var v2Tint
 
     var body: some View {
-        content
-            .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: expand ? .infinity : nil, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.045)))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
+        if let v2Tint {
+            content
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: expand ? .infinity : nil, alignment: .topLeading)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.7)))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+        } else {
+            content
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: expand ? .infinity : nil, alignment: .topLeading)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.045)))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
+        }
     }
 }
 
@@ -88,10 +100,21 @@ struct CardTitle: View {
         self.systemImage = systemImage
     }
 
+    @Environment(\.settingsV2Tint) private var v2Tint
+
     var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+        if let v2Tint {
+            HStack(spacing: 8) {
+                IconTile(symbol: systemImage, tint: v2Tint, size: 30)
+                Text(title).font(.headline)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+        } else {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

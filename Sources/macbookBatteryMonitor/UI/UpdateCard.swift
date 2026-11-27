@@ -31,7 +31,7 @@ struct UpdateCard: View {
                     Spacer()
                     Toggle("自動檢查更新", isOn: Binding(get: { settings.autoCheckUpdates }, set: { settings.autoCheckUpdates = $0 }))
                         .labelsHidden()
-                        .toggleStyle(.switch)
+                        .toggleStyle(SettingsSwitchStyle())
                         .controlSize(.small)
                 }
                 HStack {
@@ -39,7 +39,7 @@ struct UpdateCard: View {
                     Spacer()
                     Toggle("有新版本時通知", isOn: Binding(get: { settings.updateNotification }, set: { settings.updateNotification = $0 }))
                         .labelsHidden()
-                        .toggleStyle(.switch)
+                        .toggleStyle(SettingsSwitchStyle())
                         .controlSize(.small)
                 }
                 .disabled(!settings.autoCheckUpdates)

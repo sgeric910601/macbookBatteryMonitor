@@ -30,7 +30,7 @@ struct PermissionsView: View {
     private func row(_ permission: AppPermission) -> some View {
         let users = permission.users(isInstalled: settings.isInstalled)
         return HStack(alignment: .top, spacing: 10) {
-            IconTile(symbol: permission.symbol, tint: .gray, size: 28)
+            SettingsListIcon(symbol: permission.symbol)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(permission.title)

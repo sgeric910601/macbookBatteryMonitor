@@ -76,11 +76,12 @@ enum ScreenshotCommand {
         }
         SnapshotCommand.render(smartCharging, appearance: .darkAqua, settle: 0.6, to: dir.appendingPathComponent("smart-charging.png"))
 
-        // 設定視窗：左邊分類，右邊是顯示項目
-        let settingsUI = PanelState()
-        settingsUI.settingsSection = .display
-        let settingsWindow = SettingsWindowView(store: store, settings: settings, ui: settingsUI)
-            .frame(width: 720, height: 660)
+        // 設定視窗：左邊分類，右邊是選單列
+        let settingsState = SettingsV2State()
+        settingsState.page = .menuBar
+        let settingsWindow = SettingsV2WindowView(store: store, settings: settings, ui: PanelState(), state: settingsState,
+                                                  startupItems: StartupItemsManager())
+            .frame(width: 720, height: 780)
             .background(Color(nsColor: .windowBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white.opacity(0.12)))

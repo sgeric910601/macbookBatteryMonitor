@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// 設定視窗左邊的分類
-enum SettingsSection: String, CaseIterable, Identifiable {
+/// 從面板、選單等地方打開設定時指定的分類；設定視窗用 SettingsV2Page(section) 換成對應的頁面
+enum SettingsSection: String, CaseIterable {
     case general
     case xdrBrightness
     /// 選單列顯示方式、電力流向細項與詳細資訊欄位
@@ -28,210 +28,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case update
     /// 擴充功能組最後一項：加入或移除擴充功能
     case features
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .general: return "一般"
-        case .xdrBrightness: return "XDR 額外增亮"
-        case .display: return "顯示項目"
-        case .monitors: return "監控與省電"
-        case .charging: return "充電"
-        case .companion: return "充電夥伴"
-        case .peripherals: return "周邊設備"
-        case .input: return "滑鼠、觸控板與鍵盤"
-        case .windowSwitcher: return "視窗切換"
-        case .windows: return "視窗與 Dock"
-        case .startup: return "登入項目"
-        case .permissions: return "權限"
-        case .update: return "更新"
-        case .features: return "功能管理"
-        }
-    }
-
-    /// macOS 12 就有的符號，舊系統版本也能用
-    var systemImage: String {
-        switch self {
-        case .general: return "gearshape"
-        case .xdrBrightness: return "sun.max.fill"
-        case .display: return "menubar.rectangle"
-        case .monitors: return "cpu"
-        case .charging: return "battery.100.bolt"
-        case .companion: return "pawprint"
-        case .peripherals: return "keyboard"
-        case .input: return "computermouse"
-        case .windowSwitcher: return "macwindow.on.rectangle"
-        case .windows: return "dock.rectangle"
-        case .startup: return "power"
-        case .permissions: return "lock.shield"
-        case .update: return "arrow.down.circle"
-        case .features: return "square.grid.2x2"
-        }
-    }
-
-    /// 側邊欄與頁首圖示方塊的顏色
-    var tint: Color {
-        switch self {
-        case .general: return .gray
-        case .xdrBrightness: return .yellow
-        case .display: return .blue
-        case .monitors: return .orange
-        case .startup: return .indigo
-        case .permissions: return .teal
-        case .charging: return .green
-        case .companion: return .pink
-        case .peripherals: return .purple
-        case .input: return .cyan
-        case .windowSwitcher: return .blue
-        case .windows: return .mint
-        case .features: return .indigo
-        case .update: return .green
-        }
-    }
-
-    /// 頁首標題下的一行說明
-    var subtitle: String {
-        switch self {
-        case .general: return "App 圖示、通知、開機啟動與設定備份"
-        case .xdrBrightness: return "內建 XDR 螢幕增亮與亮度鍵自動啟用"
-        case .display: return "選單列的顯示方式與面板裡的項目"
-        case .monitors: return "更新頻率、省電與系統監控"
-        case .startup: return "登入時自動啟動的項目與它們的來歷"
-        case .permissions: return "這個 App 用到的系統權限與狀態"
-        case .charging: return "充電上限與智慧充電"
-        case .companion: return "充電夥伴的外觀與桌面寵物"
-        case .peripherals: return "藍牙設備的低電量通知與目前連著的裝置"
-        case .input: return "捲動、滑鼠側鍵、中文輸入法、防誤觸與鍵盤清潔"
-        case .windowSwitcher: return "取代 Cmd+Tab 的視窗切換"
-        case .windows: return "視窗吸附、綠色按鈕放大、Finder 加強、關閉最後視窗、Dock 點擊"
-        case .features: return "啟用或停用擴充功能"
-        case .update: return "版本、自動檢查與一鍵更新"
-        }
-    }
-
-    /// 擴充功能所在的分類。「滑鼠、觸控板與鍵盤」放捲動方向與中文輸入法，加入其中一個就出現
-    /// 擴充功能的設定在哪一頁；只在面板上有按鈕、沒有設定的功能（音訊切換）為 nil
-    static func section(for feature: ExtensionFeature) -> SettingsSection? {
-        switch feature {
-        case .scrollDirection, .inputMethod, .quitGuard, .keyboardCleaning, .mouseButtons: return .input
-        case .windowSwitcher: return .windowSwitcher
-        case .xdrBrightness: return .xdrBrightness
-        case .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return .windows
-        case .startupItems: return .startup
-        case .audioSwitch, .quickMenu, .portManager, .clipboardHistory, .speedTest: return nil
-        }
-    }
-
-    /// 側邊欄的分組：基本、電池（沒有電池時只剩周邊設備）、擴充功能（已加入的功能，最後是功能管理）
-    /// 最後一組「關於」只有「更新」，單獨放在最下面
-    static func sidebar(hasBattery: Bool, isInstalled: (ExtensionFeature) -> Bool) -> [(title: String, sections: [SettingsSection])] {
-        [
-            ("基本", [.general, .display, .monitors, .permissions]),
-            ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
-            ("擴充功能", ExtensionFeature.allCases.filter(isInstalled).compactMap(section(for:)).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } + [.features]),
-            ("關於", [.update]),
-        ]
-    }
-}
-
-/// 設定視窗：左邊是分類，右邊是該分類的卡片。不用 NavigationSplitView（macOS 13 起才有），舊系統版本也能用同一份
-struct SettingsWindowView: View {
-    let store: BatteryStore
-    let settings: AppSettings
-    let ui: PanelState
-    @State private var startupItems = StartupItemsManager()
-
-    private var hasBattery: Bool { store.snapshot != nil }
-
-    private var groups: [(title: String, sections: [SettingsSection])] {
-        SettingsSection.sidebar(hasBattery: hasBattery, isInstalled: settings.isInstalled)
-    }
-    private var sections: [SettingsSection] { groups.flatMap(\.sections) }
-
-    /// 沒有電池時「充電」「充電夥伴」不在側邊欄，移除的擴充功能也不在，改顯示一般
-    private var current: SettingsSection {
-        sections.contains(ui.settingsSection) ? ui.settingsSection : .general
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(groups, id: \.title) { group in
-                            Text(group.title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.top, group.title == groups.first?.title ? 4 : 14)
-                                .padding(.bottom, 2)
-                                .accessibilityAddTraits(.isHeader)
-                            ForEach(group.sections) { section in
-                                SidebarRow(section: section, selected: section == current) { ui.settingsSection = section }
-                            }
-                        }
-                    }
-                    .padding(10)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(AppEdition.appName) \(store.updater.currentVersion)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("結束\(AppEdition.appName)") { NSApp.terminate(nil) }
-                        .controlSize(.small)
-                }
-                .padding(12)
-            }
-            .frame(width: 214)
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        IconTile(symbol: current.systemImage, tint: current.tint, size: 38)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(current.title).font(.title2.weight(.semibold))
-                            Text(current.subtitle).font(.callout).foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.bottom, 4)
-                    // 通知可能被關掉，所以每一頁都顯示：使用者才知道按鍵與滑鼠功能為什麼沒有作用
-                    if ui.inputPaused, ExtensionFeature.blockingTap.contains(where: settings.isInstalled) {
-                        Label("無法確認「輔助使用」權限，按鍵與滑鼠相關功能已暫停。請到系統設定 → 隱私權與安全性 →「輔助使用」（macOS 27 起叫「裝置控制和資料取用」）確認已允許\(AppEdition.appName)；權限恢復後會自動恢復，或重新開啟 App。",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    // 登入項目分頁沒有 SettingsView 的卡片，不放進去，否則隱藏的卡片之間的間距會把標題與內容撐開
-                    if current != .startup {
-                        SettingsView(settings: settings, ui: ui, adminCPU: store.adminCPU, updater: store.updater,
-                                     chargeLimit: store.chargeLimit, hasBattery: hasBattery,
-                                     section: current, planActive: store.chargingPlan.isActive)
-                    }
-                    switch current {
-                    case .display: DisplayItemsView(settings: settings, limitSlider: store.chargeLimit.supported)
-                    case .charging: ChargingPlanView(store: store, settings: settings, ui: ui, embedded: true)
-                    case .peripherals:
-                        PeripheralAlertsCard(store: store.peripherals, settings: settings)
-                        ConnectedDevicesCard()
-                    case .windowSwitcher: WindowSwitcherSettingsView(settings: settings, ui: ui)
-                    case .windows: WindowsSettingsView(settings: settings, ui: ui)
-                    case .startup: StartupItemsView(manager: startupItems)
-                    case .features: FeatureManagerView(settings: settings)
-                    case .permissions: PermissionsView(settings: settings)
-                    default: EmptyView()
-                    }
-                }
-                .padding(20)
-                .frame(maxWidth: 520, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            // 換分類時從最上面開始
-            .id(current)
-        }
-        .frame(minWidth: 640, idealWidth: 720, minHeight: 440, idealHeight: 600)
-    }
 }
 
 /// 獨立的設定視窗。開著時 App 暫時出現在 Dock 與 Command-Tab，切到系統設定再回來也找得到；關掉後恢復成只在選單列
@@ -241,6 +37,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let settings: AppSettings
     private let ui: PanelState
     private var window: NSWindow?
+    /// 設定視窗目前的頁面
+    private let v2State = SettingsV2State()
+    private let v2StartupItems = StartupItemsManager()
 
     init(store: BatteryStore, settings: AppSettings, ui: PanelState) {
         self.store = store
@@ -249,6 +48,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     var isShown: Bool { window != nil }
+    /// 目前的頁面（selftest 印出用）
+    var pageTitle: String { v2State.page.title }
     var frame: NSRect? { window?.frame }
 
     func close() {
@@ -257,7 +58,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     /// section：要打開的分類；nil 時維持上次的分類
     func show(_ section: SettingsSection? = nil) {
-        if let section { ui.settingsSection = section }
+        show(page: section.map(SettingsV2Page.init))
+    }
+
+    func show(page: SettingsV2Page?) {
+        if let page { v2State.page = page }
         let window = self.window ?? makeWindow()
         self.window = window
         NSApp.setActivationPolicy(.regular)
@@ -267,12 +72,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let view = SettingsWindowView(store: store, settings: settings, ui: ui)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 600),
+        let view = SettingsV2WindowView(store: store, settings: settings, ui: ui, state: v2State, startupItems: v2StartupItems)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 780),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "設定"
         window.contentViewController = NSHostingController(rootView: view)
-        window.setContentSize(NSSize(width: 720, height: 600))
+        window.setContentSize(NSSize(width: 720, height: 780))
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()
@@ -322,59 +127,39 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 }
 
-extension View {
-    /// 設定視窗：卡片只出現在它所屬的分類
-    @ViewBuilder func settingsSection(_ owner: SettingsSection, shown: SettingsSection) -> some View {
-        if owner == shown { self }
-    }
-}
-
 /// 圓角方塊裡的白色圖示（側邊欄與頁首）
 struct IconTile: View {
     let symbol: String
     let tint: Color
     var size: CGFloat = 22
+    /// 設定視窗用平面單色、圖形大一點；面板等沒有主題色的地方維持漸層
+    @Environment(\.settingsV2Tint) private var v2Tint
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: size * 0.52, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(tint.gradient))
-            .accessibilityHidden(true)
-    }
-}
-
-/// 側邊欄的一列：選到時是柔和的色塊，不用系統的實心藍色
-private struct SidebarRow: View {
-    let section: SettingsSection
-    let selected: Bool
-    let select: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: select) {
-            HStack(spacing: 9) {
-                IconTile(symbol: section.systemImage, tint: section.tint)
-                Text(section.title)
-                    .fontWeight(selected ? .semibold : .regular)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(selected ? section.tint.opacity(0.2) : hovering ? Color.primary.opacity(0.06) : .clear))
-            .contentShape(Rectangle())
+        if v2Tint != nil {
+            // 新版：圖形縮放到方塊內 64% 的範圍裡（寬的圖形例如電池也不會碰到邊緣），平面單色
+            Image(systemName: symbol)
+                .resizable()
+                .scaledToFit()
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+                .frame(width: size * 0.64, height: size * 0.64)
+                .frame(width: size, height: size)
+                .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(tint))
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.52, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(RoundedRectangle(cornerRadius: size * 0.26, style: .continuous).fill(tint.gradient))
+                .accessibilityHidden(true)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
 /// 設定 →「周邊設備」：目前連著的外接螢幕、USB 與 Thunderbolt 裝置。打開這頁時才讀，按「重新整理」再讀一次
-private struct ConnectedDevicesCard: View {
+struct ConnectedDevicesCard: View {
     @State private var items: [ConnectedDevices.Item] = []
 
     var body: some View {
@@ -391,7 +176,7 @@ private struct ConnectedDevicesCard: View {
                 }
                 ForEach(items) { item in
                     HStack(spacing: 8) {
-                        Image(systemName: Self.symbol(item.kind)).frame(width: 18).foregroundStyle(.secondary).accessibilityHidden(true)
+                        Image(systemName: Self.symbol(item.kind)).frame(width: 18).foregroundStyle(.secondary).modifier(V2ItemIcon()).accessibilityHidden(true)
                         Text(item.name)
                         if let detail = item.detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
                         Spacer()

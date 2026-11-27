@@ -74,7 +74,7 @@ struct QuickMenuPanel: View {
     }
 
     private var featureGroups: [String] {
-        panelFeatures.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+        ExtensionFeature.groupOrder.filter { group in panelFeatures.contains { $0.group == group } }
     }
 
     private var featuresPage: some View {

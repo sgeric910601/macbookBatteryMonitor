@@ -98,13 +98,17 @@ enum SettingsV2Page: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 這頁屬於哪個大項（功能管理）；不是擴充功能頁時為 nil
+    var featureGroup: String? { features.first?.group }
+
     /// 側邊欄：基本、電池（沒有電池時只剩周邊設備）、擴充功能、最下面的權限與登入項目。
-    /// 擴充功能的頁面一直都在：每個功能在自己的卡片上就能打開，不用先去功能管理
-    static func sidebar(hasBattery: Bool) -> [(title: String, pages: [SettingsV2Page])] {
-        [
+    /// 擴充功能的頁面要先在功能管理打開大項才出現，功能管理一直都在
+    static func sidebar(hasBattery: Bool, enabledGroups: Set<String>) -> [(title: String, pages: [SettingsV2Page])] {
+        let extensions: [SettingsV2Page] = [.keyboard, .mouse, .windows, .quickMenu, .network]
+        return [
             ("基本", [.general, .menuBar, .monitor, .power]),
             ("電池", hasBattery ? [.charging, .companion, .peripherals] : [.peripherals]),
-            ("擴充功能", [.keyboard, .mouse, .windows, .quickMenu, .network, .features]),
+            ("擴充功能", extensions.filter { $0.featureGroup.map(enabledGroups.contains) ?? true } + [.features]),
             ("系統", [.system]),
         ]
     }
@@ -145,7 +149,7 @@ struct SettingsV2WindowView: View {
 
     private var hasBattery: Bool { store.snapshot != nil }
     private var groups: [(title: String, pages: [SettingsV2Page])] {
-        SettingsV2Page.sidebar(hasBattery: hasBattery)
+        SettingsV2Page.sidebar(hasBattery: hasBattery, enabledGroups: settings.enabledFeatureGroups)
     }
     /// 沒有電池時的電池頁不在側邊欄：改顯示一般
     private var current: SettingsV2Page {
@@ -281,8 +285,10 @@ struct SettingsV2WindowView: View {
             FeatureManagerView(settings: settings)
         case .system:
             PermissionsView(settings: settings)
-            Text("登入時自動執行的項目").font(.headline).padding(.top, 8)
-            StartupItemsGate(settings: settings, manager: startupItems)
+            if settings.isGroupEnabled(ExtensionFeature.startupItems.group) {
+                Text("登入時自動執行的項目").font(.headline).padding(.top, 8)
+                StartupItemsGate(settings: settings, manager: startupItems)
+            }
         }
     }
 }

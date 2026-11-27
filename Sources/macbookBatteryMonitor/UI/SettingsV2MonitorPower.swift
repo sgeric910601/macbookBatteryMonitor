@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 新版設定 →「系統監控」：常用的開關＋選單列預覽；合併圖示、測速、管理員取樣收進「進階」。
+/// 新版設定 →「系統監控」：常用的開關＋選單列預覽；合併圖示、管理員取樣收進「進階」（網路測速在「網路與螢幕」）。
 /// 警示的開關在這頁（門檻和模組放一起），「一般」的通知卡片有捷徑
 struct SettingsV2MonitorPage: View {
     let settings: AppSettings
@@ -60,11 +60,6 @@ struct SettingsV2MonitorPage: View {
                     SwitchRow("所有監控合併成一個圖示", isOn: binding(\.menuBarCombined))
                         .disabled(!settings.systemMonitors)
                     V2Note("選單列只留一個圖示，點一下在下方展開所有圖示；選單列太擠時用。")
-                    SwitchRow("在網路面板顯示測速", isOn: Binding(get: { settings.isInstalled(.speedTest) }, set: { settings.setInstalled(.speedTest, $0) }))
-                        .disabled(!settings.systemMonitors || !settings.monitorNetwork)
-                    V2Note(settings.monitorNetwork
-                           ? "測一次約 20～30 秒、會用掉數百 MB 流量，預設關閉以免誤按。"
-                           : "網路模組開著時才能使用。")
                     // Intel 直接由 SMC 讀 CPU 功耗，不需要管理員取樣
                     if !ChipInfo.isIntel {
                         Divider()

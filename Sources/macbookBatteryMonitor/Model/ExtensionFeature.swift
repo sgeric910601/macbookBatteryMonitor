@@ -74,28 +74,32 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 「功能管理」頁的分組
+    /// 大項：功能管理頁的分組，名稱和側邊欄的頁面一致（組別順序見 groupOrder）
     var group: String {
         switch self {
-        case .scrollDirection: return "滑鼠與鍵盤"
-        case .windowSwitcher: return "視窗與 Dock"
-        case .inputMethod: return "滑鼠與鍵盤"
-        case .quitGuard: return "滑鼠與鍵盤"
-        case .lastWindowQuit: return "視窗與 Dock"
-        case .dockClick: return "視窗與 Dock"
-        case .keyboardCleaning: return "滑鼠與鍵盤"
-        case .mouseButtons: return "滑鼠與鍵盤"
-        case .audioSwitch: return "聲音"
-        case .greenButton: return "視窗與 Dock"
-        case .windowSnap: return "視窗與 Dock"
-        case .finderKeys: return "視窗與 Dock"
-        case .quickMenu: return "選單列"
-        case .portManager: return "系統監控"
-        case .clipboardHistory: return "選單列"
-        case .xdrBrightness: return "系統監控"
-        case .speedTest: return "系統監控"
+        case .inputMethod, .quitGuard, .keyboardCleaning: return "鍵盤"
+        case .scrollDirection, .mouseButtons: return "滑鼠與觸控板"
+        case .windowSwitcher, .lastWindowQuit, .dockClick, .greenButton, .windowSnap, .finderKeys: return "視窗與 Dock"
+        case .quickMenu, .audioSwitch, .clipboardHistory: return "貓咪快捷選單"
+        case .portManager, .speedTest, .xdrBrightness: return "網路與螢幕"
         case .startupItems: return "系統"
         }
+    }
+
+    static let groupOrder = ["鍵盤", "滑鼠與觸控板", "視窗與 Dock", "貓咪快捷選單", "網路與螢幕", "系統"]
+
+    /// 存進設定與備份的大項代號：畫面上的名稱改了或翻譯了，已存的狀態仍讀得到
+    static let groupIDs = ["鍵盤": "keyboard", "滑鼠與觸控板": "mouse", "視窗與 Dock": "windows",
+                           "貓咪快捷選單": "quickMenu", "網路與螢幕": "network", "系統": "system"]
+
+    static func members(of group: String) -> [ExtensionFeature] { allCases.filter { $0.group == group } }
+
+    /// 打開的大項：沒存過時（從舊版更新）用已加入功能的組；已加入的功能所屬的大項一定是開的，
+    /// 例如匯入的備份加入了某個功能，它的大項跟著打開
+    /// stored 是 groupIDs 的代號，不認得的丟掉
+    static func enabledGroups(stored: [String]?, installed: Set<ExtensionFeature>) -> Set<String> {
+        let ids = Set(stored ?? [])
+        return Set(groupIDs.filter { ids.contains($0.value) }.keys).union(installed.map(\.group))
     }
 
     /// 加入後在背景做什麼，標在名稱旁邊，讓人知道它會監聽哪種輸入

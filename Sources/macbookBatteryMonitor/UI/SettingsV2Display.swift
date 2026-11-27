@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// 新版設定的「螢幕亮度」頁：內建 XDR 螢幕的額外增亮。
-/// 加入與移除都在功能管理，頁面上只有一個主開關
+/// 卡片上的按鈕啟用或停用這個功能，標題列的主開關
 /// 「啟用內建螢幕增亮」，只管開始或還原增亮。版面照其他擴充功能頁：頁首的輔助使用橫幅、標題列的「監聽亮度鍵」標籤、
 /// 不畫刻度的滑桿、運作狀態小標記，長說明收合。
 struct SettingsV2XDRPage: View {
@@ -43,7 +43,9 @@ struct SettingsV2XDRPage: View {
                         .disabled(!installed || !control.supported || control.preparing)
                 }
                 if !installed {
-                    V2Note("要使用請先到「功能管理」加入「\(ExtensionFeature.xdrBrightness.title)」。")
+                    V2Note("啟用後會監聽亮度鍵（亮度鍵到頂後自動增亮時），並增加耗電。")
+                    Button("啟用\(ExtensionFeature.xdrBrightness.title)") { settings.setInstalled(.xdrBrightness, true) }
+                        .disabled(!control.supported)
                 } else {
                     Divider()
                     statusRow
@@ -72,13 +74,15 @@ struct SettingsV2XDRPage: View {
                     HStack {
                         Button("還原亮度") { _ = control.disable() }
                             .disabled(!control.enabled)
+                        // 停用時會先還原亮度
+                        Button("停用\(ExtensionFeature.xdrBrightness.title)") { settings.setInstalled(.xdrBrightness, false) }
                     }
                     V2Disclosure(title: "說明", id: "xdr.help", state: state) {
                         VStack(alignment: .leading, spacing: 6) {
                             V2Note("支援內建 XDR 螢幕，接電或電池供電皆可使用。亮度鍵到頂後再按亮度增加鍵就接續增亮，降低時先退出增亮；沒有輔助使用權限時可以用上面的滑桿。")
                             V2Note("增亮時畫面上會出現浮動的亮度提示。nits 是依系統回報的螢幕規格與亮度估算，不是儀器量測，實際輸出受 EDR 餘裕限制。")
                             V2Note("會增加耗電並影響 HDR 高光與色彩。睡眠、鎖定、省電模式、溫度偏高或 30 分鐘後會自動還原；重新啟動後維持一般亮度，結束 App 時一併移除。")
-                            V2Note("要完全移除這個功能（不再監聽亮度鍵），到「功能管理」關掉「\(ExtensionFeature.xdrBrightness.title)」。")
+                            V2Note("要完全停用這個功能（不再監聽亮度鍵並還原亮度），按上面的「停用」。")
                         }
                     }
                 }

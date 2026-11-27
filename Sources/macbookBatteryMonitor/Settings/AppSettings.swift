@@ -104,6 +104,32 @@ final class AppSettings {
 
     func isInstalled(_ feature: ExtensionFeature) -> Bool { installedFeatures.contains(feature) }
 
+    /// 打開的大項（功能管理）：打開後側邊欄才有這一頁，功能要在頁面裡逐項啟用
+    private(set) var enabledFeatureGroups: Set<String> = []
+
+    func isGroupEnabled(_ group: String) -> Bool { enabledFeatureGroups.contains(group) }
+
+    /// 打開大項不啟用任何功能；關掉時組內功能全部停用（各自的設定保留）
+    func setGroupEnabled(_ group: String, _ enabled: Bool) {
+        if enabled { enabledFeatureGroups.insert(group) } else {
+            enabledFeatureGroups.remove(group)
+            let members = ExtensionFeature.members(of: group).filter(isInstalled)
+            // 先全部停用再逐一套用：共用一個套用流程的功能（視窗與 Dock 的幾項）才不會以為其他項還開著而詢問權限
+            for feature in members {
+                installedFeatures.remove(feature)
+                defaults.set(false, forKey: feature.installedKey)
+            }
+            for feature in members { onFeatureInstallChange?(feature) }
+        }
+        saveFeatureGroups()
+    }
+
+    private func saveFeatureGroups() { Self.saveFeatureGroups(enabledFeatureGroups, to: defaults) }
+
+    private static func saveFeatureGroups(_ groups: Set<String>, to defaults: UserDefaults) {
+        defaults.set(groups.compactMap { ExtensionFeature.groupIDs[$0] }.sorted(), forKey: Keys.enabledFeatureGroups)
+    }
+
     /// 可以匯出、帶到另一台 Mac 的設定。不含要另外安裝系統服務的（管理員 CPU 取樣、精準喚醒）、一次性的轉換標記，
     /// 也不含周邊設備的低電量門檻（以藍牙裝置的硬體位址為鍵，匯出檔可能被分享）
     static let backupSchema: [String: SettingsBackup.Kind] = {
@@ -114,7 +140,7 @@ final class AppSettings {
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.monitorPlainLabels: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
             Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.keepAwakeApps: .strings, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.mouseBackButton: .string, Keys.mouseForwardButton: .string, Keys.updateInterval: .int,
-            Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
+            Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings, Keys.enabledFeatureGroups: .strings,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
             Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
@@ -187,6 +213,10 @@ final class AppSettings {
     func setInstalled(_ feature: ExtensionFeature, _ installed: Bool) {
         guard isInstalled(feature) != installed else { return }
         if installed { installedFeatures.insert(feature) } else { installedFeatures.remove(feature) }
+        if installed, !isGroupEnabled(feature.group) {
+            enabledFeatureGroups.insert(feature.group)
+            saveFeatureGroups()
+        }
         // 只改加入狀態，功能自己的設定都不動，重新加入時照舊
         defaults.set(installed, forKey: feature.installedKey)
         onFeatureInstallChange?(feature)
@@ -594,6 +624,7 @@ final class AppSettings {
         static let updateInterval = "updateInterval"
         static let hiddenFlowItems = "hiddenFlowItems"
         static let hiddenDetailFields = "hiddenDetailFields"
+        static let enabledFeatureGroups = "enabledFeatureGroups"
         static let peripheralThresholds = "peripheralThresholds"
         static let appIconColor = "appIconColor"
         static let autoCheckUpdates = "autoCheckUpdates"
@@ -698,6 +729,9 @@ final class AppSettings {
             if stored == nil { defaults.set(isInstalled, forKey: feature.installedKey) }
         }
         installedFeatures = installed
+        let groups = ExtensionFeature.enabledGroups(stored: defaults.stringArray(forKey: Keys.enabledFeatureGroups), installed: installed)
+        enabledFeatureGroups = groups
+        Self.saveFeatureGroups(groups, to: defaults)
         xdrAutomaticActivation = defaults.bool(forKey: Keys.xdrAutomaticActivation)
         adminCPUSampling = defaults.bool(forKey: Keys.adminCPUSampling)
         display = MenuBarDisplay(rawValue: defaults.string(forKey: Keys.display) ?? "") ?? .iconAndPercent

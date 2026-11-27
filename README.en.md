@@ -112,7 +112,7 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
   - Drives without that record (internal drives that aren't NVMe, such as a 2015 MacBook Air's, and most USB enclosures) show the SMART "正常／異常" (OK / failing) status, and totals since boot (since connected for external disks)
 - **Network**: the menu bar shows upload and download speed; the panel shows the current interface (Wi-Fi, Ethernet) and IP, a speed chart and totals since boot
   - **Connection status**: whether a VPN is connected (a tunnel interface with a usable address; the system's own utun interfaces do not count), plus the system's Low Data Mode and metered network flags (for example a phone hotspot). It only looks at local interfaces and the system network path, watches only while the panel is open, and contacts no outside server
-  - **Speed test**: off by default so it isn't started by accident; after turning on 「網路測速」 (network speed test) in Settings → 功能管理 (feature management), press 「開始測速」 (start test) at the bottom of the network panel (the network monitor has to be on) to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
+  - **Speed test**: off by default so it isn't started by accident; after turning on 「網路測速」 (network speed test) in Settings → 網路與螢幕 (Network & display), press 「開始測速」 (start test) at the bottom of the network panel (the network monitor has to be on) to run macOS's built-in `networkQuality` against Apple's test servers, which takes about 20–30 seconds. During the test the card shows live download and upload rates (all traffic on the interface, including other apps); afterwards it shows download, upload, responsiveness (RPM, round trips per minute while the network is busy; higher means less lag) and idle latency. You can stop it at any time; it keeps running when the panel closes, and the result is still there next time. A test uses several hundred MB, so mind your data plan on a mobile connection
 - Child processes (such as browser tabs) are merged into their app
 
 ![Battery plus system monitors: CPU/GPU, memory, disk and network icons in the menu bar and each monitor's panel, with fans, temperatures and external disks](docs/screenshots/edition-status.png)
@@ -143,7 +143,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 |---|---|---|
 | 基本 (Basic) | 一般 (General) | Update (one-click update, automatic checks and new-version notifications), notification thresholds, launch at login, app icon color, settings backup (export, import) |
 | | 選單列 (Menu bar) | Menu bar style, charging icon customization, power flow items, details fields |
-| | 系統監控 (System monitors) | System monitor master switch and each monitor, label style, alerts; under 「進階」 (Advanced): memory and disk in one icon, combine all monitors into one icon, network speed test, admin CPU sampling |
+| | 系統監控 (System monitors) | System monitor master switch and each monitor, label style, alerts; under 「進階」 (Advanced): memory and disk in one icon, combine all monitors into one icon, admin CPU sampling |
 | | 省電與睡眠 (Power saving & sleep) | Update interval, power saving mode, keep awake while listed apps run, Bluetooth off during sleep |
 | 電池 (Battery) | 充電 (Charging) | Charge limit slider, smart charging |
 | | 充電夥伴 (Charging companion) | Appearance, my photo, the desktop pet's position, size and moving eyes |
@@ -153,7 +153,7 @@ Click the gear at the bottom right of the panel, or "設定…" (Settings…) in
 | | 視窗與 Dock (Windows & Dock) | Window switching (replaces Cmd+Tab: shortcuts, appearance, which windows to list, exceptions), quit when the last window closes, click a Dock icon to minimize, green button maximizes, window snapping, Finder shortcuts |
 | | 貓咪快捷選單 (Cat quick menu) | The cat quick menu and which items its panel shows, audio switcher, clipboard history |
 | | 網路與螢幕 (Network & display) | Ports and quitting processes, network speed test, XDR brightness |
-| | 功能管理 (Feature management) | Turn extension features on or off (see "[Extension features](#extension-features)") |
+| | 功能管理 (Feature management) | Turn groups of extension features on or off, which shows or hides their pages (see "[Extension features](#extension-features)") |
 | 系統 (System) | 權限與登入項目 (Permissions & login items) | The system permissions this app uses, whether each is granted, which features use it, and a button to the matching System Settings pane; what starts at login (listed once 登入項目管理 (login item management) is on; see "[Login items](#login-items)") |
 
 Extension pages are always listed; each feature's card has its own on/off switch in its title bar. Desktop Macs have no Charging or Charging companion sections. The panel's gear reopens the section you last viewed, "有新版本" (new version available) opens General, and the gear in a monitor panel opens System monitors.
@@ -225,7 +225,7 @@ On a MacBook, turn on "在桌面顯示" (show on desktop) in Settings → Chargi
 
 ## Extension features
 
-Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature that appears only after you turn it on in Settings → 功能管理 (feature management), and can be turned off again:
+Battery, charging, system monitors, the charging companion and peripherals are basic features and always there. Everything else is an extension feature, in six groups: keyboard, mouse & trackpad, windows & Dock, cat quick menu, network & display, and system. Turn a group on in Settings → 功能管理 (feature management) and its page appears in the sidebar; then turn on the features you need on that page. Turning a group on enables nothing and asks for no permission; turning it off turns off every feature in it and removes the page, keeping their settings:
 
 - **Off means not running**: no keys or mouse are intercepted, no windows are observed and its settings are hidden; turning it off is not uninstalling, it only stops it, and its settings are still there when you turn it on again
 - **Nothing is on after a fresh install**: most extensions need Accessibility, and a permission prompt right after installing would be confusing; the audio switcher, cat quick menu, ports, clipboard history and network speed test need no permission, and login item management needs Automation
@@ -238,8 +238,8 @@ Battery, charging, system monitors, the charging companion and peripherals are b
 
 For MacBook Pro models with a built-in XDR display and usable EDR headroom reported by macOS. Availability depends on the model, display settings and current system state; support is not guaranteed for every XDR model. External displays are not supported.
 
-- **Add the feature first**: it is not added by default. Add “XDR 增亮” in Settings → 功能管理 (feature management), then open its settings to enable it and adjust the gain. It works on battery or external power; extra brightness increases power use and heat
-- **Off on Macs without a supported display**: when no supported built-in XDR display is detected, it cannot be added in 功能管理 or the cat quick menu, and an already added one does nothing: no background sampling, no brightness-key tap. The same applies with the lid closed on an external display; it resumes when the built-in display is back. On a supported display the once-a-second check also runs only while boosting or while the brightness-key takeover is actually running; with the feature merely added, nothing is queried in the background until you turn it on from the slider
+- **Add the feature first**: it is not added by default. Turn on “XDR 增亮” in Settings → 網路與螢幕 (Network & display), then turn on the boost and adjust the gain. It works on battery or external power; extra brightness increases power use and heat
+- **Off on Macs without a supported display**: when no supported built-in XDR display is detected, it cannot be turned on in Settings or the cat quick menu, and an already added one does nothing: no background sampling, no brightness-key tap. The same applies with the lid closed on an external display; it resumes when the built-in display is back. On a supported display the once-a-second check also runs only while boosting or while the brightness-key takeover is actually running; with the feature merely added, nothing is queried in the background until you turn it on from the slider
 - **Slider and brightness keys**: the slider needs no Accessibility permission. Taking over the physical brightness keys requires Accessibility. With “亮度鍵到頂後自動啟用 XDR” enabled, extra brightness starts after normal brightness reaches its maximum. Returning the gain to 1× removes the overlay and restores normal brightness. Adjusting the boost shows a brightness indicator (a sun, a 16-segment bar and the estimated nits below it) that fades after about 1.3 seconds. From macOS 26, after a brightness key handled by macOS, the app looks for the system brightness indicator in the window list (position only, no permission needed); when that window can be found (measured on macOS 27) it sits where the system indicator appears, otherwise at the top right below the menu bar. Older systems show it at the bottom centre
 - **At most 30 minutes per boost**: sleep, locking, leaving the current user session, entering power saving mode, a thermal state outside the allowed range, a display configuration change or quitting the app also removes the boost overlay and restores normal brightness
 - **Brightness figures are estimates**: nits are calculated from system-reported brightness data and EDR headroom, not measured with an instrument. Gain is a request and macOS limits the actual output; a peak target such as 1600 nits does not guarantee sustained or full-screen brightness. A boost percentage is shown when valid brightness data is unavailable
@@ -299,7 +299,7 @@ The system integration uses private macOS functions, all loaded at run time and 
 
 ## Audio switcher
 
-Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speaker button appears at the bottom right of the panel:
+Turn on "音訊切換" (audio switcher) in Settings → 貓咪快捷選單 (Cat quick menu) and a speaker button appears at the bottom right of the panel:
 
 - **Output device**: lists every device that can play audio (built-in speakers, headphones, Bluetooth headphones, displays and so on) with a check on the current one; click one to switch. Virtual devices that cannot be the default output (for example a device some audio tools add for system alert sounds) are not listed, as in the system Sound menu
 - **Mute microphone**: uses the device's mute switch, or, if there is no switch, the menu says "輸入音量調到 0" (set input volume to 0) and the volume is restored when unmuted or when the app quits. A meeting app's automatic gain may turn it back up, so use the meeting app's own mute for such devices. The button shows a crossed-out microphone while muted
@@ -307,7 +307,7 @@ Turn on "音訊切換" (audio switcher) in Settings → 功能管理 and a speak
 
 ## Mouse side buttons
 
-Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠與觸控板 (Mouse & trackpad) to back (⌘[), forward (⌘]) or Mission Control:
+Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 滑鼠與觸控板 (Mouse & trackpad), then set the two thumb buttons of a multi-button mouse (buttons 4 and 5) under 滑鼠與觸控板 (Mouse & trackpad) to back (⌘[), forward (⌘]) or Mission Control:
 
 - **Only those two, only when set**: a button left at "不處理" (do nothing), and the left, right and middle buttons, go to apps as usual
 - **Only over the frontmost app**: the shortcut goes to the frontmost app, so with the pointer over another app's window (for example a browser in the background) back and forward are not converted and the original button passes through, rather than ⌘[ outdenting code in an editor; Mission Control works over any app
@@ -315,7 +315,7 @@ Turn on "滑鼠側鍵" (mouse side buttons) in Settings → 功能管理, then s
 
 ## Keyboard cleaning mode
 
-Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管理, then press "開始清潔" (start cleaning) under 鍵盤 (Keyboard) to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
+Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 鍵盤 (Keyboard), then press "開始清潔" (start cleaning) under 鍵盤 (Keyboard) to turn the keyboard off until it has been left alone for 30, 60 or 120 seconds:
 
 - **What is blocked**: every key, modifier and the brightness, volume and other system keys in the function row. The mouse and trackpad keep working; pressing keys while wiping restarts the countdown (held-down autorepeat does not), it always ends after at most 5 minutes, so it ends once the keyboard has been left alone for the chosen time or when you click "結束清潔" (stop cleaning) in the middle of the screen. The keyboard always comes back if the app quits
 - **Touch ID**: fingerprint authentication keeps working. It is also the power button, so pressing it still locks or sleeps the Mac and holding it forces a shutdown; that is hardware behaviour, so wipe it gently
@@ -323,7 +323,7 @@ Turn on "鍵盤清潔模式" (keyboard cleaning mode) in Settings → 功能管�
 
 ## Clipboard history
 
-Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 功能管理, and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu (collapsed by default; click its title to list them):
+Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu, in Settings → 貓咪快捷選單 (Cat quick menu), and the last 30 copied texts can be picked again from "剪貼簿歷史" in the cat quick menu (collapsed by default; click its title to list them):
 
 - **Text only, memory only**: no images or files, nothing written to disk, cleared when the app quits, the feature is turned off, the screen locks or the Mac sleeps; nothing is recorded while the cat quick menu is off; up to 10,000 characters each
 - **Skips what password managers mark as concealed**: anything a password manager (Keychain, 1Password and so on) marks as concealed, transient or auto-generated is never recorded. A password copied from a browser, a terminal or any other ordinary app carries no such mark and is recorded
@@ -333,7 +333,7 @@ Turn on "剪貼簿歷史" (clipboard history), together with the cat quick menu,
 
 ## Ports and quitting processes
 
-Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings → 功能管理 and:
+Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings → 網路與螢幕 (Network & display) and:
 
 - **Listening ports**: the network panel lists the TCP ports your own processes listen on, the program and whether it is local only; read when the panel opens or on refresh (with the built-in `lsof`, fixed arguments, no shell)
 - **Quit a process**: "結束" (quit) next to a port asks first, then asks the process to exit (SIGTERM); right before sending it re-checks the PID's owner, name and start time, so a reused PID is never hit, even by a program with the same name (such as `node`); you are told if it cannot be quit
@@ -342,7 +342,7 @@ Turn on "Port 管理與結束程式" (ports and quitting processes) in Settings 
 
 ## Cat quick menu
 
-Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a cat icon appears in the menu bar. Clicking it opens a panel with:
+Turn on "貓咪快捷選單" (cat quick menu) in Settings → 貓咪快捷選單 (Cat quick menu) and a cat icon appears in the menu bar. Clicking it opens a panel with:
 
 - **Three large buttons**: keep awake (with the time left), mute microphone (with the audio switcher on) and start keyboard cleaning (with keyboard cleaning mode on)
 - **Keep-awake duration**: 30 min, 1 h, 2 h or until turned off, with the running one highlighted; the display can stay on too
@@ -355,7 +355,7 @@ Turn on "貓咪快捷選單" (cat quick menu) in Settings → 功能管理 and a
 
 ## Finder shortcuts
 
-Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
+Turn on "Finder 加強" (Finder shortcuts) in Settings → 視窗與 Dock (Windows & Dock) and:
 
 - **⌘X to cut, ⌘V to move**: select files in Finder, press ⌘X, then ⌘V in another folder to move them (Finder's ⌥⌘V "Move Item Here"). If something else is copied after cutting, ⌘V pastes the clipboard as usual and never moves the files by mistake
 - **F2 to rename**: press F2 on a selected file to rename it (same as Return); on a MacBook keyboard press fn + F2, since F2 alone changes the brightness
@@ -365,7 +365,7 @@ Turn on "Finder 加強" (Finder shortcuts) in Settings → 功能管理 and:
 
 ## Window snapping
 
-Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
+Turn on "視窗吸附" (window snapping) in Settings → 視窗與 Dock (Windows & Dock) and dragging a window to the left or right screen edge snaps it to that half, to the top edge fills the screen, and to a corner makes a quarter:
 
 - **Preview first**: a preview frame appears at the edge and the window is arranged only on release; dragging away cancels. The bottom edge does not snap (the Dock is often there), nor does an edge where another display joins (the window is being moved across)
 - **Only window drags**: it checks whether the frontmost window moves with the drag, so selecting text, dragging files or resizing never snaps
@@ -374,7 +374,7 @@ Turn on "視窗吸附" (window snapping) in Settings → 功能管理 and draggi
 
 ## Green button maximizes
 
-Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管理 and the green button at the top left of a window fills the usable area of the screen the window is on instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size, both with the system animation:
+Turn on "綠色按鈕放大" (green button maximizes) in Settings → 視窗與 Dock (Windows & Dock) and the green button at the top left of a window fills the usable area of the screen the window is on instead (menu bar and Dock stay, no full screen Space); clicking it again restores the previous position and size, both with the system animation:
 
 - **Full screen**: with the feature on, the green button no longer enters full screen. Option-click is the system's own "Zoom", not full screen either. Use Window → Full Screen or ⌃⌘F instead
 - **Windows already in full screen, windows that cannot be resized**: keep the system behaviour (leave full screen; nothing happens when the button is disabled)
@@ -387,7 +387,7 @@ Turn on "綠色按鈕放大" (green button maximizes) in Settings → 功能管�
 
 ## Click a Dock icon to minimize
 
-Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 功能管理. Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
+Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings → 視窗與 Dock (Windows & Dock). Clicking the Dock icon of the frontmost app then minimizes its open windows (or hides the app, set under 視窗與 Dock); clicking again brings back the windows it minimized:
 
 - **Only then**: the click must be on the app that was frontmost when the button went down, the app must have open windows, and it must be a single click, not a drag or long press. Clicking another app switches to it as usual, and double-clicking a background app's icon only switches to it; windows you minimized yourself are not restored; this app's own icon (while Settings is open) is ignored
 - **How it decides**: on mouse down, before the Dock reacts (the Dock acts on mouse up), asking WindowServer whether the app has open windows instead of waiting on the app. On mouse up the Dock asks the app to reopen and the app restores a window itself, so minimizing (or hiding) waits 0.05 s; for apps that answer later (for example LINE), windows restored within 0.4 s are minimized (or hidden) again, unless you click again in the meantime. Clicking again brings back every window it minimized
@@ -397,7 +397,7 @@ Turn on "點 Dock 圖示縮到 Dock" (click a Dock icon to minimize) in Settings
 
 ## Quit an app when its last window closes
 
-Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 功能管理, and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
+Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in Settings → 視窗與 Dock (Windows & Dock), and an app quits by itself when its last window is closed (Settings → 視窗與 Dock):
 
 - **When it quits**: 0.6 s after a window closes and again 1 s later, both the WindowServer (every Space, minimized windows included) and Accessibility must report no windows, and the app must have had a window before. If either still sees a window it stays open, and if the WindowServer query fails (for example after a macOS update breaks the private call) the app counts as having windows. An app is quit only after it has finished launching and has run for at least 10 seconds (apps with a splash screen may show their main window seconds later). Finder and hidden apps are never quit
 - **Never quit**: call and meeting apps (FaceTime, Phone, Zoom, Microsoft Teams, Slack, Discord, Webex, Skype, LINE; they may have no window during a call, and quitting would hang up) and virtual machines (Parallels, VMware Fusion, UTM). Add other call apps to the exception list yourself
@@ -407,7 +407,7 @@ Turn on "關閉最後視窗時結束 App" (quit when the last window closes) in 
 
 ## Hold ⌘Q / ⌘W
 
-Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 功能管理 (feature management), then choose under 鍵盤 (Keyboard) whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
+Turn on "⌘Q／⌘W 防誤觸" (hold ⌘Q / ⌘W) in Settings → 鍵盤 (Keyboard), then choose under 鍵盤 (Keyboard) whether to protect ⌘Q, ⌘W or both (⌘Q only by default) and how long to hold: 0.5, 1 or 1.5 seconds:
 
 - **How it works**: on key down it remembers the frontmost app and shows a progress ring in the middle of the screen. Only when the hold completes does it send ⌘Q / ⌘W directly to that app, not to whatever is frontmost at that moment. Releasing early, switching to another app or pressing another key cancels, so a window behind can never be closed by mistake. Before sending ⌘W it also checks that the app's focused window has not changed; in browsers ⌘W still closes the tab as usual
 - **Keyboard layouts**: works on the US positions of Q and W, and only when those keys really type Q and W (ABC, US, Zhuyin, Pinyin and German layouts do). French AZERTY, Dvorak and other layouts with the letters elsewhere are not protected; keys go through as usual and no other shortcut (such as ⌘A or ⌘Z on AZERTY) is held back by mistake
@@ -428,7 +428,7 @@ The "中文輸入法" (Chinese input) card under Settings → 鍵盤 (Keyboard) 
 
 ## Login items
 
-Settings → 權限與登入項目 (Permissions & login items) (turn on 「登入項目管理」 (login item management) in feature management first; it stays on when updating from an older version) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
+Settings → 權限與登入項目 (Permissions & login items) (turn on the 「系統」 (System) group in feature management, then turn on 「登入項目管理」 (login item management) on this page; it stays on when updating from an older version) lists everything that starts by itself when you log in, and explains what each one is, where it comes from and which app it belongs to. System Settings' "Login Items & Extensions" only lists app names; this also shows background agents and daemons.
 
 - **Sources**: the "open at login" items, `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`. Every row has an icon, and items whose program no longer exists say so
 - **What you can do**: add or remove "open at login" apps; disable or enable your own (user-level) agents. Disabling takes effect at the next login and also stops the copy that is running now. Every action asks first. This app's own login item and agent are listed only and can't be disabled or removed here

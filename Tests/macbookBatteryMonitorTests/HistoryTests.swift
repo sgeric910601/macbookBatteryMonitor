@@ -5,6 +5,19 @@ final class HistoryTests {
         HistorySample(t: now.addingTimeInterval(-minutesAgo * 60), pct: 80, watts: nil, plugged: plugged, charging: false)
     }
 
+    /// 圖表十字準線：取時間最接近的點；附近沒有資料（超過容許間隔）時不顯示
+    func testNearestChartPoint() {
+        let base = Date(timeIntervalSince1970: 1_000_000)
+        let points = [0, 60, 120, 600].enumerated().map { index, offset in
+            ChartPoint(id: index, t: base.addingTimeInterval(TimeInterval(offset)), pct: Double(80 - index), watts: nil,
+                       plugged: false, segment: 0, wattsSegment: 0)
+        }
+        XCTAssertEqual(ChartPoint.nearest(points, to: base.addingTimeInterval(70), maxGap: 60)?.id, 1)
+        XCTAssertEqual(ChartPoint.nearest(points, to: base.addingTimeInterval(100), maxGap: 60)?.id, 2)
+        XCTAssertNil(ChartPoint.nearest(points, to: base.addingTimeInterval(360), maxGap: 60))
+        XCTAssertNil(ChartPoint.nearest([], to: base, maxGap: 60))
+    }
+
     func testUnpluggedTimeStartsAtBootAfterShutdown() {
         let now = Date()
         // 三天前接著電，之後拔電、關機；今天開機後一直用電池

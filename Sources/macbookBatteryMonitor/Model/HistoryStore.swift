@@ -28,6 +28,13 @@ enum BootTime {
 }
 
 struct ChartPoint: Identifiable {
+    /// 滑鼠指到的時間最接近的點（圖表的十字準線用）；離最近的點超過 maxGap 秒（中間沒資料）時回 nil
+    static func nearest(_ points: [ChartPoint], to date: Date, maxGap: TimeInterval) -> ChartPoint? {
+        guard let point = points.min(by: { abs($0.t.timeIntervalSince(date)) < abs($1.t.timeIntervalSince(date)) }),
+              abs(point.t.timeIntervalSince(date)) <= maxGap else { return nil }
+        return point
+    }
+
     let id: Int
     let t: Date
     let pct: Double

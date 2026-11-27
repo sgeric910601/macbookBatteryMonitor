@@ -43,6 +43,8 @@ final class MouseButtonsController {
                 MouseButtonsController.shared.keepAlive()
             }
         }
+        // 各功能的 5 秒檢查容許晚 1 秒：系統可以把它們併成同一次喚醒
+        watchdog?.tolerance = 1
         Self.log.notice("開始攔截滑鼠側鍵")
         return true
     }

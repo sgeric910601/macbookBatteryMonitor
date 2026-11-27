@@ -84,6 +84,8 @@ final class DockClickController {
                 DockClickController.shared.keepAlive()
             }
         }
+        // 各功能的 5 秒檢查容許晚 1 秒：系統可以把它們併成同一次喚醒
+        watchdog?.tolerance = 1
         Self.log.notice("開始監聽 Dock 點擊")
         return true
     }

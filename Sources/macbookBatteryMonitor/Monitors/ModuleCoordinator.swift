@@ -267,8 +267,8 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
         guard let button = item.button else { return }
         // GPU 有自己的圖示時，CPU 圖示只畫 CPU
         let content = kind == .cpu && gpuItem != nil ? plainCPUOnly : menuBarContent(kind)
-        // 提示框不跟著比對鍵：滑鼠停著時跳過的更新，移開後下一次就補上（文字沒變不會重設）
-        button.setToolTipUnlessHovered(content.tooltip)
+        // 提示框不跟著比對鍵：文字每次都更新，提示框開著時立刻換上新的數值
+        button.setLiveToolTip(content.tooltip)
         guard content.key != lastKeys[kind] else { return }
         lastKeys[kind] = content.key
         apply(content.image(), to: item)
@@ -276,7 +276,7 @@ final class ModuleCoordinator: NSObject, NSPopoverDelegate {
 
     private func renderGPU(_ item: NSStatusItem) {
         let g = cpu.gpu.map(ByteFormat.percent) ?? "—"
-        item.button?.setToolTipUnlessHovered("GPU \(g)")
+        item.button?.setLiveToolTip("GPU \(g)")
         guard g != lastGPUKey else { return }
         lastGPUKey = g
         apply(MonitorMenuBarRenderer.columns([("GPU", g, nil)], valueTemplate: MonitorMenuBarRenderer.plainTemplate), to: item)

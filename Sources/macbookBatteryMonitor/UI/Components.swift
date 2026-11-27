@@ -65,16 +65,25 @@ extension PowerState {
     }
 }
 
+extension Color {
+    /// 卡片底色。面板是半透明的 popover，淺色時後面有深色視窗會把底染灰，再疊一層淡黑文字就落在灰底上，
+    /// 所以淺色改用系統的實色卡片底（白色）；深色維持原本的淡白
+    static func cardFill(_ scheme: ColorScheme) -> Color {
+        scheme == .light ? Color(nsColor: .controlBackgroundColor) : Color.primary.opacity(0.045)
+    }
+}
+
 struct Card<Content: View>: View {
     /// 填滿父層給的高度（下方分頁用，切換時高度才不會跳）
     var expand = false
     @ViewBuilder var content: Content
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         content
             .padding(12)
             .frame(maxWidth: .infinity, maxHeight: expand ? .infinity : nil, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.045)))
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.cardFill(colorScheme)))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
     }
 }

@@ -359,6 +359,7 @@ private struct QuickTile: View {
     let on: Bool
     let tint: Color
     let action: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
@@ -379,7 +380,7 @@ private struct QuickTile: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(on ? AnyShapeStyle(tint.gradient) : AnyShapeStyle(Color.primary.opacity(0.045))))
+                .fill(on ? AnyShapeStyle(tint.gradient) : AnyShapeStyle(Color.cardFill(colorScheme))))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(on ? 0 : 0.07)))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }

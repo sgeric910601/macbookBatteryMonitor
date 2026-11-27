@@ -10,6 +10,13 @@ struct AdapterInfo: Codable, Equatable {
     var manufacturer: String?
     var model: String?
     var connection: String?
+    /// 充電器支援的電壓檔位（AdapterDetails 的 UsbHvcMenu），舊快照沒有這欄
+    var levels: [Level]?
+
+    struct Level: Codable, Equatable {
+        var voltage_mV: Int
+        var current_mA: Int
+    }
 
     static func parse(_ details: [String: Any]) -> AdapterInfo {
         func positive(_ key: String) -> Int? {
@@ -21,15 +28,36 @@ struct AdapterInfo: Codable, Equatable {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        func productName(_ value: String?) -> String? {
-            guard let value else { return nil }
-            let generic = ["pd charger", "usb pd charger", "usb-c charger", "charger"]
-            return generic.contains(value.lowercased()) ? nil : value
-        }
         return AdapterInfo(watts: positive("Watts"), voltage_mV: positive("AdapterVoltage") ?? positive("Voltage"),
-            current_mA: positive("Current"), name: productName(text("Name")) ?? productName(text("Description")),
-            manufacturer: text("Manufacturer"), model: text("Model"))
+            current_mA: positive("Current"), name: text("Name") ?? text("Description"),
+            manufacturer: text("Manufacturer"), model: text("Model"), levels: levels(details["UsbHvcMenu"]))
     }
+
+    private static func levels(_ raw: Any?) -> [Level]? {
+        guard let items = raw as? [[String: Any]] else { return nil }
+        let levels = items.compactMap { item -> Level? in
+            guard let v = (item["MaxVoltage"] as? NSNumber)?.intValue, v > 0,
+                  let a = (item["MaxCurrent"] as? NSNumber)?.intValue, a > 0 else { return nil }
+            return Level(voltage_mV: v, current_mA: a)
+        }
+        return levels.isEmpty ? nil : levels.sorted { $0.voltage_mV < $1.voltage_mV }
+    }
+
+    /// 支援檔位，電流相同的電壓合併成一組：["5／9／15 V 3 A", "20 V 2.25 A"]。
+    /// 相差 50 mA 內算相同、顯示取到 0.05 A：經 MagSafe 接上時每檔會少 10～40 mA（2.96、2.98 A…）
+    var levelGroups: [String] {
+        guard let levels else { return [] }
+        var groups: [(volts: [String], current_mA: Int)] = []
+        for level in levels {
+            let volts = String(format: "%g", Double(level.voltage_mV) / 1000)
+            if let last = groups.last, abs(last.current_mA - level.current_mA) <= 50 {
+                groups[groups.count - 1].volts.append(volts)
+                groups[groups.count - 1].current_mA = max(last.current_mA, level.current_mA)
+            } else { groups.append(([volts], level.current_mA)) }
+        }
+        return groups.map { "\($0.volts.joined(separator: "／")) V \(String(format: "%g", Double(($0.current_mA + 25) / 50 * 50) / 1000)) A" }
+    }
+    var levelSummary: String? { levelGroups.isEmpty ? nil : levelGroups.joined(separator: "、") }
     var specification: String? {
         guard let v = voltage_mV, let a = current_mA, v > 0, a > 0 else { return nil }
         return String(format: "%g V · %g A", Double(v) / 1000, Double(a) / 1000)

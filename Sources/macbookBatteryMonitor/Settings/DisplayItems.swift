@@ -35,6 +35,10 @@ enum DetailField: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// 數字已在電力流向、頂部或充電器規格顯示：全新安裝預設隱藏，仍可在顯示項目打開
+    static let hiddenOnFreshInstall: Set<DetailField> = [.batteryPower, .systemPower, .systemEstimate,
+                                                         .adapter, .adapterVoltage, .adapterCurrent]
+
     /// 可以顯示的欄位：主面板有充電上限滑桿時，上限只顯示在滑桿上，不列在詳細資訊
     static func available(limitSlider: Bool) -> [DetailField] {
         guard limitSlider else { return allCases }

@@ -65,7 +65,7 @@ struct HistoryChartView: View {
                 .chartXAxis {
                     AxisMarks(values: axisDates(domain)) { _ in
                         AxisGridLine()
-                        AxisValueLabel(format: xFormat)
+                        AxisValueLabel(format: xFormat, anchor: .top)
                     }
                 }
                 .padding(.trailing, 10)
@@ -111,7 +111,7 @@ struct HistoryChartView: View {
             if showsTime {
                 AxisMarks(values: axisDates(domain)) { _ in
                     AxisGridLine()
-                    AxisValueLabel(format: xFormat)
+                    AxisValueLabel(format: xFormat, anchor: .top)
                 }
             }
         }

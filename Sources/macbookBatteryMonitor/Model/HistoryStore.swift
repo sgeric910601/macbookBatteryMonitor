@@ -125,6 +125,10 @@ final class HistoryStore {
 
     /// 取指定時間範圍的資料並降採樣到 maxPoints 以內
     func points(range: TimeInterval, maxPoints: Int = 240, now: Date = Date()) -> [ChartPoint] {
+        Self.points(samples, range: range, maxPoints: maxPoints, now: now)
+    }
+
+    nonisolated static func points(_ samples: [HistorySample], range: TimeInterval, maxPoints: Int = 240, now: Date) -> [ChartPoint] {
         let start = now.addingTimeInterval(-range)
         let slice = samples.filter { $0.t >= start }
         guard !slice.isEmpty else { return [] }
@@ -136,6 +140,9 @@ final class HistoryStore {
         var segment = 0
         var wattsSegment = 0
         var previous: ChartPoint?
+        // 耗電圖看的是真正沒資料的時間：上一點最後一筆到這點第一筆，或上一點內部的空白（7 天的圖一點合併約 42 分鐘）
+        var previousEnd: Date?
+        var previousHadGap = false
         var i = 0
         while i < slice.count {
             let chunk = slice[i..<min(i + bucket, slice.count)]
@@ -145,7 +152,7 @@ final class HistoryStore {
             let watts = wattValues.isEmpty ? nil : wattValues.reduce(0, +) / Double(wattValues.count)
             let plugged = chunk.contains { $0.plugged }
             if let p = previous {
-                if watts == nil || p.watts == nil || t.timeIntervalSince(p.t) > 600 {
+                if watts == nil || p.watts == nil || previousHadGap || t.timeIntervalSince(previousEnd ?? p.t) > 600 {
                     wattsSegment += 1
                 }
                 if t.timeIntervalSince(p.t) > gapLimit {
@@ -161,6 +168,8 @@ final class HistoryStore {
                                    segment: segment, wattsSegment: wattsSegment)
             out.append(point)
             previous = point
+            previousEnd = chunk[chunk.index(before: chunk.endIndex)].t
+            previousHadGap = zip(chunk, chunk.dropFirst()).contains { $1.t.timeIntervalSince($0.t) > 600 }
             i += bucket
         }
         return out

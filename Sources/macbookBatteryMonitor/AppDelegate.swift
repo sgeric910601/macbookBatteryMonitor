@@ -273,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         func state(_ label: String) {
             let policy = NSApp.activationPolicy() == .regular ? "Dock" : "只在選單列"
             print("selftest: \(label)：設定視窗 \(settingsWindow.frame.map { "\(Int($0.width))×\(Int($0.height))" } ?? "關閉")、\(policy)、"
-                  + "分類 \(ui.settingsSection.title)、面板 \(popover?.isShown == true ? "開著" : "關著")、面板取樣 \(store.panelVisible ? "進行中" : "停止")")
+                  + "分類 \(settingsWindow.pageTitle)、面板 \(popover?.isShown == true ? "開著" : "關著")、面板取樣 \(store.panelVisible ? "進行中" : "停止")")
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.showPopover(page: .main)
@@ -283,13 +283,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.ui.openSettings(.update)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { state("從面板打開") }
-        for (index, section) in SettingsSection.allCases.enumerated() {
+        for (index, page) in SettingsV2Page.allCases.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 7 + Double(index)) { [weak self] in
-                self?.ui.settingsSection = section
+                self?.settingsWindow.show(page: page)
                 state("切換")
             }
         }
-        let end = 8 + Double(SettingsSection.allCases.count)
+        let end = 8 + Double(SettingsV2Page.allCases.count)
         DispatchQueue.main.asyncAfter(deadline: .now() + end) { [weak self] in
             self?.settingsWindow.close()
         }

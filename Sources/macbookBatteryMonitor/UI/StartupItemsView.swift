@@ -1,6 +1,27 @@
 import AppKit
 import SwiftUI
 
+/// 登入項目要先在功能管理啟用才讀取（讀取會要求「自動化」權限）：沒啟用時只顯示說明和啟用按鈕
+struct StartupItemsGate: View {
+    let settings: AppSettings
+    let manager: StartupItemsManager
+
+    var body: some View {
+        if settings.isInstalled(.startupItems) {
+            StartupItemsView(manager: manager)
+        } else {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("尚未啟用登入項目管理").font(.headline)
+                    Text("啟用後才會讀取登入時自動啟動的項目，並要求允許「自動化」控制 System Events；不啟用就不會讀取任何東西。")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("啟用登入項目管理") { settings.setInstalled(.startupItems, true) }
+                }
+            }
+        }
+    }
+}
+
 /// 設定視窗「登入項目」分頁。要在功能管理啟用「登入項目管理」才出現（讀取會要求「自動化」權限），打開這頁時才讀取
 struct StartupItemsView: View {
     let manager: StartupItemsManager
@@ -122,7 +143,7 @@ struct StartupItemsView: View {
                 .buttonStyle(.borderless).help("詳細資訊")
             if item.canToggle {
                 Toggle("", isOn: Binding(get: { item.enabled }, set: { pendingToggle = (item, $0) }))
-                    .labelsHidden().toggleStyle(.switch)
+                    .labelsHidden().toggleStyle(SettingsSwitchStyle())
             }
             if item.canRemove {
                 Button { pendingRemoval = item } label: { Image(systemName: "minus.circle") }

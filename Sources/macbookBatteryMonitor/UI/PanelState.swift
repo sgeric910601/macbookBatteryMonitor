@@ -58,8 +58,6 @@ final class PanelState {
     var pageHeights: [PanelPage: CGFloat] = [:]
     /// macOS 關閉了這個 App 的通知（設定視窗打開時檢查）
     var notificationsBlocked = false
-    /// 設定視窗左邊選的分類
-    var settingsSection: SettingsSection = .general
     /// 打開設定視窗（由 AppDelegate 提供）；nil 時維持上次的分類
     var openSettings: (SettingsSection?) -> Void = { _ in }
     /// 有沒有「輔助使用」權限（分開設定捲動方向要用）

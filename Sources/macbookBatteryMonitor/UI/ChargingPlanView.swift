@@ -8,6 +8,8 @@ struct ChargingPlanView: View {
     let ui: PanelState
     /// 放在設定視窗裡：不要返回按鈕與外觀（設定視窗另有「充電夥伴」），建立排程後留在原地
     var embedded = false
+    /// 新版設定視窗：版面較寬，快速設定排成三格、每週排程的時間與按鈕排成一列
+    @Environment(\.settingsV2Tint) private var v2Tint
 
     /// 星期一排到星期日（Calendar 的 weekday：1 = 星期日）
     private let weekdays = [(2, "一"), (3, "二"), (4, "三"), (5, "四"), (6, "五"), (7, "六"), (1, "日")]
@@ -39,11 +41,9 @@ struct ChargingPlanView: View {
             if !embedded {
                 HStack(spacing: 8) {
                     Text(supported ? "滑桿旁顯示" : "面板上方顯示").font(.callout)
-                    Picker("外觀", selection: Binding(get: { settings.chargingAppearance },
-                                                    set: { settings.selectAppearance($0) })) {
-                        ForEach(ChargingAppearance.allCases) { Text($0.shortTitle).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
+                    SettingsPicker("外觀", selection: Binding(get: { settings.chargingAppearance },
+                                                            set: { settings.selectAppearance($0) }),
+                                   options: ChargingAppearance.allCases.map { ($0, $0.shortTitle) }, segmented: true, hidesTitle: true)
                     .labelsHidden()
                 }
                 if settings.chargingAppearance == .customPhoto {
@@ -117,7 +117,58 @@ struct ChargingPlanView: View {
 
     // MARK: 快速設定
 
-    private var quickCard: some View {
+    @ViewBuilder private var quickCard: some View {
+        if v2Tint != nil { wideQuickCard } else { narrowQuickCard }
+    }
+
+    /// 設定視窗（新版）：三個時間各一格，預估寫在格子裡；自訂時間與按鈕同一列
+    private var wideQuickCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                CardTitle(controller.plan == nil ? "多久後要用" : "改成新的排程", systemImage: "timer")
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach([1, 2, 3], id: \.self) { hours in
+                        Button {
+                            store.startChargingPlan(.once(Date().addingTimeInterval(Double(hours) * 3600)))
+                            planStarted()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("\(hours) 小時後", systemImage: "clock")
+                                    .font(.headline)
+                                forecastLabel(until: Date().addingTimeInterval(Double(hours) * 3600))
+                                    .multilineTextAlignment(.leading)
+                            }
+                            // 三格同高（以最高的一格為準），內容貼齊上緣，不另外撐出空白
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06)))
+                            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+                            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(hours) 小時後充好")
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                HStack(spacing: 10) {
+                    Text("指定時間")
+                    V2DateTimePicker(title: "指定時間", selection: ui.binding(\.chargingCustomDeadline))
+                    Spacer(minLength: 8)
+                    Button("在這個時間前充好") {
+                        store.startChargingPlan(.once(ui.chargingCustomDeadline))
+                        planStarted()
+                    }
+                    .lineLimit(1).fixedSize()
+                    .disabled(ui.chargingCustomDeadline.timeIntervalSinceNow < 60)
+                }
+                forecastLabel(until: ui.chargingCustomDeadline)
+            }
+        }
+    }
+
+    private var narrowQuickCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 CardTitle(controller.plan == nil ? "多久後要用" : "改成新的排程", systemImage: "timer")
@@ -190,8 +241,8 @@ struct ChargingPlanView: View {
                         } label: {
                             Text(label)
                                 .font(.caption.weight(.semibold))
-                                .frame(width: 26, height: 22)
-                                .background(selected ? Color.accentColor : Color.secondary.opacity(0.13),
+                                .frame(width: v2Tint == nil ? 26 : 38, height: v2Tint == nil ? 22 : 30)
+                                .background(selected ? (v2Tint == nil ? Color.accentColor : V2Theme.on) : Color.secondary.opacity(0.13),
                                             in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 .foregroundStyle(selected ? Color.white : Color.secondary)
                         }
@@ -200,19 +251,33 @@ struct ChargingPlanView: View {
                         .accessibilityValue(selected ? "已選取" : "未選取")
                     }
                 }
-                DatePicker("完成時間", selection: ui.binding(\.chargingWeeklyTime), displayedComponents: .hourAndMinute)
-                Button("儲存每週排程") {
-                    let parts = Calendar.current.dateComponents([.hour, .minute], from: ui.chargingWeeklyTime)
-                    store.startChargingPlan(.weekly(weekdays: ui.chargingWeekdays,
-                                                    minuteOfDay: (parts.hour ?? 8) * 60 + (parts.minute ?? 0)))
-                    planStarted()
+                if v2Tint != nil {
+                    HStack(spacing: 10) {
+                        Text("完成時間")
+                        V2TimePicker(title: "完成時間", selection: ui.binding(\.chargingWeeklyTime))
+                        Spacer(minLength: 8)
+                        saveWeeklyButton
+                    }
+                } else {
+                    DatePicker("完成時間", selection: ui.binding(\.chargingWeeklyTime), displayedComponents: .hourAndMinute)
+                    saveWeeklyButton
                 }
-                .disabled(ui.chargingWeekdays.isEmpty)
                 Text("例如上班日 8:00 前充到完成目標，其他時間維持保養上限。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var saveWeeklyButton: some View {
+        Button("儲存每週排程") {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: ui.chargingWeeklyTime)
+            store.startChargingPlan(.weekly(weekdays: ui.chargingWeekdays,
+                                            minuteOfDay: (parts.hour ?? 8) * 60 + (parts.minute ?? 0)))
+            planStarted()
+        }
+        .lineLimit(1).fixedSize()
+        .disabled(ui.chargingWeekdays.isEmpty)
     }
 
     // MARK: 目標與睡眠策略
@@ -221,20 +286,17 @@ struct ChargingPlanView: View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 CardTitle("目標與保養上限", systemImage: "slider.horizontal.3")
-                Picker("完成目標", selection: targetBinding) {
-                    Text("原本的上限（\(originalLimit)%）").tag(AppSettings.originalLimitTarget)
-                    ForEach(options, id: \.self) { Text("\($0)%").tag($0) }
-                }
-                Picker("保養上限", selection: holdBinding) {
-                    ForEach(options.filter { $0 <= store.chargingTarget }, id: \.self) { Text("\($0)%").tag($0) }
-                }
+                SettingsPicker("完成目標", selection: targetBinding,
+                               options: [(AppSettings.originalLimitTarget, "原本的上限（\(originalLimit)%）")] + options.map { ($0, "\($0)%") })
+                SettingsPicker("保養上限", selection: holdBinding,
+                               options: options.filter { $0 <= store.chargingTarget }.map { ($0, "\($0)%") })
                 Text("套用到之後建立的排程。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Divider()
-                Picker("睡眠時", selection: strategyBinding) {
-                    ForEach(ChargingSleepStrategy.allCases) { Text($0.title).tag($0) }
-                }
+                SettingsPicker("睡眠時", selection: strategyBinding,
+                               options: ChargingSleepStrategy.allCases.map { ($0, $0.title) },
+                               symbol: { $0 == .preciseWake ? "alarm" : "moon.zzz" })
                 Text(settings.chargingSleepStrategy == .preciseWake
                      ? "時間到時叫醒 Mac 開始充電；需要輸入一次管理員密碼。"
                      : "睡著前先提高上限，在睡眠中充好，可能會比預定時間早充滿。")

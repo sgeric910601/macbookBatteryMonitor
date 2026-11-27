@@ -14,7 +14,7 @@ struct FeatureManagerView: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
-                Text("只啟用會用到的功能。停用的功能完全不運作（不攔截按鍵或滑鼠、不監聽視窗），也從側邊欄拿掉；原本的設定都會保留，再啟用就回來。這裡的開關決定功能要不要出現，功能裡面的細項在它自己的設定頁調整。")
+                Text("只啟用會用到的功能。停用的功能完全不運作（不攔截按鍵或滑鼠、不監聽視窗）；原本的設定都會保留，再啟用就回來。這裡的開關和各功能頁卡片標題的開關是同一個，功能裡面的細項在它自己的設定頁調整。")
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
                 Text("已啟用 \(settings.installedFeatures.count)／\(ExtensionFeature.allCases.count) 項")
@@ -79,7 +79,7 @@ struct FeatureManagerView: View {
             }
             Spacer()
             Toggle("啟用", isOn: Binding(get: { settings.isInstalled(feature) }, set: { settings.setInstalled(feature, $0) }))
-                .toggleStyle(.switch)
+                .toggleStyle(SettingsSwitchStyle())
                 .labelsHidden()
                 .disabled(unsupported && !settings.isInstalled(feature))
                 .accessibilityLabel("啟用\(feature.title)")

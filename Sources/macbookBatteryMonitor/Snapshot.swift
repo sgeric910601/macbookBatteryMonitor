@@ -120,18 +120,19 @@ enum SnapshotCommand {
     /// 設定視窗的每個分類；一般另外畫一張 macOS 關閉了 App 通知時的提醒
     private static func renderSettingsWindow(store: BatteryStore, ui: PanelState, appearance: NSAppearance.Name,
                                              directory dir: URL, suffix: String) {
-        var pages = SettingsSection.allCases.map { ($0, $0.rawValue, false) }
+        let state = SettingsV2State()
+        let startupItems = StartupItemsManager()
+        var pages = SettingsV2Page.allCases.map { ($0, $0.rawValue, false) }
         pages.append((.general, "general-notifications-off", true))
-        for (section, name, blocked) in pages {
-            ui.settingsSection = section
+        for (page, name, blocked) in pages {
+            state.page = page
             ui.notificationsBlocked = blocked
-            let view = SettingsWindowView(store: store, settings: .shared, ui: ui)
-                .frame(width: 720, height: section == .charging ? 1500 : 780)
+            let view = SettingsV2WindowView(store: store, settings: .shared, ui: ui, state: state, startupItems: startupItems)
+                .frame(width: 720, height: page == .charging ? 1500 : 780)
                 .background(Color(nsColor: .windowBackgroundColor))
                 .environment(\.colorScheme, appearance == .aqua ? .light : .dark)
             render(view, appearance: appearance, settle: 0.4, to: dir.appendingPathComponent("settings-\(name)-\(suffix).png"))
         }
-        ui.settingsSection = .general
         ui.notificationsBlocked = false
     }
 
@@ -249,6 +250,7 @@ enum SnapshotCommand {
             let ui = PanelState()
             ui.confirmingBetaInstall = confirming
             let view = UpdateCard(updater: updater, settings: .shared, ui: ui)
+                .environment(\.settingsV2Tint, SettingsV2Page.general.tint)
                 .padding(14)
                 .frame(width: 380)
                 .background(Color(nsColor: .windowBackgroundColor))

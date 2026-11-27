@@ -10,6 +10,10 @@ struct MonitorPanel: View {
     let disk: DiskMonitor
     let network: NetworkMonitor
     var memoryDiskMerged = false
+    /// 只看 GPU（不加底色時選單列的 GPU 圖示）
+    var gpuOnly = false
+    /// GPU 有自己的圖示和面板：CPU 面板不再顯示 GPU
+    var separateGPU = false
     /// 設定裡打開了網路測速才顯示測速卡片
     var showsSpeedTest = false
     var onSettings: () -> Void
@@ -21,7 +25,8 @@ struct MonitorPanel: View {
                 ScrollView(.vertical) {
                     VStack(spacing: 10) {
                         switch kind {
-                        case .cpu: CPUPanel(cpu: cpu)
+                        case .cpu where gpuOnly: GPUPanel(cpu: cpu)
+                        case .cpu: CPUPanel(cpu: cpu, showsGPU: !separateGPU)
                         case .memory:
                             MemoryPanel(memory: memory)
                             if memoryDiskMerged { DiskPanel(disk: disk) }
@@ -304,6 +309,7 @@ private struct TopList: View {
 
 private struct CPUPanel: View {
     let cpu: CPUMonitor
+    var showsGPU = true
 
     var body: some View {
         VStack(spacing: 10) {
@@ -311,7 +317,7 @@ private struct CPUPanel: View {
                         value: cpu.usage.map { ByteFormat.percent($0.total) } ?? "—",
                         detail: cpu.usage.map { "使用者 \(ByteFormat.percent($0.user))・系統 \(ByteFormat.percent($0.system))" } ?? "計算中…")
             Card {
-                MonitorChart(points: cpu.history.points, a: ("CPU", .green), b: ("GPU", .orange), percent: true)
+                MonitorChart(points: cpu.history.points, a: ("CPU", .green), b: showsGPU ? ("GPU", .orange) : nil, percent: true)
             }
             Card {
                 VStack(alignment: .leading, spacing: 8) {
@@ -327,8 +333,10 @@ private struct CPUPanel: View {
             }
             Card {
                 VStack(alignment: .leading, spacing: 6) {
-                    InfoRow("GPU 使用率", cpu.gpu.map(ByteFormat.percent) ?? "—")
-                    InfoRow("GPU 記憶體", cpu.gpuMemory.map(ByteFormat.memory) ?? "—")
+                    if showsGPU {
+                        InfoRow("GPU 使用率", cpu.gpu.map(ByteFormat.percent) ?? "—")
+                        InfoRow("GPU 記憶體", cpu.gpuMemory.map(ByteFormat.memory) ?? "—")
+                    }
                     InfoRow("平均負載（1／5／15 分）", cpu.load.isEmpty ? "—" : cpu.load.map { String(format: "%.2f", $0) }.joined(separator: "／"))
                 }
             }
@@ -337,6 +345,37 @@ private struct CPUPanel: View {
             }
             TopList(title: "CPU 使用率最高的 App", processes: cpu.topProcesses, loaded: cpu.topLoaded) {
                 String(format: "%.1f%%", $0)
+            }
+        }
+    }
+}
+
+/// 只看 GPU（不加底色時選單列的 GPU 圖示）：GPU 的歷史、詳細資料、溫度
+private struct GPUPanel: View {
+    let cpu: CPUMonitor
+
+    var body: some View {
+        VStack(spacing: 10) {
+            PanelHeader(symbol: "cpu.fill", title: "GPU",
+                        value: cpu.gpu.map(ByteFormat.percent) ?? "—",
+                        detail: ChipInfo.shortName)
+            Card {
+                // 歷史紀錄裡第二條是 GPU：只畫 GPU 這條
+                MonitorChart(points: cpu.history.points.map { MonitorPoint(id: $0.id, t: $0.t, a: $0.b, b: 0) },
+                             a: ("GPU", .orange), b: nil, percent: true)
+            }
+            Card {
+                VStack(alignment: .leading, spacing: 6) {
+                    InfoRow("晶片", ChipInfo.shortName)
+                    if let cores = GPUReader.coreCount { InfoRow("GPU 核心", "\(cores)") }
+                    InfoRow("使用率", cpu.gpu.map(ByteFormat.percent) ?? "—")
+                    if cpu.gpuRenderer != nil { InfoRow("Renderer 使用率", cpu.gpuRenderer.map(ByteFormat.percent) ?? "—") }
+                    if cpu.gpuTiler != nil { InfoRow("Tiler 使用率", cpu.gpuTiler.map(ByteFormat.percent) ?? "—") }
+                    InfoRow("GPU 記憶體", cpu.gpuMemory.map(ByteFormat.memory) ?? "—")
+                }
+            }
+            if !cpu.fans.isEmpty || !cpu.temperatures.isEmpty {
+                ThermalCard(fans: cpu.fans, temperatures: cpu.temperatures)
             }
         }
     }

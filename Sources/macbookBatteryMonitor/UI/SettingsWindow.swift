@@ -196,7 +196,7 @@ struct SettingsWindowView: View {
                     }
                     .padding(.bottom, 4)
                     // 通知可能被關掉，所以每一頁都顯示：使用者才知道按鍵與滑鼠功能為什麼沒有作用
-                    if ui.inputPaused {
+                    if ui.inputPaused, ExtensionFeature.blockingTap.contains(where: settings.isInstalled) {
                         Label("無法確認「輔助使用」權限，按鍵與滑鼠相關功能已暫停。請到系統設定 → 隱私權與安全性 →「輔助使用」（macOS 27 起叫「裝置控制和資料取用」）確認已允許\(AppEdition.appName)；權限恢復後會自動恢復，或重新開啟 App。",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.callout)

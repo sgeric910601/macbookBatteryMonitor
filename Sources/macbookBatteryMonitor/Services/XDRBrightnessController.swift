@@ -41,6 +41,8 @@ final class XDRBrightnessController {
     @ObservationIgnored private var safetyTimer: Timer?
     private let hud = XDRBrightnessHUD()
     @ObservationIgnored private var sampleTask: Task<Void, Never>?
+    /// 取樣進行中又有人要新的（例如按亮度鍵剛把系統亮度推到頂）：這次結束後馬上再取一次，不用等下一秒
+    @ObservationIgnored private var snapshotPending = false
     @ObservationIgnored private var keySnapshot = XDRKeySnapshot(nativeBrightness: nil, allowed: false, sampledAt: 0)
     @ObservationIgnored private var keyGain = 1.0
     @ObservationIgnored private var cachedKeyAllowed = false
@@ -48,6 +50,10 @@ final class XDRBrightnessController {
     @ObservationIgnored private var displaySignature: String?
     @ObservationIgnored private var lifecycleSuspended = false
     @ObservationIgnored private var capturePaused = false
+    /// 截圖程式最近一次啟動（或按下截圖快捷鍵）的時間。截圖程式截完後常會在背景留好幾分鐘，
+    /// 所以只看「剛啟動」：只擋按下快捷鍵到選取框出現之間的空檔，之後交給 captureUIOnScreen 判斷
+    @ObservationIgnored private var captureStartedAt = -Double.infinity
+    private var captureRecent: Bool { ProcessInfo.processInfo.systemUptime - captureStartedAt < 1.5 }
     @ObservationIgnored private var captureMonitor: Any?
     @ObservationIgnored private var localCaptureMonitor: Any?
     @ObservationIgnored private var nativeRefreshTask: Task<Void, Never>?
@@ -88,9 +94,7 @@ final class XDRBrightnessController {
         lifecycleSuspended = false
         capturePaused = false
         refreshDisplayLimits()
-        requestSnapshot()
         updateKeyMonitoring()
-        if let screen { hud.prepareAlignment(on: screen) }
         Self.log.notice("Automatic XDR: \(self.automaticActivation, privacy: .public), keys: \(self.keysStatus, privacy: .public)")
         observers.append(DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
@@ -118,6 +122,7 @@ final class XDRBrightnessController {
             MainActor.assumeIsolated {
                 guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                       Self.isCaptureApplication(app) else { return }
+                self?.captureStartedAt = ProcessInfo.processInfo.systemUptime
                 self?.pauseForCapture()
             }
         })
@@ -128,9 +133,13 @@ final class XDRBrightnessController {
         updateSafetyTimer()
     }
 
-    /// 每秒的檢查只在有支援的螢幕時才跑；沒有支援的 Mac（或闔上筆電只接外接螢幕時）不在背景查詢
+    /// 需要背景檢查與取樣的時候：增亮中、正在啟動，或亮度鍵攔截真的在運作（要用最新的快照判斷）。
+    /// 只是加入功能、從滑桿手動開啟、或沒有輔助使用權限建不起攔截時，平常不檢查，按下開啟時才讀一次
+    private var needsMonitoring: Bool { enabled || preparing || keys?.isRunning == true }
+
+    /// 每秒的檢查只在有支援的螢幕、而且需要時才跑；沒有支援的 Mac（或闔上筆電只接外接螢幕時）不在背景查詢
     private func updateSafetyTimer() {
-        guard started, supported else {
+        guard started, supported, needsMonitoring else {
             safetyTimer?.invalidate(); safetyTimer = nil
             return
         }
@@ -146,6 +155,7 @@ final class XDRBrightnessController {
         guard started else { return }
         started = false
         sampleTask?.cancel(); sampleTask = nil
+        snapshotPending = false
         nativeRefreshTask?.cancel(); nativeRefreshTask = nil
         safetyTimer?.invalidate(); safetyTimer = nil
         disable(reason: "功能未加入")
@@ -168,7 +178,6 @@ final class XDRBrightnessController {
     private func resume() {
         guard started else { return }
         lifecycleSuspended = false
-        requestSnapshot()
         updateKeyMonitoring()
     }
 
@@ -183,6 +192,11 @@ final class XDRBrightnessController {
     }
 
     private func updateKeyMonitoring() {
+        // 自動啟用、增亮狀態改變時，每秒檢查與取樣跟著開始或停止
+        defer {
+            updateSafetyTimer()
+            requestSnapshot()
+        }
         guard inputAvailable, !lifecycleSuspended, started, supported, automaticActivation || enabled else {
             keys?.stop()
             keys = nil
@@ -213,15 +227,18 @@ final class XDRBrightnessController {
         guard started else { return }
         refreshDisplayLimits()
         updateSafetyTimer()
-        requestSnapshot()
         updateKeyMonitoring()
         reconcileActiveState()
         cachedKeyAllowed = unavailableReason == nil
     }
 
     private func requestSnapshot() {
-        // 沒有支援的螢幕時不取樣：亮度鍵攔截也不會建立，用不到
-        guard started, supported, sampleTask == nil else { return }
+        // 沒有支援的螢幕、或不需要背景檢查時不取樣（手動開啟時在 enable 裡同步讀一次）
+        guard started, supported, needsMonitoring else { return }
+        guard sampleTask == nil else {
+            snapshotPending = true
+            return
+        }
         let id = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
         sampleTask = Task { [weak self] in
             let result = await Task.detached(priority: .utility) { XDRSystemQuery.snapshot(display: id) }.value
@@ -230,6 +247,10 @@ final class XDRBrightnessController {
             keySnapshot = result
             cachedKeyAllowed = unavailableReason == nil
             reconcileActiveState()
+            if snapshotPending {
+                snapshotPending = false
+                requestSnapshot()
+            }
         }
     }
 
@@ -242,6 +263,9 @@ final class XDRBrightnessController {
             disable(reason: "顯示器已變更，已還原亮度")
         } else if screen?.frame != screenFrame {
             disable(reason: "顯示尺寸已變更，已還原亮度")
+        } else if Self.captureUIOnScreen() {
+            // 截圖快捷鍵被系統攔走、截圖程式又早就在背景時收不到任何事件：每秒檢查與調整亮度時看畫面上有沒有選取框
+            pauseForCapture()
         }
     }
 
@@ -261,10 +285,14 @@ final class XDRBrightnessController {
             status = "僅在正式打包 App 中開啟"; return
         }
         refreshDisplayLimits()
+        // 平常不取樣時快照是舊的：按下開啟這一刻同步讀一次（只查鎖定狀態與目前亮度，很快）
+        if ProcessInfo.processInfo.systemUptime - keySnapshot.sampledAt > 2.5 {
+            keySnapshot = XDRSystemQuery.snapshot(display: screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID)
+            cachedKeyAllowed = unavailableReason == nil
+        }
         if let reason = unavailableReason { status = reason; return }
         let conflicts = ["fyi.lunar.Lunar", "com.niklasr22.BrightIntosh", "me.guillaumeb.CosmicNitor"]
-        if NSWorkspace.shared.runningApplications.contains(where: Self.isCaptureApplication) {
-            capturePaused = true
+        if captureRecent || Self.captureUIOnScreen() {
             status = "請先完成截圖／錄影，再啟用 XDR"
             return
         }
@@ -329,6 +357,8 @@ final class XDRBrightnessController {
 
     /// 會擋輸入的回呼只讀取記憶體快取；系統查詢、視窗與呈現都排到回呼結束後。
     private func handleKey(up: Bool) -> Bool {
+        // 截圖／錄影時暫停過：過了空檔再按亮度鍵就解除；真的開啟前 enable() 還會確認截圖程式沒有在畫面上
+        if capturePaused, !captureRecent { capturePaused = false }
         guard started, inputAvailable, !lifecycleSuspended, !capturePaused, !preparing else { return false }
         let allowed = cachedKeyAllowed && keySnapshot.allowed
         let snapshot = XDRKeySnapshot(nativeBrightness: keySnapshot.nativeBrightness,
@@ -373,6 +403,15 @@ final class XDRBrightnessController {
         }
     }
 
+    /// 截圖程式有畫面上的視窗（選取框、錄影工具列、截完的縮圖）：正在截圖或錄影。
+    /// 截完後只留在背景、沒有視窗的不算（它常會留好幾分鐘）
+    private static func captureUIOnScreen() -> Bool {
+        let pids = Set(NSWorkspace.shared.runningApplications.filter(isCaptureApplication).map(\.processIdentifier))
+        guard !pids.isEmpty else { return false }
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        return windows.contains { pids.contains(($0[kCGWindowOwnerPID as String] as? pid_t) ?? -1) }
+    }
+
     private static func isCaptureApplication(_ app: NSRunningApplication) -> Bool {
         let identifier = app.bundleIdentifier ?? ""
         return identifier == "com.apple.screencaptureui" || identifier == "com.apple.screenshot"
@@ -396,9 +435,10 @@ final class XDRBrightnessController {
     }
 
     private func pauseForCapture() {
+        captureStartedAt = ProcessInfo.processInfo.systemUptime
         guard enabled || preparing else { return }
         capturePaused = true
-        disable(reason: "截圖／錄影時已還原亮度；完成後請手動重新啟用 XDR")
+        disable(reason: "截圖／錄影時已還原亮度；完成後再按亮度鍵或重新啟用即可")
     }
 
     @discardableResult

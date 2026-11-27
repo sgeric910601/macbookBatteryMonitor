@@ -157,6 +157,10 @@ enum ExtensionFeature: String, CaseIterable, Identifiable {
     /// 更新不會讓它消失；沒用過的新功能不會自己出現，要到「功能管理」加入
     func isInstalled(stored: Bool?, switchedOn: Bool) -> Bool { stored ?? (self == .scrollDirection || self == .startupItems || switchedOn) }
 
+    /// 會建立會擋輸入的攔截（EventTapAccess.createTap）的功能：權限異常停用中，只有加入了這些才需要定時試建、顯示暫停警告
+    static let blockingTap: [ExtensionFeature] = [.windowSwitcher, .scrollDirection, .inputMethod, .quitGuard, .finderKeys,
+                                                  .greenButton, .mouseButtons, .keyboardCleaning, .xdrBrightness]
+
     /// 每個功能實際的加入狀態，寫進匯出的設定：沒存過、靠規則算出來的也寫出來
     static func installedValues(_ isInstalled: (ExtensionFeature) -> Bool) -> [String: Bool] {
         Dictionary(uniqueKeysWithValues: allCases.map { ($0.installedKey, isInstalled($0)) })

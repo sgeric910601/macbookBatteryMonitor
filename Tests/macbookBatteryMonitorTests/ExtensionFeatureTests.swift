@@ -1,6 +1,12 @@
 import Foundation
 
 struct ExtensionFeatureTests {
+    /// 會擋輸入的攔截一定要有輔助使用權限：清單裡的功能都標成需要；沒列進去的功能停用中不會定時試建
+    func testBlockingTapFeaturesNeedAccessibility() {
+        XCTAssertTrue(ExtensionFeature.blockingTap.allSatisfy(\.needsAccessibility))
+        XCTAssertTrue(!ExtensionFeature.blockingTap.contains(.quickMenu) && !ExtensionFeature.blockingTap.contains(.clipboardHistory))
+    }
+
     /// 原始值存在設定裡（加入狀態的鍵），改名會讓所有人的選擇失效；基本功能不在清單裡
     func testRawValuesAreStable() {
         XCTAssertEqual(ExtensionFeature.allCases.map(\.rawValue), ["scrollDirection", "windowSwitcher", "inputMethod", "quitGuard", "lastWindowQuit", "dockClick", "keyboardCleaning", "mouseButtons", "audioSwitch", "greenButton", "windowSnap", "finderKeys", "quickMenu", "portManager", "clipboardHistory", "xdrBrightness", "speedTest", "startupItems"])

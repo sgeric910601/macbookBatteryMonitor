@@ -164,7 +164,7 @@ final class BatteryStore {
             guard let self, self.chargingPlan.isActive else { allow(); return }
             self.evaluateChargingPlan(.willSleep, completion: allow)
         }
-        sleepGate.start()
+        syncSleepGate()
         if let plan = chargingPlan.plan {
             ChargingPlanLog.shared.write("App 啟動，繼續排程（\(plan.deadline.formatted(date: .abbreviated, time: .shortened)) 前充到 \(plan.targetPercent)%）")
         }
@@ -172,6 +172,7 @@ final class BatteryStore {
 
     /// 依目前電量與排程判斷，需要時寫入充電上限；completion 在寫入（或判斷）結束後呼叫
     func evaluateChargingPlan(_ event: ChargingPlanEvent, completion: (() -> Void)? = nil) {
+        syncSleepGate()
         // 沒有排程時每秒只做這個判斷，不讀歷史也不連線
         guard chargingPlanRunning, !previewing, chargingPlan.isActive, let input = chargingPlanInput() else {
             if chargingPlanRunning { syncChargingWake() }
@@ -189,6 +190,11 @@ final class BatteryStore {
             chargingPlan.writeFinished(target: target, success: result.success, readBack: result.readBack)
             completion?()
         }
+    }
+
+    /// 有排程時才註冊系統電源通知（睡前要先寫好上限）；沒有排程就取消
+    private func syncSleepGate() {
+        if chargingPlanRunning, chargingPlan.isActive { sleepGate.start() } else { sleepGate.stop() }
     }
 
     /// 建立排程（快速、指定時間或每週）

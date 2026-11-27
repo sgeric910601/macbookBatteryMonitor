@@ -154,7 +154,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         settings.onInputSourceFixChange = { [weak self] in self?.applyInputSourceFix(prompt: true) }
         applyInputSourceFix(prompt: false)
         settings.onXDRBrightnessChange = { [weak self] in self?.applyXDRBrightness() }
-        settings.onFeatureInstallChange = { [weak self] feature in self?.applyFeature(feature) }
+        settings.onFeatureInstallChange = { [weak self] feature in
+            self?.applyFeature(feature)
+            self?.updateTapWanted()
+        }
         settings.onQuitGuardChange = { [weak self] in self?.applyQuitGuard(prompt: true) }
         applyQuitGuard(prompt: false)
         applyQuickMenu()
@@ -188,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         })
 
         observePowerSourceChanges()
+        updateTapWanted()
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil
         )
@@ -311,6 +315,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         } else {
             controller.stop()
         }
+    }
+
+    /// 告訴 EventTapAccess 有沒有功能會用到會擋輸入的攔截：權限異常停用中、而且都不需要時，不再定時試建
+    private func updateTapWanted() {
+        EventTapAccess.shared.setWanted(ExtensionFeature.blockingTap.contains(where: settings.isInstalled))
     }
 
     private func applyFeature(_ feature: ExtensionFeature) {

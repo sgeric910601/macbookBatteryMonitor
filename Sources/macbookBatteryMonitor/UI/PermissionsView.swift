@@ -60,7 +60,8 @@ struct PermissionsView: View {
 
     private func refresh() {
         // 從清單「移除」後系統在這個行程裡仍回答有權限（#25），按鍵與滑鼠功能暫停中就不能顯示「已允許」
-        statuses[.accessibility] = EventTapAccess.shared.isLost ? .unconfirmed : ScrollDirection.trusted ? .granted : .denied
+        let paused = EventTapAccess.shared.isLost && ExtensionFeature.blockingTap.contains(where: settings.isInstalled)
+        statuses[.accessibility] = paused ? .unconfirmed : ScrollDirection.trusted ? .granted : .denied
         statuses[.screenRecording] = WindowThumbnails.hasPermission ? .granted : .denied
         statuses[.bluetooth] = BLEBatteryReader.authorized ? .granted : BLEBatteryReader.denied ? .denied : .askWhenUsed
         // 自動化的狀態要實際詢問 System Events 才知道，查詢本身可能跳出系統詢問，所以不查

@@ -11,12 +11,16 @@ final class SleepGate {
     private var port: IONotificationPortRef?
     private var notifier: io_object_t = 0
     static let timeout: TimeInterval = 5
+    /// 還沒回覆的「即將睡眠」：回覆前不能取消註冊，否則系統等不到同意
+    private var pendingReplies = 0
+    private var stopWhenAnswered = false
 
     // IOKit/IOMessage.h 的 iokit_common_msg(...)，Swift 不會匯入這些巨集
     private static let canSystemSleep: natural_t = 0xE000_0270
     private static let systemWillSleep: natural_t = 0xE000_0280
 
     func start() {
+        stopWhenAnswered = false
         guard root == 0 else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
         root = IORegisterForSystemPower(context, &port, { context, _, message, argument in
@@ -27,6 +31,22 @@ final class SleepGate {
         IONotificationPortSetDispatchQueue(port, .main)
     }
 
+    /// 沒有排程時不需要延後睡眠：取消系統電源通知
+    func stop() {
+        // 睡眠回覆還沒送出：等回覆完再取消
+        guard pendingReplies == 0 else {
+            stopWhenAnswered = true
+            return
+        }
+        guard root != 0 else { return }
+        IODeregisterForSystemPower(&notifier)
+        notifier = 0
+        if let port { IONotificationPortDestroy(port) }
+        port = nil
+        IOServiceClose(root)
+        root = 0
+    }
+
     private func handle(_ message: natural_t, _ argument: UnsafeMutableRawPointer?) {
         let id = Int(bitPattern: argument)
         switch message {
@@ -34,10 +54,17 @@ final class SleepGate {
             IOAllowPowerChange(root, id)
         case Self.systemWillSleep:
             var answered = false
+            let root = self.root
+            pendingReplies += 1
             let allow = { [weak self] in
                 guard let self, !answered else { return }
                 answered = true
-                IOAllowPowerChange(self.root, id)
+                IOAllowPowerChange(root, id)
+                pendingReplies -= 1
+                if pendingReplies == 0, stopWhenAnswered {
+                    stopWhenAnswered = false
+                    stop()
+                }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.timeout) { allow() }
             if let onWillSleep { onWillSleep { DispatchQueue.main.async { allow() } } } else { allow() }

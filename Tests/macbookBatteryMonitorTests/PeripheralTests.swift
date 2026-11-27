@@ -41,8 +41,11 @@ final class PeripheralTests {
         // 名稱裡沒有 AirPods，也能依 Product ID 顯示第 3 代的圖示
         XCTAssertEqual(devices[0].appleProductID, 0x2013)
         XCTAssertEqual(devices[0].symbol, "airpods.gen3")
+        // 型號名稱也依 Product ID
+        XCTAssertEqual(devices[0].modelName, "AirPods（第 3 代）")
         // 不是 Apple 的廠商不採用 Product ID
         XCTAssertNil(devices[1].appleProductID)
+        XCTAssertNil(devices[1].modelName)
         XCTAssertEqual(devices[1].symbol, "headphones")
         // 不認得的 Product ID 退回名稱判斷
         let unknown = PeripheralBattery(id: "x", name: "AirPods Pro", kind: .headphones, appleProductID: 0x2999)
@@ -91,6 +94,38 @@ final class PeripheralTests {
         // 門檻設為 0 表示不通知
         var silent = PeripheralAlerts()
         XCTAssertTrue(silent.evaluate([mouse]) { _ in 0 }.isEmpty)
+    }
+
+    func testPhones() {
+        // 型號代號 → 種類與機型；不認得的 iPhone 顯示通用名稱，非 Apple 型號回 nil
+        XCTAssertEqual(PeripheralParse.iPhone(model: "iPhone14,2")?.name, "iPhone 13 Pro")
+        XCTAssertEqual(PeripheralParse.iPhone(model: "iPhone99,1")?.name, "iPhone")
+        XCTAssertNil(PeripheralParse.iPhone(model: "iPad13,1"))
+        XCTAssertNil(PeripheralParse.iPhone(model: "Watch6,1"))
+        XCTAssertNil(PeripheralParse.iPhone(model: "MX Master 3"))
+        // 圖示依外型：Home 鍵、瀏海、動態島；不認得的新機用通用圖示
+        XCTAssertEqual(PeripheralParse.iPhone(model: "iPhone14,6")?.symbol, "iphone.gen1")
+        XCTAssertEqual(PeripheralParse.iPhone(model: "iPhone14,2")?.symbol, "iphone.gen2")
+        XCTAssertEqual(PeripheralParse.iPhone(model: "iPhone16,2")?.symbol, "iphone.gen3")
+        XCTAssertNil(PeripheralParse.iPhone(model: "iPhone99,1")?.symbol)
+        // 對照表的每一筆都有對應圖示
+        for model in PeripheralParse.iPhoneNames.keys { XCTAssertTrue(PeripheralParse.iPhoneSymbol(model) != nil) }
+        XCTAssertNil(PeripheralParse.iPhone(model: "Watch GT 3"))
+        XCTAssertNil(PeripheralParse.iPhone(model: "iPhone Case"))
+        // 型號字串：去掉結尾 NUL 與空白，空的視為沒有
+        XCTAssertEqual(PeripheralParse.bluetoothLEText(Data("iPhone14,2\0".utf8)), "iPhone14,2")
+        XCTAssertNil(PeripheralParse.bluetoothLEText(Data("  ".utf8)))
+        XCTAssertNil(PeripheralParse.bluetoothLEText(nil))
+        // 關掉設定時清單不含手機，其他設備照常
+        let phone = PeripheralBattery(id: "ble-1", name: "我的手機", kind: .phone, level: 65, modelName: "iPhone 13 Pro",
+                                      modelSymbol: "iphone.gen2")
+        let mouse = PeripheralBattery(id: "ble-2", name: "MX Master", kind: .mouse, level: 40)
+        XCTAssertEqual(phone.symbol, "iphone.gen2")
+        XCTAssertEqual(PeripheralBattery(id: "x", name: "手機", kind: .phone, level: 1).symbol, "iphone")
+        XCTAssertEqual(PeripheralParse.visible([phone, mouse], showPhones: true).map(\.id), ["ble-1", "ble-2"])
+        XCTAssertEqual(PeripheralParse.visible([phone, mouse], showPhones: false).map(\.id), ["ble-2"])
+        // 只有一個電池、沒有左右耳時，列表照常只顯示一個電量（不會因為有機型就變成三欄）
+        XCTAssertNil(phone.detailText)
     }
 
     func testBluetoothLEBattery() {

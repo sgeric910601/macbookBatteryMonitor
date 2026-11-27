@@ -120,8 +120,9 @@ Pick "battery plus system monitors" on the first launch, or turn on the master s
 ### Peripherals
 
 The "周邊設備" (Peripherals) tab at the bottom of the panel lists the battery levels of connected Bluetooth keyboards, mice, trackpads and headphones:
-- AirPods and similar headphones show "左" (left), "右" (right) and "盒" (case) side by side on one line;
-- non-Apple Bluetooth LE mice and keyboards from Logitech, Razer and others show up too (Bluetooth permission required).
+- AirPods and similar headphones show "左" (left), "右" (right) and "盒" (case) side by side on one line, and Apple headphones show their model under the name (for example AirPods Pro (2nd generation));
+- non-Apple Bluetooth LE mice and keyboards from Logitech, Razer and others show up too (Bluetooth permission required);
+- an iPhone signed in to the same Apple ID as this Mac, with Bluetooth on, usually shows up as well, with its model under the name (for example iPhone 13 Pro; models that are too new or not listed just say iPhone) and an icon matching its shape (Home button, notch or Dynamic Island). Its level comes over the Continuity Bluetooth link the system keeps with the phone (the same link that shows the phone's battery for Personal Hotspot in the Wi-Fi menu); without that link the phone does not show up, and a USB cable or Finder's Wi-Fi sync does not bring it in. To hide it, turn off "顯示 iPhone" (show iPhone) in Settings → Peripherals.
 
 The bell to the right of each device sets its low-battery notification: off, or below 10%, 15%, 20%, 30% or 50% (20% by default). Settings → Peripherals sets them for all connected devices at once. Levels update every 60 seconds; the arrow at the bottom right refreshes them right away.
 

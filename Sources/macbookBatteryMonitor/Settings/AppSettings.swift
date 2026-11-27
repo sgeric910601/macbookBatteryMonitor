@@ -114,7 +114,7 @@ final class AppSettings {
             Keys.monitorNetwork: .bool, Keys.mergeMemoryDisk: .bool, Keys.monitorPlainLabels: .bool, Keys.networkSpeedTest: .bool, Keys.systemMonitors: .bool,
             Keys.alertCPU: .bool, Keys.alertMemory: .bool, Keys.alertDisk: .bool, Keys.menuBarCombined: .bool,
             Keys.powerSaving: .bool, Keys.powerSavingOnBatteryOnly: .bool, Keys.bluetoothOffDuringSleep: .bool, Keys.keepAwakeApps: .strings, Keys.quitGuardQuit: .bool, Keys.quitGuardClose: .bool, Keys.quitGuardDuration: .double, Keys.lastWindowQuitExcluded: .strings, Keys.dockClickMode: .string, Keys.keyboardCleaningSeconds: .int, Keys.mouseBackButton: .string, Keys.mouseForwardButton: .string, Keys.updateInterval: .int,
-            Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings,
+            Keys.hiddenFlowItems: .strings, Keys.hiddenDetailFields: .strings, Keys.showPhones: .bool,
             Keys.appIconColor: .string, Keys.autoCheckUpdates: .bool, Keys.updateNotification: .bool,
             Keys.chargingAppearance: .string, Keys.desktopPet: .bool, Keys.desktopPetOnWallpaper: .bool,
             Keys.desktopPetScale: .double, Keys.desktopPetLiveEyes: .bool, Keys.desktopPetFollowCursor: .bool,
@@ -504,6 +504,10 @@ final class AppSettings {
         didSet { defaults.set(peripheralThresholds, forKey: Keys.peripheralThresholds) }
     }
     static let defaultPeripheralThreshold = 20
+    /// 周邊設備清單要不要列出透過接續互通連著的 iPhone（預設列出）
+    var showPhones: Bool {
+        didSet { defaults.set(showPhones, forKey: Keys.showPhones) }
+    }
     static let peripheralThresholdChoices = [0, 10, 15, 20, 30, 50]
 
     func isVisible(_ item: FlowItem) -> Bool { !hiddenFlowItems.contains(item.rawValue) }
@@ -595,6 +599,7 @@ final class AppSettings {
         static let hiddenFlowItems = "hiddenFlowItems"
         static let hiddenDetailFields = "hiddenDetailFields"
         static let peripheralThresholds = "peripheralThresholds"
+        static let showPhones = "showPhones"
         static let appIconColor = "appIconColor"
         static let autoCheckUpdates = "autoCheckUpdates"
         static let updateNotification = "updateNotification"
@@ -753,6 +758,7 @@ final class AppSettings {
         }
         hiddenDetailFields = Set(defaults.stringArray(forKey: Keys.hiddenDetailFields) ?? [])
         peripheralThresholds = defaults.dictionary(forKey: Keys.peripheralThresholds) as? [String: Int] ?? [:]
+        showPhones = defaults.object(forKey: Keys.showPhones) as? Bool ?? true
         appIconColor = AppIconColor(rawValue: defaults.string(forKey: Keys.appIconColor) ?? "") ?? .mint
         autoCheckUpdates = defaults.bool(forKey: Keys.autoCheckUpdates)
         updateNotification = defaults.bool(forKey: Keys.updateNotification)

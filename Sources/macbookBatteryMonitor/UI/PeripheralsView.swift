@@ -15,7 +15,7 @@ struct PeripheralsView: View {
                             .foregroundStyle(.secondary)
                         Text(store.updated == nil ? "讀取中…" : "沒有偵測到連線中的周邊設備")
                             .font(.callout)
-                        Text("支援會回報電量的藍牙鍵盤、滑鼠、觸控板與耳機")
+                        Text("支援會回報電量的藍牙鍵盤、滑鼠、觸控板、耳機，以及同一個 Apple ID 的 iPhone")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if BLEBatteryReader.denied { BluetoothDeniedNote() }
@@ -74,7 +74,12 @@ struct PeripheralsView: View {
                 .font(.system(size: 17))
                 .frame(width: 24)
                 .foregroundStyle(.secondary)
-            Text(device.name).lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(device.name).lineLimit(1)
+                if let model = device.modelName {
+                    Text(model).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
             Spacer(minLength: 6)
             if device.detailText != nil {
                 // 耳機：左耳、右耳、充電盒各一欄，不再另外只顯示一個數字
@@ -162,7 +167,9 @@ struct PeripheralAlertsCard: View {
                         }
                     }
                 }
-                Text("支援會回報電量的藍牙鍵盤、滑鼠、觸控板與耳機；面板的「周邊設備」分頁看得到電量。")
+                Toggle("顯示 iPhone", isOn: Binding(get: { settings.showPhones },
+                                                    set: { settings.showPhones = $0; store.mergeBluetoothLE() }))
+                Text("支援會回報電量的藍牙鍵盤、滑鼠、觸控板與耳機；和這台 Mac 登入同一個 Apple ID、藍牙開著的 iPhone 通常也會列出（顯示機型）。面板的「周邊設備」分頁看得到電量。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

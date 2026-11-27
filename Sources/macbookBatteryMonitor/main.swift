@@ -24,15 +24,17 @@ if CommandLine.arguments.contains("--dump-peripherals") {
     let audio = PeripheralReader.bluetoothAudioConnected()
     // 藍牙低功耗設備（羅技、Razer 等）：要從 .app 啟動才會用這個 App 的藍牙權限；最多等 6 秒讀到電量
     if !BLEBatteryReader.denied {
+        // 等型號讀完再列出，診斷輸出才看得到機型
+        BLEBatteryReader.shared.setHoldUntilModel(true)
         BLEBatteryReader.shared.start()
-        let deadline = Date().addingTimeInterval(6)
+        let deadline = Date().addingTimeInterval(11)
         while Date() < deadline, BLEBatteryReader.shared.currentReadings().isEmpty { Thread.sleep(forTimeInterval: 0.3) }
     }
     print("藍牙權限：\(BLEBatteryReader.authorized ? "已允許" : BLEBatteryReader.denied ? "已拒絕" : "尚未決定")・藍牙低功耗電量 \(BLEBatteryReader.shared.currentReadings().count) 個")
     let devices = PeripheralReader.read(includeAllBluetooth: true)
     print("HID 電量服務 \(services.count) 個・藍牙音訊裝置連線中：\(audio)・耗時 \(Int(Date().timeIntervalSince(start) * 1000)) ms")
     for device in devices {
-        print("\(device.name)（\(device.kind.rawValue)）\(device.lowest.map { "\($0)%" } ?? "—") \(device.detailText ?? "")")
+        print("\(device.name)（\(device.kind.rawValue)）\(device.lowest.map { "\($0)%" } ?? "—") \([device.modelName, device.detailText].compactMap { $0 }.joined(separator: " "))")
     }
     if devices.isEmpty { print("沒有連線中、會回報電量的周邊設備") }
     exit(0)

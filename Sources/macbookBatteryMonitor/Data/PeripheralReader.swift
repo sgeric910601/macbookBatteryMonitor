@@ -25,9 +25,13 @@ enum PeripheralReader {
         guard reader.started else { return [] }
         let usages = bluetoothLEUsages()
         return reader.currentReadings().map { reading in
-            PeripheralBattery(id: reading.id, name: reading.name,
-                              kind: PeripheralParse.kind(name: reading.name, usages: usages[reading.name] ?? []),
-                              level: reading.level)
+            if let model = reading.model, let phone = PeripheralParse.iPhone(model: model) {
+                return PeripheralBattery(id: reading.id, name: reading.name, kind: .phone, level: reading.level,
+                                         modelName: phone.name, modelSymbol: phone.symbol)
+            }
+            return PeripheralBattery(id: reading.id, name: reading.name,
+                                     kind: PeripheralParse.kind(name: reading.name, usages: usages[reading.name] ?? []),
+                                     level: reading.level)
         }
     }
 
@@ -111,6 +115,8 @@ final class PeripheralStore {
     /// 藍牙低功耗設備讀到新電量時，只重新合併這一部分（不再跑 system_profiler）
     @ObservationIgnored private var base: [PeripheralBattery] = []
     @ObservationIgnored private var listening = false
+    /// 重新整理期間收到的藍牙低功耗更新，讀完後補套用
+    @ObservationIgnored private var mergeAfterLoading = false
 
     /// 已經允許藍牙權限時，背景也讀藍牙低功耗設備（第一次啟動時才會詢問權限，見 AppDelegate）
     func startBluetoothLE() {
@@ -124,16 +130,19 @@ final class PeripheralStore {
         reader.start()
     }
 
-    private func mergeBluetoothLE() {
-        guard !loading else { return }
+    /// 設定改變時用現有資料重新套用（不重跑 system_profiler）
+    func mergeBluetoothLE() {
+        guard !loading else { mergeAfterLoading = true; return }
+        BLEBatteryReader.shared.setHoldUntilModel(!AppSettings.shared.showPhones)
         let ble = PeripheralReader.bluetoothLE()
         apply(PeripheralParse.merge(base, bluetoothLE: ble))
     }
 
     private func apply(_ found: [PeripheralBattery]) {
+        let settings = AppSettings.shared
+        let found = PeripheralParse.visible(found, showPhones: settings.showPhones)
         devices = found
         updated = Date()
-        let settings = AppSettings.shared
         let due = alerts.evaluate(found) { settings.peripheralThreshold(for: $0) }
         for device in due {
             Notifier.shared.notifyPeripheralLow(device, threshold: settings.peripheralThreshold(for: device.id))
@@ -143,6 +152,7 @@ final class PeripheralStore {
     func refresh(includeAllBluetooth: Bool = false) {
         guard !loading else { return }
         loading = true
+        BLEBatteryReader.shared.setHoldUntilModel(!AppSettings.shared.showPhones)
         Task {
             let (found, base) = await Task.detached(priority: .utility) { () -> ([PeripheralBattery], [PeripheralBattery]) in
                 let base = PeripheralReader.read(includeAllBluetooth: includeAllBluetooth, includeBluetoothLE: false)
@@ -151,6 +161,10 @@ final class PeripheralStore {
             self.base = base
             loading = false
             apply(found)
+            if mergeAfterLoading {
+                mergeAfterLoading = false
+                mergeBluetoothLE()
+            }
         }
     }
 

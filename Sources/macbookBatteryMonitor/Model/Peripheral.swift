@@ -1,8 +1,10 @@
 import Foundation
 
-/// 周邊設備的電量（藍牙鍵盤、滑鼠、觸控板、耳機等）
+/// 周邊設備的電量（藍牙鍵盤、滑鼠、觸控板、耳機，以及透過接續互通連著的 iPhone）
 struct PeripheralBattery: Identifiable, Equatable {
-    enum Kind: String { case keyboard, mouse, trackpad, headphones, gameController, other }
+    enum Kind: String {
+        case keyboard, mouse, trackpad, headphones, gameController, phone, other
+    }
 
     /// 藍牙位址（小寫、冒號分隔）；沒有位址時用序號或名稱
     var id: String
@@ -16,6 +18,10 @@ struct PeripheralBattery: Identifiable, Equatable {
     var caseLevel: Int?
     /// Apple 耳機的藍牙 Product ID（system_profiler 的 device_productID），用來顯示對應款式的圖示
     var appleProductID: Int?
+    /// iPhone 等 Apple 裝置的機型名稱（例如 iPhone 13 Pro），由藍牙裝置資訊的型號代號換算
+    var modelName: String?
+    /// 依機型外型挑的圖示（Home 鍵、瀏海、動態島）；nil 時用該種類的通用圖示
+    var modelSymbol: String?
 
     /// 通知與顯示用的代表電量：耳機取左右耳較低者（不含充電盒）
     var lowest: Int? { [left, right].compactMap { $0 }.min() ?? level }
@@ -26,6 +32,7 @@ struct PeripheralBattery: Identifiable, Equatable {
         case .mouse: return "computermouse"
         case .trackpad: return "rectangle.and.hand.point.up.left"
         case .gameController: return "gamecontroller"
+        case .phone: return modelSymbol ?? "iphone"
         case .headphones:
             if let id = appleProductID, let symbol = Self.headphoneSymbol(productID: id) { return symbol }
             if name.localizedCaseInsensitiveContains("AirPods Max") { return "airpodsmax" }
@@ -46,6 +53,20 @@ struct PeripheralBattery: Identifiable, Equatable {
             return "airpods.gen3"
         case 0x200E, 0x2014, 0x2024: return "airpodspro"   // AirPods Pro、Pro 2（Lightning、USB-C）
         case 0x200A, 0x201F: return "airpodsmax"           // AirPods Max（Lightning、USB-C）
+        default: return nil
+        }
+    }
+
+    /// AirPods 的 Product ID → 型號名稱（顯示在藍牙名稱下方）；不認得的回 nil
+    static func headphoneName(productID: Int) -> String? {
+        switch productID {
+        case 0x2002: return "AirPods（第 1 代）"
+        case 0x200F: return "AirPods（第 2 代）"
+        case 0x2013: return "AirPods（第 3 代）"
+        case 0x2019, 0x201B: return "AirPods 4"
+        case 0x200E: return "AirPods Pro"
+        case 0x2014, 0x2024: return "AirPods Pro（第 2 代）"
+        case 0x200A, 0x201F: return "AirPods Max"
         default: return nil
         }
     }
@@ -98,7 +119,8 @@ enum PeripheralParse {
                         left: percent(info["device_batteryLevelLeft"]),
                         right: percent(info["device_batteryLevelRight"]),
                         caseLevel: percent(info["device_batteryLevelCase"]),
-                        appleProductID: appleProductID(info))
+                        appleProductID: appleProductID(info),
+                        modelName: appleProductID(info).flatMap(PeripheralBattery.headphoneName))
                     if device.lowest != nil || device.caseLevel != nil { result.append(device) }
                 }
             }
@@ -135,6 +157,8 @@ enum PeripheralParse {
             primary.right = primary.right ?? other.right
             primary.caseLevel = primary.caseLevel ?? other.caseLevel
             primary.appleProductID = primary.appleProductID ?? other.appleProductID
+            primary.modelName = primary.modelName ?? other.modelName
+            primary.modelSymbol = primary.modelSymbol ?? other.modelSymbol
             if primary.kind == .other { primary.kind = other.kind }
             merged[index] = primary
         }
@@ -161,6 +185,13 @@ enum PeripheralParse {
         return Int(byte)
     }
 
+    /// 藍牙字串特徵值（例如型號 0x2A24）：UTF-8，去掉結尾的 NUL 與空白；空字串或超過 64 字元（不是型號）回 nil
+    static func bluetoothLEText(_ value: Data?) -> String? {
+        guard let value, let text = String(data: value, encoding: .utf8) else { return nil }
+        let trimmed = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
+        return trimmed.isEmpty || trimmed.count > 64 ? nil : trimmed
+    }
+
     /// 藍牙低功耗 HID 設備的種類：名稱看得出來就用名稱，否則看 HID 用途
     /// （Generic Desktop 0x01：滑鼠 0x02、搖桿 0x04、遊戲手把 0x05、鍵盤 0x06；Digitizer 0x0D：觸控板）
     static func kind(name: String, usages: [(page: Int, usage: Int)]) -> PeripheralBattery.Kind {
@@ -172,6 +203,44 @@ enum PeripheralParse {
         if set.contains("13:5") || set.contains("13:4") { return .trackpad }
         if set.contains("1:5") || set.contains("1:4") { return .gameController }
         return .other
+    }
+
+    /// 藍牙裝置資訊的型號代號（0x2A24，例如 "iPhone14,2"）→ iPhone 機型名稱與圖示；不是 iPhone 時回 nil。
+    /// 不認得的代號（多半是新機）顯示通用名稱與圖示
+    static func iPhone(model: String) -> (name: String, symbol: String?)? {
+        // 只收 Apple 機型代號的格式（字首＋數字,數字），其他廠商的型號（例如 "iPhone Case"）不算
+        guard model.range(of: #"^iPhone[0-9]+,[0-9]+$"#, options: .regularExpression) != nil else { return nil }
+        return (iPhoneNames[model] ?? "iPhone", iPhoneSymbol(model))
+    }
+
+    /// iPhone XS 以後（iOS 18 支援的機型起）
+    static let iPhoneNames: [String: String] = [
+        "iPhone11,2": "iPhone XS", "iPhone11,4": "iPhone XS Max", "iPhone11,6": "iPhone XS Max", "iPhone11,8": "iPhone XR",
+        "iPhone12,1": "iPhone 11", "iPhone12,3": "iPhone 11 Pro", "iPhone12,5": "iPhone 11 Pro Max",
+        "iPhone12,8": "iPhone SE（第 2 代）",
+        "iPhone13,1": "iPhone 12 mini", "iPhone13,2": "iPhone 12", "iPhone13,3": "iPhone 12 Pro", "iPhone13,4": "iPhone 12 Pro Max",
+        "iPhone14,4": "iPhone 13 mini", "iPhone14,5": "iPhone 13", "iPhone14,2": "iPhone 13 Pro", "iPhone14,3": "iPhone 13 Pro Max",
+        "iPhone14,6": "iPhone SE（第 3 代）", "iPhone14,7": "iPhone 14", "iPhone14,8": "iPhone 14 Plus",
+        "iPhone15,2": "iPhone 14 Pro", "iPhone15,3": "iPhone 14 Pro Max", "iPhone15,4": "iPhone 15", "iPhone15,5": "iPhone 15 Plus",
+        "iPhone16,1": "iPhone 15 Pro", "iPhone16,2": "iPhone 15 Pro Max",
+        "iPhone17,3": "iPhone 16", "iPhone17,4": "iPhone 16 Plus", "iPhone17,1": "iPhone 16 Pro", "iPhone17,2": "iPhone 16 Pro Max",
+        "iPhone17,5": "iPhone 16e",
+        "iPhone18,3": "iPhone 17", "iPhone18,4": "iPhone Air", "iPhone18,1": "iPhone 17 Pro", "iPhone18,2": "iPhone 17 Pro Max",
+    ]
+
+    /// iPhone 外型對應的系統圖示：Home 鍵 gen1、瀏海 gen2、動態島 gen3；不認得的（多半是新機）回 nil 用通用圖示
+    static func iPhoneSymbol(_ model: String) -> String? {
+        guard iPhoneNames[model] != nil else { return nil }
+        if ["iPhone12,8", "iPhone14,6"].contains(model) { return "iphone.gen1" }
+        let notch: Set = ["iPhone11,2", "iPhone11,4", "iPhone11,6", "iPhone11,8", "iPhone12,1", "iPhone12,3", "iPhone12,5",
+                          "iPhone13,1", "iPhone13,2", "iPhone13,3", "iPhone13,4", "iPhone14,2", "iPhone14,3", "iPhone14,4",
+                          "iPhone14,5", "iPhone14,7", "iPhone14,8", "iPhone17,5"]
+        return notch.contains(model) ? "iphone.gen2" : "iphone.gen3"
+    }
+
+    /// 設定關掉「顯示 iPhone」時，清單與低電量通知都不含手機
+    static func visible(_ devices: [PeripheralBattery], showPhones: Bool) -> [PeripheralBattery] {
+        showPhones ? devices : devices.filter { $0.kind != .phone }
     }
 
     /// 加上藍牙低功耗設備：同名的設備已經由 IORegistry 或 system_profiler 列出時（例如 Apple 的設備），以原本的為準

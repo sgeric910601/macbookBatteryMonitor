@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 struct WindowSwitcherSettingsView: View {
     let settings: AppSettings
     let ui: PanelState
+    /// 新版設定把開關放在功能卡片上，這裡只顯示詳細設定
+    var showsEnableCard = true
 
     /// 正在錄製第幾組；等於 profiles.count 代表錄製新增的一組
     @State private var recordingIndex: Int?
@@ -15,7 +17,7 @@ struct WindowSwitcherSettingsView: View {
     @State private var monitor: Any?
 
     var body: some View {
-        enableCard
+        if showsEnableCard { enableCard }
         if settings.windowSwitcher {
             shortcutCard
             profileCard
@@ -54,21 +56,10 @@ struct WindowSwitcherSettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Button("打開輔助使用設定") { ScrollDirection.openAccessibilitySettings() }
         }
-        if WindowThumbnails.hasPermission {
-            Label("視窗縮圖：已允許「螢幕錄製」", systemImage: "photo").font(.caption).foregroundStyle(.secondary)
-        } else {
-            Text("允許「螢幕錄製」後才會顯示視窗縮圖；沒有允許時只顯示 App 圖示與標題。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("要求權限") { WindowThumbnails.requestPermission() }
-                Button("打開螢幕錄製設定") { Self.open("Privacy_ScreenCapture") }
-            }
-        }
+        SwitcherThumbnailPermission()
     }
 
-    private static func open(_ pane: String) {
+    static func open(_ pane: String) {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
         NSWorkspace.shared.open(url)
     }
@@ -191,11 +182,8 @@ struct WindowSwitcherSettingsView: View {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     CardTitle("設定哪一組", systemImage: "slider.horizontal.3")
-                    Picker("", selection: Binding(get: { current }, set: { selected = $0 })) {
-                        ForEach(Array(profiles.enumerated()), id: \.offset) { index, profile in
-                            Text(profile.shortcut.displayName).tag(index)
-                        }
-                    }
+                    SettingsPicker("", selection: Binding(get: { current }, set: { selected = $0 }),
+                                   options: profiles.enumerated().map { ($0.offset, $0.element.shortcut.displayName) }, hidesTitle: true)
                     .labelsHidden()
                     Text("下面「外觀」和「要列出的視窗」只套用在這一組快捷鍵。")
                         .font(.caption)
@@ -213,13 +201,10 @@ struct WindowSwitcherSettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
                 CardTitle("外觀", systemImage: "rectangle.grid.2x2")
-                Picker("樣式", selection: bindProfile(\.style)) {
-                    ForEach(SwitcherStyle.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                Picker("大小", selection: bindProfile(\.tileSize)) {
-                    ForEach(SwitcherLayout.TileSize.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
+                SettingsPicker("樣式", selection: bindProfile(\.style), options: SwitcherStyle.allCases.map { ($0, $0.title) },
+                               symbol: { $0 == .thumbnails ? "rectangle.grid.2x2" : $0 == .appIcons ? "square.grid.3x2" : "list.bullet.rectangle" })
+                SettingsPicker("大小", selection: bindProfile(\.tileSize),
+                               options: SwitcherLayout.TileSize.allCases.map { ($0, $0.title) }, segmented: true)
                 if profiles[current].style != .titles {
                     SettingsView.SwitchRow("自動調整大小", isOn: bindProfile(\.autoSize))
                 }
@@ -253,15 +238,9 @@ struct WindowSwitcherSettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
                 CardTitle("要列出的視窗", systemImage: "line.3.horizontal.decrease.circle")
-                Picker("桌面（Space）", selection: bindFilter(\.spaces)) {
-                    ForEach(SwitcherFilter.Spaces.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                Picker("螢幕", selection: bindFilter(\.screens)) {
-                    ForEach(SwitcherFilter.Screens.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                Picker("排序", selection: bindFilter(\.order)) {
-                    ForEach(SwitcherFilter.Order.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
+                SettingsPicker("桌面（Space）", selection: bindFilter(\.spaces), options: SwitcherFilter.Spaces.allCases.map { ($0, $0.title) })
+                SettingsPicker("螢幕", selection: bindFilter(\.screens), options: SwitcherFilter.Screens.allCases.map { ($0, $0.title) })
+                SettingsPicker("排序", selection: bindFilter(\.order), options: SwitcherFilter.Order.allCases.map { ($0, $0.title) })
                 SettingsView.SwitchRow("縮到 Dock 的視窗", isOn: bindFilter(\.showMinimized))
                 SettingsView.SwitchRow("已隱藏 App 的視窗", isOn: bindFilter(\.showHidden))
                 SettingsView.SwitchRow("全螢幕視窗", isOn: bindFilter(\.showFullscreen))
@@ -356,4 +335,22 @@ extension SwitcherFilter.Screens {
 
 extension SwitcherFilter.Order {
     var title: String { self == .recentlyUsed ? "最近使用" : "App 名稱" }
+}
+
+/// 視窗縮圖要的「螢幕錄製」權限：狀態與要求權限的按鈕
+struct SwitcherThumbnailPermission: View {
+    var body: some View {
+        if WindowThumbnails.hasPermission {
+            Label("視窗縮圖：已允許「螢幕錄製」", systemImage: "photo").font(.caption).foregroundStyle(.secondary)
+        } else {
+            Text("允許「螢幕錄製」後才會顯示視窗縮圖；沒有允許時只顯示 App 圖示與標題。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("要求權限") { WindowThumbnails.requestPermission() }
+                Button("打開螢幕錄製設定") { WindowSwitcherSettingsView.open("Privacy_ScreenCapture") }
+            }
+        }
+    }
 }

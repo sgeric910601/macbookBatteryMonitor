@@ -63,13 +63,13 @@ struct DisplayItemsView: View {
         HStack(spacing: 16) {
             ForEach(items) { item in
                 Toggle(item.title, isOn: Binding(get: { settings.isVisible(item) }, set: { settings.setVisible(item, $0) }))
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(SettingsCheckboxStyle())
             }
         }
     }
 
     private func checkbox(_ field: DetailField) -> some View {
         Toggle(field.title, isOn: Binding(get: { settings.isVisible(field) }, set: { settings.setVisible(field, $0) }))
-            .toggleStyle(.checkbox)
+            .toggleStyle(SettingsCheckboxStyle())
     }
 }

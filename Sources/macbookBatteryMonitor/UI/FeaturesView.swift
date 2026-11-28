@@ -1,23 +1,20 @@
 import SwiftUI
 
-/// 側邊欄「擴充功能 → 功能管理」：依分組列出擴充功能，用開關啟用或停用。
-/// 停用不是解除安裝：功能停止運作、從側邊欄拿掉，設定都保留，再啟用就回來
+/// 側邊欄「擴充功能 → 功能管理」：以大項為單位打開或關掉。
+/// 打開大項只讓它的頁面出現在側邊欄，不啟用任何功能（也不要求權限）；功能在該頁逐項啟用。
+/// 關掉大項時組內功能全部停用、頁面從側邊欄拿掉，設定都保留
 struct FeatureManagerView: View {
     let settings: AppSettings
-    /// 這台 Mac 現在有沒有支援的內建 XDR 螢幕；沒有時不能加入 XDR 增亮（已加入的仍可移除）
+    /// 這台 Mac 現在有沒有支援的內建 XDR 螢幕
     @State private var xdrSupported = true
-
-    private var groups: [String] {
-        ExtensionFeature.allCases.map(\.group).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
-    }
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
-                Text("只啟用會用到的功能。停用的功能完全不運作（不攔截按鍵或滑鼠、不監聽視窗），也從側邊欄拿掉；原本的設定都會保留，再啟用就回來。這裡的開關決定功能要不要出現，功能裡面的細項在它自己的設定頁調整。")
+                Text("先打開要用的大項，它的頁面才會出現在左側；再到那一頁逐項啟用需要的功能，用到權限的功能在啟用時才會詢問。關掉大項時，裡面的功能全部停用、不再運作（不攔截按鍵或滑鼠、不監聽視窗），原本的設定都會保留。")
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
-                Text("已啟用 \(settings.installedFeatures.count)／\(ExtensionFeature.allCases.count) 項")
+                Text("已打開 \(settings.enabledFeatureGroups.count)／\(ExtensionFeature.groupOrder.count) 個大項・已啟用 \(settings.installedFeatures.count)／\(ExtensionFeature.allCases.count) 個功能")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -27,21 +24,33 @@ struct FeatureManagerView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             xdrSupported = XDRBrightnessController.shared.checkSupport()
         }
-        ForEach(groups, id: \.self) { group in
-            Text(group)
-                .font(.headline)
-                .padding(.top, 8)
+        ForEach(ExtensionFeature.groupOrder, id: \.self) { group in
+            let features = ExtensionFeature.members(of: group)
+            let enabled = settings.isGroupEnabled(group)
             Card {
                 VStack(alignment: .leading, spacing: 0) {
-                    let features = ExtensionFeature.allCases.filter { $0.group == group }
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(group).font(.headline)
+                            Text(enabled ? "已啟用 \(features.filter(settings.isInstalled).count)／\(features.count) 個功能，到「\(group == ExtensionFeature.startupItems.group ? "權限與登入項目" : group)」頁逐項啟用" : "打開後到它的頁面逐項啟用")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("打開\(group)", isOn: Binding(get: { enabled }, set: { settings.setGroupEnabled(group, $0) }))
+                            .toggleStyle(SettingsSwitchStyle())
+                            .labelsHidden()
+                            .accessibilityLabel("打開\(group)")
+                    }
+                    .padding(.bottom, 8)
                     ForEach(features) { feature in
+                        Divider().padding(.vertical, 8)
                         row(feature)
-                        if feature != features.last { Divider().padding(.vertical, 8) }
                     }
                 }
             }
         }
-        Text("大部分擴充功能需要「輔助使用」權限，用到時才會詢問（功能自己的開關原本就開著時，會在啟用時詢問）。停用「中文輸入法」時，Caps Lock 恢復系統預設的延遲。電池、充電、系統監控與充電夥伴是基本功能，一直都在。")
+        Text("電池、充電、系統監控與充電夥伴是基本功能，一直都在。停用「中文輸入法」時，Caps Lock 恢復系統預設的延遲。")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -78,11 +87,9 @@ struct FeatureManagerView: View {
                 }
             }
             Spacer()
-            Toggle("啟用", isOn: Binding(get: { settings.isInstalled(feature) }, set: { settings.setInstalled(feature, $0) }))
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .disabled(unsupported && !settings.isInstalled(feature))
-                .accessibilityLabel("啟用\(feature.title)")
+            Text(settings.isInstalled(feature) ? "已啟用" : "未啟用")
+                .font(.caption)
+                .foregroundStyle(settings.isInstalled(feature) ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
         }
     }
 }

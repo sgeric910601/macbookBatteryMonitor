@@ -49,7 +49,7 @@
 | **macOS 14 以上** · Apple 晶片／Intel | [下載通用版 DMG](https://github.com/sgeric910601/macbookBatteryMonitor/releases/latest/download/macbookBatteryMonitor.dmg) |
 | **macOS 12／13** · Apple 晶片／Intel | [下載舊系統版 DMG](https://github.com/sgeric910601/macbookBatteryMonitor/releases/download/v1.7.7/macbookBatteryMonitor-macOS12.dmg)（停在 v1.7.7，維持可用但不再加入新功能） |
 
-已安裝 v1.7.2 以後的版本？到 **設定 → 更新 → 一鍵更新** 即可，設定與歷史資料會保留；同一頁的「安裝 Beta 版…」可以提前試用測試版，一鍵更新本身不會通知 Beta。v2.0.0 起 Release 不再附 ZIP：v1.7.1 會先一鍵更新到 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；v1.5.0～v1.6.2 請下載上面的 DMG 安裝一次。
+已安裝 v1.7.2 以後的版本？到 **設定 → 一般 →「更新」→ 一鍵更新** 即可，設定與歷史資料會保留；同一張卡片的「安裝 Beta 版…」可以提前試用測試版，一鍵更新本身不會通知 Beta。v2.0.0 起 Release 不再附 ZIP：v1.7.1 會先一鍵更新到 v1.7.7（舊系統版本是 v1.7.2），再按一次就到最新版；v1.5.0～v1.6.2 請下載上面的 DMG 安裝一次。
 
 <a id="安裝"></a>
 
@@ -118,7 +118,7 @@ xattr -dr com.apple.quarantine /Applications/macbookBatteryMonitor.app
 
 ## 個人化與可選工具
 
-**選單列圖示自訂**：在「設定 → 顯示項目」選白色／黑色／自動百分比，搭配原生綠、預設色票或自訂色盤。底色不透明度與充電流光可分別調整；填色維持實際電量比例。
+**選單列圖示自訂**：在「設定 → 選單列」選白色／黑色／自動百分比，搭配原生綠、預設色票或自訂色盤。底色不透明度與充電流光可分別調整；填色維持實際電量比例。
 
 <details>
 <summary>展開其他擴充功能</summary>

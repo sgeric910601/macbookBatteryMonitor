@@ -149,14 +149,13 @@ struct PeripheralAlertsCard: View {
                             Image(systemName: device.symbol)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 22)
+                                .modifier(V2ItemIcon())
                             Text(device.name).lineLimit(1)
                             Spacer(minLength: 8)
-                            Picker(device.name, selection: Binding(get: { settings.peripheralThreshold(for: device.id) },
-                                                                   set: { settings.setPeripheralThreshold($0, for: device.id) })) {
-                                ForEach(AppSettings.peripheralThresholdChoices, id: \.self) { value in
-                                    Text(value == 0 ? "不通知" : "低於 \(value)% 時通知").tag(value)
-                                }
-                            }
+                            SettingsPicker(device.name, selection: Binding(get: { settings.peripheralThreshold(for: device.id) },
+                                                                           set: { settings.setPeripheralThreshold($0, for: device.id) }),
+                                           options: AppSettings.peripheralThresholdChoices.map { ($0, $0 == 0 ? "不通知" : "低於 \($0)% 時通知") },
+                                           hidesTitle: true)
                             .labelsHidden()
                             .frame(width: 170)
                         }
